@@ -1,0 +1,17 @@
+{
+  "schema_version": "ase/v1alpha1",
+  "run_id": "30000000-0000-4000-8000-000000000099",
+  "attempt_id": "30000000-0000-4000-8000-000000000098",
+  "status": "abstained",
+  "synthetic": true,
+  "findings": [
+    {
+      "label": "UNKNOWN",
+      "role": "root_cause",
+      "confidence": 0.31,
+      "rule_id": "insufficient-observable-evidence-v1",
+      "evidence_sequence_nos": [3, 4],
+      "rationale": "The synthetic run failed, but observable events do not support a deterministic planning, tool, or Skill attribution."
+    }
+  ]
+}

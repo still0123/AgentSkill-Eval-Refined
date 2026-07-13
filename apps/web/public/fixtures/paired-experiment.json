@@ -1,0 +1,273 @@
+{
+  "report_schema_version": "ase/report/v1alpha1",
+  "synthetic": true,
+  "simulated": true,
+  "experiment": {
+    "schema_version": "ase/v1alpha1",
+    "id": "10000000-0000-4000-8000-000000000001",
+    "name": "Synthetic Python Review Paired Evaluation",
+    "dataset_name": "python-review-demo@2026.07-synthetic",
+    "dataset_version_id": "10000000-0000-4000-8000-000000000002",
+    "protocol_snapshot": {
+      "evidence_mode": "simulated_fixture",
+      "demo_only": true,
+      "claim_limit": "UI and controller demonstration only; no performance claim"
+    }
+  },
+  "variants": [
+    {
+      "id": "20000000-0000-4000-8000-000000000001",
+      "name": "Baseline · no Skill",
+      "role": "control",
+      "runner_snapshot": { "name": "synthetic-runner", "version": "0.1" },
+      "agent_snapshot": { "engine": "fixture", "model": "synthetic-agent" },
+      "skill_snapshot": null
+    },
+    {
+      "id": "20000000-0000-4000-8000-000000000002",
+      "name": "Treatment · with Skill",
+      "role": "treatment",
+      "runner_snapshot": { "name": "synthetic-runner", "version": "0.1" },
+      "agent_snapshot": { "engine": "fixture", "model": "synthetic-agent" },
+      "skill_snapshot": { "name": "synthetic-review-skill", "version": "demo" }
+    }
+  ],
+  "statistics": {
+    "experiment_id": "10000000-0000-4000-8000-000000000001",
+    "control_variant_id": "20000000-0000-4000-8000-000000000001",
+    "treatment_variant_id": "20000000-0000-4000-8000-000000000002",
+    "run_count": 12,
+    "case_count": 6,
+    "independence_group_count": 4,
+    "complete_block_ratio": 1,
+    "valid_block_ratio": 0.8333,
+    "inference_ready": true,
+    "inference_note": "synthetic descriptive fixture; confirmatory claims prohibited",
+    "bootstrap_resamples": 10000,
+    "bootstrap_seed": 2026,
+    "majority_threshold": 0.5,
+    "min_independent_groups": 2,
+    "weighting": "equal_independence_group",
+    "primary_assignment_based": {
+      "control_pass_rate": 0.4167,
+      "treatment_pass_rate": 0.75,
+      "absolute_gain": 0.3333,
+      "relative_gain": 0.8,
+      "included_cases": 6,
+      "included_groups": 4
+    },
+    "sensitivity_capability": {
+      "control_pass_rate": 0.5,
+      "treatment_pass_rate": 0.8,
+      "absolute_gain": 0.3,
+      "relative_gain": 0.6,
+      "included_cases": 5,
+      "included_groups": 4
+    },
+    "wtl": { "win": 2, "tie_positive": 2, "tie_negative": 1, "loss": 1 },
+    "cases": [
+      {
+        "case_id": "py-null-guard",
+        "category": "correctness",
+        "independence_group": "repo-profile",
+        "control_pass_rate": 0,
+        "treatment_pass_rate": 1,
+        "control_score": 0.2,
+        "treatment_score": 1,
+        "classification": "win",
+        "token_delta": 384,
+        "latency_delta": 820
+      },
+      {
+        "case_id": "py-off-by-one",
+        "category": "correctness",
+        "independence_group": "repo-paging",
+        "control_pass_rate": 0,
+        "treatment_pass_rate": 1,
+        "control_score": 0,
+        "treatment_score": 0.9,
+        "classification": "win",
+        "token_delta": 271,
+        "latency_delta": 510
+      },
+      {
+        "case_id": "py-retry-budget",
+        "category": "robustness",
+        "independence_group": "repo-runtime",
+        "control_pass_rate": 1,
+        "treatment_pass_rate": 1,
+        "classification": "tie-positive",
+        "token_delta": 142,
+        "latency_delta": 190
+      },
+      {
+        "case_id": "py-resource-leak",
+        "category": "resource-safety",
+        "independence_group": "repo-runtime",
+        "control_pass_rate": 1,
+        "treatment_pass_rate": 1,
+        "classification": "tie-positive",
+        "token_delta": 208,
+        "latency_delta": 330
+      },
+      {
+        "case_id": "py-env-bool",
+        "category": "configuration",
+        "independence_group": "repo-config",
+        "control_pass_rate": 0,
+        "treatment_pass_rate": 0,
+        "classification": "tie-negative",
+        "token_delta": 97,
+        "latency_delta": 120
+      },
+      {
+        "case_id": "py-cross-cache",
+        "category": "architecture",
+        "independence_group": "repo-profile",
+        "control_pass_rate": 1,
+        "treatment_pass_rate": 0,
+        "control_status": "pass",
+        "treatment_status": "invalid",
+        "classification": "loss",
+        "invalid_reason": "runner_timeout",
+        "token_delta": 491,
+        "latency_delta": 30000
+      }
+    ],
+    "variants": [
+      {
+        "variant_id": "20000000-0000-4000-8000-000000000001",
+        "assigned_runs": 6,
+        "pass_runs": 3,
+        "fail_runs": 3,
+        "invalid_runs": 0,
+        "total_cost_microusd": 6420,
+        "cost_per_success_microusd": 2140
+      },
+      {
+        "variant_id": "20000000-0000-4000-8000-000000000002",
+        "assigned_runs": 6,
+        "pass_runs": 4,
+        "fail_runs": 1,
+        "invalid_runs": 1,
+        "total_cost_microusd": 8110,
+        "cost_per_success_microusd": 2027.5
+      }
+    ],
+    "tokens": {
+      "unit": "tokens",
+      "control_mean": 1840,
+      "treatment_mean": 2105,
+      "relative_overhead": 0.144,
+      "paired_median_delta": 239,
+      "observed_control_runs": 6,
+      "observed_treatment_runs": 6,
+      "observed_pairs": 6
+    },
+    "latency_ms": {
+      "unit": "milliseconds",
+      "control_mean": 6120,
+      "treatment_mean": 7020,
+      "relative_overhead": 0.147,
+      "paired_median_delta": 420,
+      "observed_control_runs": 6,
+      "observed_treatment_runs": 6,
+      "observed_pairs": 6
+    },
+    "cost_microusd": {
+      "unit": "micro-USD",
+      "control_mean": 1070,
+      "treatment_mean": 1352,
+      "relative_overhead": 0.264,
+      "paired_median_delta": 260,
+      "observed_control_runs": 6,
+      "observed_treatment_runs": 6,
+      "observed_pairs": 6
+    }
+  },
+  "trace_intelligence": {
+    "traces": [
+      {
+        "schema_version": "ase/v1alpha1",
+        "run_id": "30000000-0000-4000-8000-000000000001",
+        "attempt_id": "30000000-0000-4000-8000-000000000002",
+        "capabilities": [
+          { "name": "runner_lifecycle", "availability": "observed", "source": "synthetic-runner" },
+          { "name": "tool_file_command", "availability": "observed", "source": "synthetic-runner" },
+          {
+            "name": "mcp_rag_memory",
+            "availability": "unavailable",
+            "source": "platform",
+            "reason": "fixture runner emitted no MCP/RAG/Memory telemetry"
+          }
+        ],
+        "events": [
+          {
+            "sequence_no": 1,
+            "occurred_at": "2026-07-13T12:00:00Z",
+            "kind": "platform.validation",
+            "source": "platform",
+            "status": "completed",
+            "summary": { "result": "accepted" }
+          },
+          {
+            "sequence_no": 2,
+            "occurred_at": "2026-07-13T12:00:01Z",
+            "kind": "runner.started",
+            "source": "runner",
+            "status": "started",
+            "summary": { "sandbox": "synthetic" }
+          },
+          {
+            "sequence_no": 3,
+            "occurred_at": "2026-07-13T12:00:03Z",
+            "kind": "command.pytest",
+            "source": "agent",
+            "status": "failed",
+            "summary": { "command": "pytest -q", "exit_code": 1, "output": "1 failed, 7 passed" }
+          },
+          {
+            "sequence_no": 4,
+            "occurred_at": "2026-07-13T12:00:05Z",
+            "kind": "tool.file_edit",
+            "source": "agent",
+            "status": "completed",
+            "summary": { "path": "profile.py" }
+          },
+          {
+            "sequence_no": 5,
+            "occurred_at": "2026-07-13T12:00:08Z",
+            "kind": "test.pytest",
+            "source": "agent",
+            "status": "completed",
+            "summary": { "exit_code": 0, "output": "8 passed" }
+          },
+          {
+            "sequence_no": 6,
+            "occurred_at": "2026-07-13T12:00:09Z",
+            "kind": "platform.run_terminal",
+            "source": "platform",
+            "status": "completed",
+            "summary": { "outcome": "pass" }
+          }
+        ]
+      }
+    ],
+    "diagnoses": [],
+    "pair_diffs": [
+      {
+        "schema_version": "ase/v1alpha1",
+        "pair_block_id": "40000000-0000-4000-8000-000000000001",
+        "control_run_id": "30000000-0000-4000-8000-000000000003",
+        "treatment_run_id": "30000000-0000-4000-8000-000000000001",
+        "control_attempt_id": "30000000-0000-4000-8000-000000000004",
+        "treatment_attempt_id": "30000000-0000-4000-8000-000000000002",
+        "sequence_edit_distance": 3,
+        "event_count_deltas": [
+          { "kind": "test.pytest", "control_count": 0, "treatment_count": 1, "delta": 1 },
+          { "kind": "tool.file_edit", "control_count": 1, "treatment_count": 1, "delta": 0 }
+        ]
+      }
+    ]
+  }
+}
