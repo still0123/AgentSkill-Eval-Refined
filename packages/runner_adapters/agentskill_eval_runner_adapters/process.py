@@ -23,7 +23,6 @@ class ProcessSupervisor:
     def __init__(self) -> None:
         self._processes: dict[str, asyncio.subprocess.Process] = {}
         self._cancelled: set[str] = set()
-        self._lock = asyncio.Lock()
 
     async def run(
         self,
@@ -41,12 +40,10 @@ class ProcessSupervisor:
             stderr=asyncio.subprocess.PIPE,
             start_new_session=True,
         )
-        async with self._lock:
-            self._processes[execution_id] = process
+        self._processes[execution_id] = process
         try:
             stdout, stderr = await asyncio.wait_for(process.communicate(), timeout_seconds)
-            async with self._lock:
-                cancelled = execution_id in self._cancelled
+            cancelled = execution_id in self._cancelled
             return ProcessOutcome(
                 exit_code=process.returncode,
                 stdout=stdout.decode("utf-8", errors="replace"),
@@ -67,17 +64,14 @@ class ProcessSupervisor:
             await process.communicate()
             raise
         finally:
-            async with self._lock:
-                self._processes.pop(execution_id, None)
-                self._cancelled.discard(execution_id)
+            self._processes.pop(execution_id, None)
+            self._cancelled.discard(execution_id)
 
     async def cancel(self, execution_id: str) -> bool:
-        async with self._lock:
-            process = self._processes.get(execution_id)
+        process = self._processes.get(execution_id)
         if process is None or process.returncode is not None:
             return False
-        async with self._lock:
-            self._cancelled.add(execution_id)
+        self._cancelled.add(execution_id)
         await self._terminate_group(process)
         return True
 

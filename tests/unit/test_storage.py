@@ -187,6 +187,12 @@ def advance_to_persisting(store: LocalExperimentStore, run: Run) -> Run:
     return run
 
 
+def update_attempt(attempt: RunAttempt, **updates: Any) -> RunAttempt:
+    payload: Dict[str, Any] = attempt.model_dump(mode="python", round_trip=True)
+    payload.update(updates)
+    return RunAttempt.model_validate(payload)
+
+
 def test_manifest_envelope_detects_payload_tampering() -> None:
     variant = make_variant(uuid4(), role=VariantRole.BASELINE)
     document = json.loads(model_bytes(variant).decode("utf-8"))
@@ -194,6 +200,44 @@ def test_manifest_envelope_detects_payload_tampering() -> None:
 
     with pytest.raises(IntegrityError, match="digest mismatch"):
         parse_envelope(json.dumps(document).encode("utf-8"))
+
+
+def test_attempt_persistence_enforces_lifecycle_and_terminal_immutability(
+    tmp_path: Path,
+) -> None:
+    store = LocalExperimentStore(tmp_path)
+    experiment, _, _, _, run = prepare_experiment(store)
+    now = datetime.now(timezone.utc)
+    claimed = RunAttempt(
+        id=uuid4(),
+        run_id=run.id,
+        attempt_no=1,
+        lease_generation=1,
+        fencing_token=uuid4(),
+        status=AttemptStatus.CLAIMED,
+        claimed_at=now,
+    )
+    store.save_attempt(experiment.id, claimed)
+    preparing = update_attempt(claimed, status=AttemptStatus.PREPARING)
+    store.save_attempt(experiment.id, preparing)
+
+    with pytest.raises(ValueError, match="claimant cannot change"):
+        store.save_attempt(experiment.id, update_attempt(preparing, worker_id="other-worker"))
+
+    with pytest.raises(ValueError, match="PREPARING -> COMPLETED"):
+        store.save_attempt(
+            experiment.id,
+            update_attempt(preparing, status=AttemptStatus.COMPLETED, finished_at=now),
+        )
+
+    running = update_attempt(preparing, status=AttemptStatus.RUNNING)
+    store.save_attempt(experiment.id, running)
+    completed = update_attempt(running, status=AttemptStatus.COMPLETED, finished_at=now)
+    store.save_attempt(experiment.id, completed)
+    store.save_attempt(experiment.id, completed)
+
+    with pytest.raises(ValueError, match="terminal attempt cannot change"):
+        store.save_attempt(experiment.id, update_attempt(completed, sandbox_ref={"changed": True}))
 
 
 def test_immutable_manifest_is_idempotent_but_rejects_replacement(tmp_path: Path) -> None:

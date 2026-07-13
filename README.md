@@ -2,7 +2,7 @@
 
 AgentSkill-Eval 是一个面向 Agent Skill 的可复现评测与回归分析项目。平台以受控配对实验为核心，比较同一 Agent 在 without-Skill、with-Skill 或不同 Skill 版本下的任务质量、成本、时延与稳定性。
 
-当前仓库已完成 **P0 目标 1～4：Python 项目初始化、核心数据契约、本地可靠存储与 Runner 防腐层**。目前提供可安装的 monorepo、Typer CLI、冻结的 Pydantic 领域模型、稳定内容哈希、Run 状态机、JSON Schema 导出、原子 Manifest、内容寻址 Blob、崩溃恢复、可重建 SQLite 索引，以及支持取消的 Mock/`skill-up v0.5.0` Runner Adapter；实验编排与报告会在后续目标中实现。完整设计见 [开发设计文档](./AgentSkillEval_%E5%BC%80%E5%8F%91%E8%AE%BE%E8%AE%A1%E6%96%87%E6%A1%A3_v1.0.md)。
+当前仓库已完成 **P0 目标 1～5：Python 项目初始化、核心数据契约、本地可靠存储、Runner 防腐层与本地配对实验编排**。目前提供可安装的 monorepo、Typer CLI、冻结的 Pydantic 领域模型、稳定内容哈希、Run/Attempt 状态机、原子 Manifest、内容寻址 Blob、崩溃恢复、可重建 SQLite 索引、Mock/`skill-up v0.5.0` Adapter，以及确定性 PairBlock 计划和 baseline/treatment 执行闭环；统计与静态报告会在后续目标中实现。完整设计见 [开发设计文档](./AgentSkillEval_%E5%BC%80%E5%8F%91%E8%AE%BE%E8%AE%A1%E6%96%87%E6%A1%A3_v1.0.md)。
 
 ## 环境要求
 
@@ -86,6 +86,17 @@ tests/                    unit / integration / e2e
 - Golden parser 测试无需外部依赖；发现固定二进制时自动执行真实 Custom Engine 集成测试。
 
 详细协议见 [Runner 防腐层与兼容协议](./docs/runner-adapters.md)。
+
+## 本地配对实验
+
+- 计划器以 UUIDv5 和冻结 seed 确定性生成 PairBlock、Run 与 Variant 执行顺序。
+- Experiment 引用、Variant 指纹、运行时配置和预算在执行前做一致性检查。
+- Run 与 Attempt 分别持久化生命周期，任务失败和基础设施 invalid 使用不同终态。
+- Runner 原始产物复制前复验路径、大小和 SHA-256，并同步写入内容寻址对象存储。
+- 已完成 Run 可幂等重放，不会再次调用 Agent；崩溃后的未终态 Run 只报告、不静默重复计费。
+- 真实集成测试使用 `skill-up` Custom Engine 跑完整 baseline/treatment 两臂，无需模型凭据。
+
+详细协议见 [P0 本地配对实验引擎](./docs/local-experiment-engine.md)。
 
 ## 开发原则
 

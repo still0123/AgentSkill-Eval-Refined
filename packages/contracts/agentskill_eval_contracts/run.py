@@ -78,11 +78,48 @@ ALLOWED_RUN_TRANSITIONS: Dict[ExecutionStatus, FrozenSet[ExecutionStatus]] = {
     ExecutionStatus.CANCELLED: frozenset(),
 }
 
+ALLOWED_ATTEMPT_TRANSITIONS: Dict[AttemptStatus, FrozenSet[AttemptStatus]] = {
+    AttemptStatus.CLAIMED: frozenset(
+        {
+            AttemptStatus.PREPARING,
+            AttemptStatus.FAILED,
+            AttemptStatus.FENCED,
+            AttemptStatus.CANCELLED,
+        }
+    ),
+    AttemptStatus.PREPARING: frozenset(
+        {
+            AttemptStatus.RUNNING,
+            AttemptStatus.FAILED,
+            AttemptStatus.FENCED,
+            AttemptStatus.CANCELLED,
+        }
+    ),
+    AttemptStatus.RUNNING: frozenset(
+        {
+            AttemptStatus.COMPLETED,
+            AttemptStatus.FAILED,
+            AttemptStatus.FENCED,
+            AttemptStatus.CANCELLED,
+        }
+    ),
+    AttemptStatus.COMPLETED: frozenset(),
+    AttemptStatus.FAILED: frozenset(),
+    AttemptStatus.FENCED: frozenset(),
+    AttemptStatus.CANCELLED: frozenset(),
+}
+
 
 def validate_run_transition(current: ExecutionStatus, target: ExecutionStatus) -> None:
     """Raise when a requested logical run transition is not allowed."""
     if target not in ALLOWED_RUN_TRANSITIONS[current]:
         raise ValueError(f"invalid run transition: {current.value} -> {target.value}")
+
+
+def validate_attempt_transition(current: AttemptStatus, target: AttemptStatus) -> None:
+    """Raise when a requested physical-attempt transition is not allowed."""
+    if target not in ALLOWED_ATTEMPT_TRANSITIONS[current]:
+        raise ValueError(f"invalid attempt transition: {current.value} -> {target.value}")
 
 
 class Run(FrozenModel):

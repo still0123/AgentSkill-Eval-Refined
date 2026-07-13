@@ -19,6 +19,7 @@ from agentskill_eval_contracts import (
     PairBlock,
     Run,
     RunAttempt,
+    validate_attempt_transition,
     validate_run_transition,
 )
 from agentskill_eval_experiment.storage.atomic import (
@@ -174,6 +175,52 @@ class LocalExperimentStore:
         layout = ExperimentLayout(self.workspace, experiment_id)
         return self._load_model(layout.run(run_id), Run)
 
+    def save_attempt(self, experiment_id: UUID, attempt: RunAttempt) -> None:
+        """Persist a physical Attempt and enforce monotonic state transitions."""
+        layout = ExperimentLayout(self.workspace, experiment_id)
+        path = layout.attempt(attempt.run_id, attempt.attempt_no)
+        if path.exists():
+            current = self._load_model(path, RunAttempt)
+            if current.id != attempt.id or current.run_id != attempt.run_id:
+                raise ValueError("attempt identity cannot change")
+            if current.attempt_no != attempt.attempt_no:
+                raise ValueError("attempt number cannot change")
+            if current.lease_generation != attempt.lease_generation:
+                raise ValueError("attempt lease_generation cannot change")
+            if current.fencing_token != attempt.fencing_token:
+                raise ValueError("attempt fencing_token cannot change")
+            if current.claimed_at != attempt.claimed_at or current.worker_id != attempt.worker_id:
+                raise ValueError("attempt claimant cannot change")
+            if current.status in TERMINAL_ATTEMPT_STATUSES and current != attempt:
+                raise ValueError("terminal attempt cannot change")
+            if current.status != attempt.status:
+                validate_attempt_transition(current.status, attempt.status)
+        self._write_model(layout, path, attempt, immutable=False)
+
+    def load_attempt(
+        self, experiment_id: UUID, run_id: UUID, attempt_no: int
+    ) -> RunAttempt:
+        layout = ExperimentLayout(self.workspace, experiment_id)
+        return self._load_model(layout.attempt(run_id, attempt_no), RunAttempt)
+
+    def save_artifact_manifest(
+        self,
+        experiment_id: UUID,
+        run_id: UUID,
+        attempt_no: int,
+        attempt_id: UUID,
+        artifacts: ArtifactManifest,
+    ) -> None:
+        """Publish an immutable artifact manifest after all referenced bytes exist."""
+        layout = ExperimentLayout(self.workspace, experiment_id)
+        self._write_model(
+            layout,
+            layout.artifact_manifest(run_id, attempt_no),
+            artifacts,
+            immutable=True,
+            entity_id=str(attempt_id),
+        )
+
     def commit_attempt(
         self,
         run: Run,
@@ -190,21 +237,15 @@ class LocalExperimentStore:
         if attempt.lease_generation != run.lease_generation:
             raise ValueError("attempt lease_generation must match the Run generation")
 
-        layout = ExperimentLayout(self.workspace, run.experiment_id)
         attempt_envelope = envelope_for_model(attempt)
-        self._write_model(
-            layout,
-            layout.attempt(run.id, attempt.attempt_no),
-            attempt,
-            immutable=True,
-        )
+        self.save_attempt(run.experiment_id, attempt)
         if artifacts is not None:
-            self._write_model(
-                layout,
-                layout.artifact_manifest(run.id, attempt.attempt_no),
+            self.save_artifact_manifest(
+                run.experiment_id,
+                run.id,
+                attempt.attempt_no,
+                attempt.id,
                 artifacts,
-                immutable=True,
-                entity_id=str(attempt.id),
             )
 
         run_payload = run.model_dump(mode="python", round_trip=True)

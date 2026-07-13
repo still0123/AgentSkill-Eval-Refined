@@ -58,7 +58,9 @@ class MockRunnerAdapter:
         async def operation() -> RunnerResult:
             if self._delay_seconds:
                 await asyncio.sleep(self._delay_seconds)
-            configured = self._results.get(request.case_id)
+            configured = self._results.get(f"{request.case_id}:{request.variant}")
+            if configured is None:
+                configured = self._results.get(request.case_id)
             if configured is not None:
                 return replace(configured, execution_id=request.execution_id)
             return RunnerResult(

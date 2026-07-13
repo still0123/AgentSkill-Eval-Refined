@@ -24,10 +24,12 @@ from agentskill_eval_contracts.experiment import (
     VariantReference,
 )
 from agentskill_eval_contracts.run import (
+    ALLOWED_ATTEMPT_TRANSITIONS,
     ALLOWED_RUN_TRANSITIONS,
     Run,
     RunAttempt,
     RunPlanFingerprint,
+    validate_attempt_transition,
     validate_run_transition,
 )
 from agentskill_eval_contracts.schema import build_schema_bundle, export_schema_bundle
@@ -43,6 +45,7 @@ from agentskill_eval_contracts.snapshots import (
 )
 
 __all__ = [
+    "ALLOWED_ATTEMPT_TRANSITIONS",
     "ALLOWED_RUN_TRANSITIONS",
     "SCHEMA_VERSION",
     "AgentSnapshot",
@@ -75,5 +78,6 @@ __all__ = [
     "export_schema_bundle",
     "sha256_text",
     "stable_sha256",
+    "validate_attempt_transition",
     "validate_run_transition",
 ]

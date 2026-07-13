@@ -2,10 +2,32 @@ from __future__ import annotations
 
 import asyncio
 import sys
+from hashlib import sha256
 from pathlib import Path
+from uuid import uuid4
 
 import pytest
 
+from agentskill_eval_contracts import (
+    AgentSnapshot,
+    ExperimentManifest,
+    ExperimentStatus,
+    ExperimentVariant,
+    RunnerSnapshot,
+    SandboxSnapshot,
+    SkillSnapshot,
+    ToolSnapshot,
+    VariantReference,
+    VariantRole,
+)
+from agentskill_eval_experiment import (
+    CaseExecutionSpec,
+    ExperimentLayout,
+    LocalExperimentExecutor,
+    LocalExperimentPlanner,
+    LocalExperimentStore,
+    VariantRuntimeSpec,
+)
 from agentskill_eval_runner_adapters import (
     RunnerRequest,
     RunnerStatus,
@@ -61,3 +83,108 @@ def test_pinned_skill_up_custom_engine_contract(tmp_path: Path) -> None:
         assert any(item.path == "result.json" for item in result.artifacts)
 
     asyncio.run(scenario())
+
+
+@pytest.mark.skipif(BINARY is None, reason="pinned skill-up binary is not installed")
+def test_paired_executor_runs_both_arms_with_real_skill_up(tmp_path: Path) -> None:
+    assert BINARY is not None
+    experiment_id = uuid4()
+    runner = RunnerSnapshot(
+        name="skill-up",
+        version="0.5.0",
+        binary_sha256=sha256(BINARY.read_bytes()).hexdigest(),
+    )
+    common = {
+        "experiment_id": experiment_id,
+        "runner_snapshot": runner,
+        "agent_snapshot": AgentSnapshot(engine="golden-local", model="deterministic"),
+        "tool_snapshot": ToolSnapshot(),
+        "sandbox_snapshot": SandboxSnapshot(profile="runner_default"),
+    }
+    baseline = ExperimentVariant(
+        id=uuid4(), name="without-skill", role=VariantRole.BASELINE, **common
+    )
+    treatment = ExperimentVariant(
+        id=uuid4(),
+        name="with-skill",
+        role=VariantRole.TREATMENT,
+        skill_snapshot=SkillSnapshot(
+            skill_id=uuid4(),
+            version_id=uuid4(),
+            name="golden-selected",
+            version="1.0.0",
+            content_sha256="b" * 64,
+            injection_mode="native_install",
+        ),
+        **common,
+    )
+    arms = (baseline, treatment)
+    experiment = ExperimentManifest(
+        id=experiment_id,
+        name="real-paired-runner",
+        code_revision="integration-test",
+        dataset_version_id=uuid4(),
+        dataset_sha256="a" * 64,
+        protocol_snapshot={"repeats": 1, "random_seed": 42},
+        statistics_plan={"primary": "absolute_gain"},
+        budget_snapshot={"max_runs": 2},
+        variants=tuple(
+            VariantReference(
+                variant_id=arm.id,
+                variant_sha256=arm.variant_sha256,
+                manifest_path=f"variants/{arm.id}.json",
+            )
+            for arm in arms
+        ),
+        status=ExperimentStatus.FROZEN,
+    )
+    case_file = ROOT / "tests/fixtures/runner_eval/cases/golden-pass.yaml"
+    case = CaseExecutionSpec(
+        id=uuid4(),
+        runner_case_id="golden-pass",
+        independence_group="repo/golden",
+        source_eval_dir=case_file.parents[1],
+        case_file=case_file,
+        case_sha256=sha256(case_file.read_bytes()).hexdigest(),
+        grader_sha256=sha256(b"expect").hexdigest(),
+        platform_compiled_prompt_sha256=sha256(b"prompt").hexdigest(),
+    )
+    skill = tmp_path / "selected-skill"
+    skill.mkdir()
+    (skill / "SKILL.md").write_text(
+        "---\nname: golden-selected\n---\n# Golden selected\n", encoding="utf-8"
+    )
+    code = (
+        "import json,sys; json.load(open(sys.argv[1])); "
+        "print(json.dumps({'exit_code':0,'final_message':'custom-engine-handled',"
+        "'turns':1,'input_tokens':7,'output_tokens':3}))"
+    )
+    engine = {
+        "name": "golden-local",
+        "custom": {
+            "transport": "local",
+            "response_format": "session_result",
+            "local": {"command": sys.executable, "args": ["-c", code, "${input_file}"]},
+        },
+    }
+    runtimes = (
+        VariantRuntimeSpec(baseline.id, engine, {"type": "none"}),
+        VariantRuntimeSpec(treatment.id, engine, {"type": "none"}, skill_path=skill),
+    )
+    store = LocalExperimentStore(tmp_path / "workspace")
+    planner = LocalExperimentPlanner(store)
+    plan = planner.build(experiment, arms, runtimes, [case], repeats=1, random_seed=42)
+    planner.persist(plan)
+
+    summary = asyncio.run(
+        LocalExperimentExecutor(store, SkillUpRunnerAdapter(BINARY)).execute(plan)
+    )
+
+    assert summary.completed_runs == 2
+    assert summary.invalid_runs == 0
+    assert all(record.runner_status == RunnerStatus.PASS for record in summary.records)
+    layout = ExperimentLayout(store.workspace, experiment_id)
+    for block in plan.blocks:
+        for run in block.runs:
+            assert layout.artifact_manifest(run.id, 1).is_file()
+            assert (layout.raw_runner(run.id, 1) / "result.json").is_file()
