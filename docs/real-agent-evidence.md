@@ -44,6 +44,8 @@ OPENAI_API_KEY="$(security find-generic-password \
 `generationConfig.reasoning: false`，使 V4 明确发送 `thinking: {type: disabled}`，避免持久化隐藏推理。
 Qwen smoke 还应禁用不必要的 `agent` 子 Agent，并设置 `maxWallTimeSeconds`、`maxToolCalls`、
 `sessionTokenLimit` 和循环检测；这些限制属于冻结 Agent 配置，不能在双臂间变化。
+首轮真实 smoke 显示 12 turns 会让较难 Bug Fix Case 的双臂同时 invalid，因此当前示例冻结为
+24 turns、600k 会话 Token，同时继续保留 240 秒墙钟和 24 次工具调用硬门。
 
 真实数据集必须由 Automatic Benchmark Generation 发布：fixture 来自修复前 commit，oracle 在
 修复前失败、修复后通过，包含许可证和 provenance，离线可复现且版本不可变。当前 smoke 使用两个

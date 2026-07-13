@@ -27,7 +27,7 @@ agent:
   base_url: https://api.deepseek.com
   temperature: 0.0
   seed: null
-  max_turns: 12
+  max_turns: 24
   timeout_seconds: 900
   tool_capabilities: [filesystem, shell, tests]
   secret_env_names: [OPENAI_API_KEY]
@@ -40,11 +40,11 @@ agent:
           selectedType: openai
       model:
         name: deepseek-v4-pro
-        maxSessionTurns: 12
+        maxSessionTurns: 24
         maxWallTimeSeconds: 240
         maxToolCalls: 24
         maxSubagentDepth: 1
-        sessionTokenLimit: 350000
+        sessionTokenLimit: 600000
         skipLoopDetection: false
         skipStartupContext: true
       tools:
@@ -71,9 +71,9 @@ pricing:
   input_microusd_per_million_tokens: 435000
   input_cache_hit_microusd_per_million_tokens: 3625
   output_microusd_per_million_tokens: 870000
-  estimated_input_tokens_per_run: 400000
-  estimated_cache_hit_tokens_per_run: 300000
-  estimated_output_tokens_per_run: 5000
+  estimated_input_tokens_per_run: 600000
+  estimated_cache_hit_tokens_per_run: 500000
+  estimated_output_tokens_per_run: 8000
 protocol:
   evidence_repeats: 3
   random_seed: 2026
