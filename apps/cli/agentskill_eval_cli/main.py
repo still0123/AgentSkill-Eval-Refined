@@ -27,6 +27,11 @@ from agentskill_eval_experiment import (
     ReplayBundleWriter,
     StaticReportWriter,
 )
+from agentskill_eval_skill_optimizer import (
+    BenchmarkGuidedSkillSearch,
+    OptimizationSearchSpec,
+    OptimizationStore,
+)
 from agentskill_eval_trace_intelligence import compare_traces
 
 app = typer.Typer(
@@ -51,6 +56,8 @@ trace_app = typer.Typer(help="Inspect normalized traces and rule-based diagnoses
 app.add_typer(trace_app, name="trace")
 benchmark_app = typer.Typer(help="Generate, review, and publish audited benchmark candidates.")
 app.add_typer(benchmark_app, name="benchmark")
+optimize_app = typer.Typer(help="Search validation data for a frozen Skill candidate.")
+app.add_typer(optimize_app, name="optimize")
 
 
 def _version_callback(value: bool) -> None:
@@ -76,6 +83,69 @@ def main(
 def version() -> None:
     """Show the installed AgentSkill-Eval version."""
     typer.echo(__version__)
+
+
+@optimize_app.command("search")
+def optimize_search(
+    spec_path: Path = typer.Argument(  # noqa: B008
+        ..., exists=True, dir_okay=False, help="Frozen benchmark-guided search spec."
+    ),
+    workspace: Path = typer.Option(  # noqa: B008
+        Path(".agentskill-eval-workspace"), "--workspace", file_okay=False
+    ),
+    allow_simulation: bool = typer.Option(  # noqa: B008
+        False,
+        "--allow-simulation",
+        help="Required for simulated evaluators; results are never performance evidence.",
+    ),
+) -> None:
+    """Run successive halving and freeze one validation-only Pareto winner."""
+    spec = OptimizationSearchSpec.load(spec_path)
+    if spec.evaluator.type == "simulated_keyword" and not allow_simulation:
+        raise typer.BadParameter(
+            "simulated evaluator requires --allow-simulation",
+            param_hint="--allow-simulation",
+        )
+    result = BenchmarkGuidedSkillSearch(workspace).run(spec)
+    typer.echo(
+        json.dumps(
+            {
+                "candidate_count": len(result.candidates),
+                "evaluations_used": result.job.evaluations_used,
+                "job_id": str(result.job.id),
+                "locked_test_accessed": result.job.locked_test_accessed,
+                "report_html": str(result.report_html),
+                "report_json": str(result.report_json),
+                "simulated": result.job.simulated,
+                "status": result.job.status.value,
+                "winner_id": str(result.winner.id),
+                "winner_name": result.winner.name,
+            },
+            sort_keys=True,
+        )
+    )
+
+
+@optimize_app.command("status")
+def optimize_status(
+    workspace: Path = typer.Argument(..., exists=True, file_okay=False),  # noqa: B008
+    job_id: UUID = typer.Argument(...),  # noqa: B008
+) -> None:
+    """Show the frozen optimization job and complete candidate lineage."""
+    store = OptimizationStore(workspace)
+    job = store.load_job(job_id)
+    typer.echo(
+        json.dumps(
+            {
+                "job": job.model_dump(mode="json"),
+                "candidates": [
+                    item.model_dump(mode="json") for item in store.list_candidates(job)
+                ],
+            },
+            ensure_ascii=False,
+            sort_keys=True,
+        )
+    )
 
 
 @benchmark_app.command("generate")

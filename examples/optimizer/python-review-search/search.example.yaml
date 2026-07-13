@@ -1,0 +1,34 @@
+schema_version: ase/optimization-search/v1alpha1
+name: python-review-search-controller-demo
+base_skill_path: examples/skills/python-review-v1
+manual_skill_path: examples/optimizer/python-review-search/manual
+validation_search_path: examples/optimizer/python-review-search/validation-search.yaml
+mutations:
+  - id: normalization-boundaries
+    hypothesis: Explicit boundary verification reduces normalization misses.
+    instruction: Normalize at producer and consumer boundaries, then compare the canonical values.
+  - id: exception-cleanup
+    hypothesis: Exceptional-path cleanup guidance improves resource analysis.
+    instruction: For resources, verify cleanup on every exception path before reporting a leak.
+  - id: retry-accounting
+    hypothesis: Explicit retry accounting prevents budget off-by-one mistakes.
+    instruction: Derive the attempt count from the configured retry budget before judging the loop.
+  - id: runtime-evidence
+    hypothesis: A stronger reachability gate reduces unsupported findings.
+    instruction: Require reachable runtime evidence before reporting any actionable defect.
+search:
+  algorithm: successive_halving
+  subset_size: 4
+  promote_search_candidates: 3
+  random_seed: 2026
+constraints:
+  max_skill_bytes: 20000
+  max_loss_cases: 0
+  max_token_overhead_ratio: 0.25
+budget:
+  max_candidate_case_evaluations: 80
+  timeout_seconds: 60
+evaluator:
+  type: simulated_keyword
+  version: controller-demo-v1
+  simulated: true

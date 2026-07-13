@@ -24,6 +24,7 @@ def test_cli_help_lists_project_description() -> None:
     assert "storage" in result.stdout
     assert "dataset" in result.stdout
     assert "trace" in result.stdout
+    assert "optimize" in result.stdout
     assert "version" in result.stdout
 
 
@@ -124,3 +125,17 @@ def test_demo_real_mode_requires_explicit_cost_confirmation(tmp_path: Path) -> N
 
     assert result.exit_code == 2
     assert "confirm-real-run" in result.stdout
+
+
+def test_optimizer_simulation_requires_explicit_acknowledgement() -> None:
+    result = runner.invoke(
+        app,
+        [
+            "optimize",
+            "search",
+            str(ROOT / "examples/optimizer/python-review-search/search.example.yaml"),
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert "allow-simulation" in result.stdout

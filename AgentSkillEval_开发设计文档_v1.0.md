@@ -1141,6 +1141,21 @@ OptimizationJobResult:
 
 若要声称搜索算法普遍优于 manual/random，需另建 `optimizer_comparison_protocol`：各算法以相同预算和 seed 策略独立冻结一个候选，再在同一未见 locked batch 上公平比较；实验覆盖多个独立 Skill/任务域和 search seed，并以 OptimizationJob/Skill 为统计单位。单 Skill 纵切或只看 validation 只能表述为工程案例，不能宣称算法普遍有效。
 
+### 10.8 搜索控制器 MVP 实现基线（2026-07-13）
+
+当前纵切实现到“冻结 validation winner”，尚未进入独立 locked-test workflow：
+
+- 从冻结 base Skill 生成 original、manual、等 seed random 和至少三个 search 候选；
+- 对候选执行大小、单文件 Markdown、安全和 benchmark ID/oracle token 泄漏 lint；
+- 使用确定性 subset 做 successive halving，original/manual/random 始终进入 full validation；
+- 在 pass rate、mean score、Token、时延和 Skill 长度上计算 Pareto 支配关系；
+- 以 max loss case、Token overhead 和 candidate-case 预算作为硬约束；
+- 完整保存父子谱系、失败候选、每阶段结果、淘汰理由和不可变候选内容；
+- 支持严格 JSON Process Evaluator 接真实 Agent Runtime；离线 evaluator 强制标记 simulated；
+- 搜索契约不包含 locked-test 字段，Job 固定记录 `locked_test_accessed=false`。
+
+详细协议见 `docs/benchmark-guided-skill-search.md`。下一纵切才实现独立 final-evaluation 权限域、一次冻结确认批次和人工发布审批；不得把本阶段 validation winner 表述为确认性性能提升。
+
 ---
 
 ## 11. MCP 工具评测

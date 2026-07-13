@@ -22,6 +22,7 @@ from agentskill_eval_contracts.evidence import (
 )
 from agentskill_eval_contracts.experiment import ExperimentManifest, ExperimentVariant, PairBlock
 from agentskill_eval_contracts.measurements import RunMeasurement
+from agentskill_eval_contracts.optimizer import OptimizationJob, SkillCandidate
 from agentskill_eval_contracts.run import Run, RunAttempt
 from agentskill_eval_contracts.trace import FailureDiagnosis, PairTraceDiff, TraceManifest
 
@@ -45,6 +46,8 @@ SCHEMA_MODELS: Dict[str, Type[BaseModel]] = {
         BenchmarkJob,
         BenchmarkCandidate,
         BenchmarkDatasetVersion,
+        OptimizationJob,
+        SkillCandidate,
     )
 }
 

@@ -37,6 +37,9 @@ agentskill-eval benchmark status .agentskill-eval/benchmark JOB_UUID
 agentskill-eval benchmark review .agentskill-eval/benchmark JOB_UUID CANDIDATE_UUID \
   --reviewer NAME --approve --reason "evidence reviewed"
 agentskill-eval benchmark publish .agentskill-eval/benchmark JOB_UUID --publisher NAME
+agentskill-eval optimize search examples/optimizer/python-review-search/search.example.yaml \
+  --workspace .agentskill-eval/optimizer --allow-simulation
+agentskill-eval optimize status .agentskill-eval/optimizer OPTIMIZATION_JOB_UUID
 ```
 
 ## 本地验证
@@ -183,6 +186,14 @@ before-fail/after-pass、反向补丁 mutation 和替代修复验证，经确定
 发布不可变 DatasetVersion。仓库包含 MIT 许可 `more-itertools` 的离线 Git bundle 和
 两个真实历史缺陷，不需要调用模型或访问网络。协议、状态机、质量门和重放命令见
 [Automatic Benchmark Generation MVP](./docs/automatic-benchmark-generation.md)。
+
+## Benchmark-guided Skill Search
+
+P2 搜索纵切支持 Markdown Skill 候选变异、benchmark-specific leakage lint、固定预算的
+successive halving、original/manual/random/search 完整对照、Pareto 排序和唯一 winner
+冻结。搜索进程的契约中不存在 locked-test 输入；仓库离线演示强制标记为 simulated，
+只证明控制器行为。真实 Agent 可通过严格 JSON Process Evaluator 接入。详见
+[Benchmark-guided Skill Search MVP](./docs/benchmark-guided-skill-search.md)。
 
 ## 开发原则
 

@@ -53,6 +53,7 @@ source = [
   "agentskill_eval_experiment",
   "agentskill_eval_trace_intelligence",
   "agentskill_eval_runner_adapters",
+  "agentskill_eval_skill_optimizer",
 ]
 
 [tool.coverage.report]
@@ -81,6 +82,7 @@ known-first-party = [
   "agentskill_eval_experiment",
   "agentskill_eval_trace_intelligence",
   "agentskill_eval_runner_adapters",
+  "agentskill_eval_skill_optimizer",
 ]
 
 [tool.mypy]
