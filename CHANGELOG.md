@@ -9,6 +9,15 @@ after the first stable release.
 
 - GitHub Actions quality gates for Python, Dashboard, wheel packaging, schemas and Secret scanning.
 - Release, contribution and security policy metadata.
+- Cross-repository Automatic Benchmark Generation v1alpha2 with explicit source keys,
+  provenance-family independence groups and published split-leakage guards.
+- A second audited offline source (`cachetools`) and a four-case, two-repository deterministic
+  evidence bundle whose DatasetVersion hash covers case, fixture, grader, provenance and metadata.
+
+### Evidence boundary
+
+- The cross-repository evidence performs no model calls and proves only deterministic
+  reconstruction and publication controls; it is not Agent-performance evidence.
 
 ## [0.1.0-rc1] - 2026-07-13
 

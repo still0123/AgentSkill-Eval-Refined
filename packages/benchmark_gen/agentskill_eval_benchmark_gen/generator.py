@@ -20,7 +20,11 @@ from uuid import NAMESPACE_URL, UUID, uuid5
 import yaml
 
 from agentskill_eval_benchmark_gen.git_source import GitSource, GitSourceError, GitTreeLimits
-from agentskill_eval_benchmark_gen.spec import BenchmarkGenerationSpec, CandidateSpec
+from agentskill_eval_benchmark_gen.spec import (
+    BenchmarkGenerationSpec,
+    CandidateSpec,
+    RepositorySourceSpec,
+)
 from agentskill_eval_contracts import (
     BenchmarkCandidate,
     BenchmarkCandidateStatus,
@@ -120,6 +124,45 @@ class BenchmarkStore:
         self.writer.write(destination / "dataset-version.json", model_bytes(version))
         return destination
 
+    def published_dataset_versions(self) -> Tuple[Tuple[BenchmarkDatasetVersion, Path], ...]:
+        versions_root = self.root.parent / "dataset-versions"
+        if not versions_root.is_dir():
+            return ()
+        versions = []
+        for directory in sorted(versions_root.iterdir()):
+            manifest = directory / "dataset-version.json"
+            if not directory.is_dir() or not manifest.is_file():
+                continue
+            version = load_model(manifest.read_bytes(), BenchmarkDatasetVersion)
+            self.assert_dataset_version_integrity(version, directory)
+            versions.append((version, directory))
+        return tuple(versions)
+
+    @staticmethod
+    def assert_dataset_version_integrity(
+        version: BenchmarkDatasetVersion, root: Path
+    ) -> None:
+        for case in version.cases:
+            case_id = case.case_id
+            expected = {
+                "case": case.case_sha256,
+                "fixture": case.fixture_sha256,
+                "grader": case.grader_sha256,
+                "provenance": case.provenance_sha256,
+            }
+            actual = {
+                "case": _file_sha256(root / f"evals/cases/{case_id}.yaml"),
+                "fixture": _tree_sha256(root / f"evals/fixtures/repos/{case_id}"),
+                "grader": _file_sha256(root / f"evals/fixtures/scripts/{case_id}.py"),
+                "provenance": _file_sha256(root / f"provenance/{case_id}.json"),
+            }
+            if actual != expected:
+                raise BenchmarkGenerationError("published DatasetVersion integrity mismatch")
+            if case.metadata_sha256 is not None and _file_sha256(
+                root / f"metadata/{case_id}.yaml"
+            ) != case.metadata_sha256:
+                raise BenchmarkGenerationError("published metadata integrity mismatch")
+
 
 class CommandVerifier:
     """Run controlled offline test commands and retain hashed evidence logs."""
@@ -165,6 +208,10 @@ class CommandVerifier:
             "socket.socket.connect = _deny\n",
             encoding="utf-8",
         )
+        python_paths = [guard_dir]
+        source_layout = fixture / "src"
+        if source_layout.is_dir():
+            python_paths.append(source_layout)
         environment = {
             "HOME": str(runtime_dir / "home"),
             "LANG": "C.UTF-8",
@@ -173,7 +220,7 @@ class CommandVerifier:
             "PATH": os.environ.get("PATH", ""),
             "PYTHONDONTWRITEBYTECODE": "1",
             "PYTHONHASHSEED": "0",
-            "PYTHONPATH": str(guard_dir),
+            "PYTHONPATH": os.pathsep.join(str(path) for path in python_paths),
             "TZ": "UTC",
         }
         (runtime_dir / "home").mkdir()
@@ -228,7 +275,7 @@ class AutomaticBenchmarkGenerator:
         self.store = BenchmarkStore(workspace)
 
     def generate(self, spec: BenchmarkGenerationSpec) -> GenerationResult:
-        semantic_spec = spec.model_dump(mode="json", exclude={"repository_path"})
+        semantic_spec = spec.semantic_payload()
         source_hash = stable_sha256(semantic_spec)
         job_id = uuid5(NAMESPACE_URL, f"ase-benchmark-job:{source_hash}")
         candidate_ids = tuple(uuid5(job_id, item.key) for item in spec.candidates)
@@ -255,9 +302,15 @@ class AutomaticBenchmarkGenerator:
             ):
                 raise BenchmarkGenerationError("existing frozen source spec integrity mismatch")
             return GenerationResult(existing, self.store.list_candidates(existing))
-        source = GitSource(spec.repository_path)
-        if source.origin_url() != spec.repository_url:
-            raise BenchmarkGenerationError("repository origin does not match pinned repository_url")
+        source_specs = {source.key: source for source in spec.repository_sources()}
+        sources = {
+            key: GitSource(source.repository_path) for key, source in source_specs.items()
+        }
+        for key, source in sources.items():
+            if source.origin_url() != source_specs[key].repository_url:
+                raise BenchmarkGenerationError(
+                    f"repository origin does not match pinned repository_url: {key}"
+                )
         self.store.save_job(job)
         self.store.writer.write(
             self.store.job_dir(job_id) / "source-spec.json", canonical_json(semantic_spec)
@@ -266,6 +319,7 @@ class AutomaticBenchmarkGenerator:
         started = time.monotonic()
         candidates = []
         seen: Dict[str, UUID] = {}
+        seen_families: Dict[str, UUID] = {}
         for item, candidate_id in zip(spec.candidates, candidate_ids):
             if time.monotonic() - started > spec.budget.wall_seconds:
                 job = job.model_copy(update={"status": BenchmarkJobStatus.BUDGET_EXHAUSTED})
@@ -274,11 +328,14 @@ class AutomaticBenchmarkGenerator:
             candidate = self._new_candidate(job, item, candidate_id)
             self.store.save_candidate(candidate)
             try:
-                candidate = self._reconstruct(spec, source, item, candidate)
+                source_spec = source_specs[item.source_key]
+                candidate = self._reconstruct(
+                    spec, source_spec, sources[item.source_key], item, candidate
+                )
                 self.store.save_candidate(candidate)
                 candidate = self._verify(spec, item, candidate, verifier)
                 self.store.save_candidate(candidate)
-                candidate = self._deduplicate(candidate, seen)
+                candidate = self._deduplicate(candidate, seen, seen_families)
                 self.store.save_candidate(candidate)
             except (BenchmarkGenerationError, GitSourceError) as exc:
                 candidate = self._reject(candidate, str(exc))
@@ -338,6 +395,7 @@ class AutomaticBenchmarkGenerator:
         )
         if not candidates:
             raise BenchmarkGenerationError("no human-approved candidates to publish")
+        self._assert_no_cross_split_sources(job, candidates)
         lineages_by_split: Dict[str, str] = {}
         for item in candidates:
             assert item.provenance is not None
@@ -398,6 +456,8 @@ class AutomaticBenchmarkGenerator:
             job_id=job.id,
             key=spec.key,
             task=spec.task,
+            category=spec.category,
+            tags=spec.tags,
             target_split=job.target_split,
             status=BenchmarkCandidateStatus.INGESTED,
             transitions=(transition,),
@@ -406,6 +466,7 @@ class AutomaticBenchmarkGenerator:
     def _reconstruct(
         self,
         spec: BenchmarkGenerationSpec,
+        source_spec: RepositorySourceSpec,
         source: GitSource,
         item: CandidateSpec,
         candidate: BenchmarkCandidate,
@@ -439,13 +500,14 @@ class AutomaticBenchmarkGenerator:
         patch_dir.mkdir(parents=True, exist_ok=True)
         self.store.writer.write(patch_dir / "reference.patch", reference_patch)
         self.store.writer.write(patch_dir / "alternative.patch", alternative_patch)
-        license_content = source.blob(after, spec.license_path)
+        license_content = source.blob(after, source_spec.license_path)
         if not license_content.strip():
             raise BenchmarkGenerationError("license file is empty")
         provenance = CandidateProvenance(
-            repository_url=spec.repository_url,
-            fork_lineage=spec.fork_lineage,
-            license_spdx=spec.license_spdx,
+            repository_url=source_spec.repository_url,
+            fork_lineage=source_spec.fork_lineage,
+            provenance_family=item.provenance_family or after,
+            license_spdx=source_spec.license_spdx,
             license_sha256=hashlib.sha256(license_content).hexdigest(),
             before_commit=before,
             after_commit=after,
@@ -456,7 +518,7 @@ class AutomaticBenchmarkGenerator:
             generator_version=GENERATOR_VERSION,
             verifier_profile=spec.verifier_profile,
             verifier_version=VERIFIER_VERSION,
-            contamination_risk=spec.contamination_risk,
+            contamination_risk=source_spec.contamination_risk,
         )
         fixture_sha = _tree_sha256(before_dir)
         artifacts = {
@@ -661,9 +723,21 @@ class AutomaticBenchmarkGenerator:
         return "\n".join(selected)
 
     def _deduplicate(
-        self, candidate: BenchmarkCandidate, seen: Dict[str, UUID]
+        self,
+        candidate: BenchmarkCandidate,
+        seen: Dict[str, UUID],
+        seen_families: Dict[str, UUID],
     ) -> BenchmarkCandidate:
         assert candidate.provenance is not None
+        family = (
+            f"{candidate.provenance.fork_lineage}#"
+            f"{candidate.provenance.provenance_family or candidate.provenance.after_commit}"
+        )
+        if family in seen_families:
+            return self._reject(
+                candidate.model_copy(update={"duplicate_of": seen_families[family]}),
+                f"duplicate provenance family of {seen_families[family]}",
+            )
         fingerprint = stable_sha256(
             {
                 "task": " ".join(candidate.task.lower().split()),
@@ -677,6 +751,7 @@ class AutomaticBenchmarkGenerator:
                 f"duplicate of {seen[fingerprint]}",
             )
         seen[fingerprint] = candidate.id
+        seen_families[family] = candidate.id
         gate = QualityGateResult(
             name="exact_multisignal_dedup",
             passed=True,
@@ -690,6 +765,42 @@ class AutomaticBenchmarkGenerator:
             output={"fingerprint": fingerprint},
             updates={"quality_gates": (*candidate.quality_gates, gate)},
         )
+
+    def _assert_no_cross_split_sources(
+        self, job: BenchmarkJob, candidates: Sequence[BenchmarkCandidate]
+    ) -> None:
+        incoming_lineages = set()
+        incoming_families = set()
+        for candidate in candidates:
+            assert candidate.provenance is not None
+            incoming_lineages.add(candidate.provenance.fork_lineage)
+            incoming_families.add(
+                (
+                    candidate.provenance.fork_lineage,
+                    candidate.provenance.provenance_family
+                    or candidate.provenance.after_commit,
+                )
+            )
+        for version, root in self.store.published_dataset_versions():
+            if version.split == job.target_split:
+                continue
+            existing_lineages = set(version.source_lineages)
+            if incoming_lineages & existing_lineages:
+                raise BenchmarkGenerationError(
+                    "fork lineage crosses published dataset splits"
+                )
+            for case in version.cases:
+                provenance = json.loads(
+                    (root / f"provenance/{case.case_id}.json").read_text(encoding="utf-8")
+                )
+                existing_family = (
+                    provenance["fork_lineage"],
+                    provenance.get("provenance_family") or provenance["after_commit"],
+                )
+                if existing_family in incoming_families:
+                    raise BenchmarkGenerationError(
+                        "provenance family crosses published dataset splits"
+                    )
 
     def _reject(self, candidate: BenchmarkCandidate, reason: str) -> BenchmarkCandidate:
         return self._transition(
@@ -755,12 +866,20 @@ class AutomaticBenchmarkGenerator:
     def _grader_text(command: Sequence[str]) -> str:
         return (
             "#!/usr/bin/env python3\n"
+            "import os\n"
             "import subprocess\n"
             "import sys\n\n"
+            "from pathlib import Path\n\n"
             f"COMMAND = {list(command)!r}\n"
             "argv = [sys.executable if x in {'python', 'python3', '${PYTHON}'} "
             "else x for x in COMMAND]\n"
-            "raise SystemExit(subprocess.run(argv, check=False).returncode)\n"
+            "environment = dict(os.environ)\n"
+            "source_layout = Path.cwd() / 'src'\n"
+            "if source_layout.is_dir():\n"
+            "    inherited = environment.get('PYTHONPATH', '')\n"
+            "    environment['PYTHONPATH'] = str(source_layout) + "
+            "(os.pathsep + inherited if inherited else '')\n"
+            "raise SystemExit(subprocess.run(argv, check=False, env=environment).returncode)\n"
         )
 
     @staticmethod
@@ -804,18 +923,20 @@ class AutomaticBenchmarkGenerator:
         case_path.write_text(
             yaml.safe_dump(case, allow_unicode=True, sort_keys=False), encoding="utf-8"
         )
+        family = candidate.provenance.provenance_family or candidate.provenance.after_commit
+        independence_group = f"{candidate.provenance.fork_lineage}#{family}"
         metadata = {
             "schema_version": "ase-case-meta/v1alpha1",
             "case_id": candidate.key,
             "case_ref": case_ref,
             "split": candidate.target_split,
-            "category": "positive",
+            "category": candidate.category,
             "skill_applicable": True,
             "group_keys": {
-                "independence_group": candidate.provenance.fork_lineage,
+                "independence_group": independence_group,
                 "repository": candidate.provenance.repository_url,
                 "fork_lineage": candidate.provenance.fork_lineage,
-                "patch_family": candidate.provenance.after_commit,
+                "patch_family": family,
             },
             "provenance": {
                 "source_type": "git_history",
@@ -825,7 +946,7 @@ class AutomaticBenchmarkGenerator:
                 "synthetic": False,
             },
             "oracle": {"kind": "script", "expected_signal": "regression test exits 0"},
-            "tags": ["generated", "real-oss", "offline"],
+            "tags": ["generated", "real-oss", "offline", *candidate.tags],
         }
         metadata_path = root / metadata_ref
         metadata_path.parent.mkdir(parents=True, exist_ok=True)
@@ -846,6 +967,7 @@ class AutomaticBenchmarkGenerator:
             fixture_sha256=_tree_sha256(root / fixture_ref),
             grader_sha256=_file_sha256(grader_path),
             provenance_sha256=_file_sha256(provenance_path),
+            metadata_sha256=_file_sha256(metadata_path),
         )
 
     @staticmethod
@@ -868,7 +990,14 @@ class AutomaticBenchmarkGenerator:
             "demo_only": False,
             "expected_case_count": len(candidates),
             "case_metadata": [f"metadata/{item.key}.yaml" for item in candidates],
-            "minimum_category_counts": {"positive": len(candidates)},
+            "minimum_category_counts": dict(
+                sorted(
+                    {
+                        category: sum(1 for item in candidates if item.category == category)
+                        for category in {item.category for item in candidates}
+                    }.items()
+                )
+            ),
         }
         (root / "dataset.yaml").write_text(
             yaml.safe_dump(manifest, allow_unicode=True, sort_keys=False), encoding="utf-8"

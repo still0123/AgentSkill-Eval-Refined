@@ -13,6 +13,9 @@ AgentSkill-Eval 用可复现的 A/B 实验回答一个问题：
 
 **当前版本：[`v0.1.0-rc1`](https://github.com/ranmaoxia0123/AgentSkill-Eval/tree/v0.1.0-rc1)**
 
+当前 RC2 候选在 RC1 基础上增加跨仓库 Benchmark 重建：使用两个真实 MIT 开源仓库、
+四个独立缺陷家族完成全离线质量门验证。该证据不调用模型，也不代表 Agent 性能结论。
+
 ## 30 秒理解工作流
 
 ```text
@@ -117,6 +120,16 @@ pnpm run build
 
 - [DeepSeek smoke 脱敏记录](./experiments/real-deepseek-v4-pro-smoke-2026-07-13/README.md)
 - [DeepSeek evidence 脱敏记录](./experiments/real-deepseek-v4-pro-evidence-2026-07-13/README.md)
+
+## 跨仓库 Benchmark 证据
+
+Automatic Benchmark Generation v1alpha2 可在一个冻结 Job 中重建多个本地 Git source，
+使用显式 provenance family 分组和去重，并阻止同一 fork lineage 跨 split 发布。仓库内的
+`more-itertools` 与 `cachetools` 离线 bundle 共提供四个真实历史缺陷；每个候选都执行
+before、after、mutation 和 alternative repair 各三次，共 48 次确定性验证。
+
+- [跨仓库离线验收说明](./experiments/cross-repository-benchmark-2026-07-14/README.md)
+- [脱敏哈希与聚合结果](./experiments/cross-repository-benchmark-2026-07-14/result.sanitized.json)
 
 ## 真实 Agent 运行安全门
 

@@ -29,6 +29,7 @@ from agentskill_eval_benchmark_gen.spec import (
     BudgetSpec,
     CandidateSpec,
     QualityGateSpec,
+    RepositorySourceSpec,
     SpecError,
 )
 
@@ -55,5 +56,6 @@ __all__ = [
     "LoadedDataset",
     "GenerationResult",
     "QualityGateSpec",
+    "RepositorySourceSpec",
     "SpecError",
 ]

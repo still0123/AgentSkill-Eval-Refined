@@ -5,7 +5,7 @@
 project is MIT-licensed. The bundle preserves the exact historical commits used by the two
 MVP candidates; it is input evidence, not a generated toy repository.
 
-- Bundle SHA-256: `32be67f33e17d8390d452090fcb5e59ab9a9e1238b5ddbc6c1deffdd002c4cca`
+- Bundle SHA-256: `9e19644b0027cc11502b5ccc959abce2847b8cf94a3446b09d45a1cd716651bb`
 - Frozen upstream `LICENSE` SHA-256:
   `09f1c8c9e941af3e584d59641ea9b87d83c0cb0fd007eb5ef391a7e2643c1a46`
 
@@ -33,3 +33,15 @@ Pinned defects:
 The generator overlays the after-commit regression tests onto each before-commit fixture. It
 then runs before, after, reverse-patch mutation, and an independently written alternative fix
 three times each under a controlled environment.
+
+`cachetools.bundle` is the second offline source. It freezes the MIT-licensed
+[`cachetools`](https://github.com/tkem/cachetools) history needed by two additional candidates.
+
+- Bundle SHA-256: `9933f9067dbc4da476cdc2612625422251916d53d8945153b0795dca1371258c`
+- Pinned defects: cachedmethod class-level autospec (`57d2e481...`) and hash-key pickle
+  restoration (`748d10de...`).
+
+Use `cross-repository-generation.example.yaml` to publish all four candidates into one immutable
+DatasetVersion. The v1alpha2 spec excludes machine-local clone paths from the semantic job hash,
+uses explicit provenance families as independence groups, and blocks a fork lineage from being
+published into another split in the same workspace.

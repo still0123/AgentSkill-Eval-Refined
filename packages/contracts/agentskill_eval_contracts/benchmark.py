@@ -86,6 +86,7 @@ class CandidateProvenance(FrozenModel):
     source_type: Literal["git_history"] = "git_history"
     repository_url: str = Field(min_length=1)
     fork_lineage: str = Field(min_length=1)
+    provenance_family: Optional[str] = Field(default=None, min_length=1)
     license_spdx: str = Field(min_length=1)
     license_sha256: HexDigest
     before_commit: str = Field(pattern=r"^[0-9a-f]{40}$")
@@ -118,6 +119,10 @@ class BenchmarkCandidate(FrozenModel):
     job_id: UUID
     key: str = Field(pattern=r"^[a-z0-9][a-z0-9-]{2,79}$")
     task: str = Field(min_length=1)
+    category: Literal[
+        "positive", "negative", "distractor", "complex", "robustness"
+    ] = "positive"
+    tags: Tuple[str, ...] = ()
     target_split: str = Field(min_length=1)
     status: BenchmarkCandidateStatus
     fixture_sha256: Optional[HexDigest] = None
@@ -183,6 +188,7 @@ class PublishedCase(FrozenModel):
     fixture_sha256: HexDigest
     grader_sha256: HexDigest
     provenance_sha256: HexDigest
+    metadata_sha256: Optional[HexDigest] = None
 
 
 class BenchmarkDatasetVersion(FrozenModel):
@@ -203,7 +209,9 @@ class BenchmarkDatasetVersion(FrozenModel):
 
     @staticmethod
     def calculate_content_sha256(cases: Tuple[PublishedCase, ...]) -> str:
-        return stable_sha256([item.model_dump(mode="json") for item in cases])
+        return stable_sha256(
+            [item.model_dump(mode="json", exclude_none=True) for item in cases]
+        )
 
     @model_validator(mode="after")
     def content_hash_matches(self) -> "BenchmarkDatasetVersion":
