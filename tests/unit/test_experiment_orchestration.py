@@ -216,7 +216,14 @@ def test_executor_persists_paired_outcomes_attempts_and_order(tmp_path: Path) ->
             process_exit_code=0,
         ),
     }
-    executor = LocalExperimentExecutor(store, MockRunnerAdapter(results))
+    progress = []
+    executor = LocalExperimentExecutor(
+        store,
+        MockRunnerAdapter(results),
+        progress_sink=lambda record, completed, total: progress.append(
+            (record.run_id, completed, total)
+        ),
+    )
     summary = asyncio.run(executor.execute(plan))
 
     assert [record.variant_id for record in summary.records] == list(
@@ -224,6 +231,7 @@ def test_executor_persists_paired_outcomes_attempts_and_order(tmp_path: Path) ->
     )
     assert summary.completed_runs == 2
     assert summary.invalid_runs == 0
+    assert [item[1:] for item in progress] == [(1, 2), (2, 2)]
     by_variant = {record.variant_id: record for record in summary.records}
     assert by_variant[arms[0].id].evaluation_outcome == EvaluationOutcome.FAIL
     assert by_variant[arms[1].id].evaluation_outcome == EvaluationOutcome.PASS

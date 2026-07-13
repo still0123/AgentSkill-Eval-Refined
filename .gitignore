@@ -22,6 +22,7 @@ site/
 
 # AgentSkill-Eval runtime output
 .agentskill-eval/
+.agentskill-eval-workspace/
 artifacts/
 runs/
 

@@ -2,7 +2,7 @@
 
 AgentSkill-Eval 是一个面向 Agent Skill 的可复现评测与回归分析项目。平台以受控配对实验为核心，比较同一 Agent 在 without-Skill、with-Skill 或不同 Skill 版本下的任务质量、成本、时延与稳定性。
 
-当前仓库已完成 **P0 目标 1～7：Python 项目初始化、核心数据契约、本地可靠存储、Runner 防腐层、本地配对实验编排、可信统计报告及 12 Case Demo Dataset**。目前提供冻结领域模型、原子 Manifest、内容寻址 Blob、Mock/`skill-up v0.5.0` Adapter、确定性 PairBlock 执行、RunMeasurement、group/case 层级统计、W/T/L、invalid 双口径、效率指标、安全离线 HTML，以及严格可寻址的 Python 代码审查演示集。完整设计见 [开发设计文档](./AgentSkillEval_%E5%BC%80%E5%8F%91%E8%AE%BE%E8%AE%A1%E6%96%87%E6%A1%A3_v1.0.md)。
+当前仓库已完成 **P0 目标 1～8：Python 项目初始化、核心数据契约、本地可靠存储、Runner 防腐层、本地配对实验编排、可信统计报告、12 Case Demo Dataset 及一键 72 Run 演示**。目前提供冻结领域模型、原子 Manifest、内容寻址 Blob、Mock/`skill-up v0.5.0` Adapter、确定性 PairBlock 执行、RunMeasurement、group/case 层级统计、W/T/L、invalid 双口径、效率指标、安全离线 HTML，以及严格可寻址的 Python 代码审查演示集。完整设计见 [开发设计文档](./AgentSkillEval_%E5%BC%80%E5%8F%91%E8%AE%BE%E8%AE%A1%E6%96%87%E6%A1%A3_v1.0.md)。
 
 ## 环境要求
 
@@ -22,6 +22,7 @@ agentskill-eval --help
 agentskill-eval version
 agentskill-eval schema export /tmp/agentskill-eval-schema.json
 agentskill-eval dataset validate examples/datasets/python-review-demo
+agentskill-eval demo run --workspace .agentskill-eval/demo
 agentskill-eval storage recover /path/to/workspace
 agentskill-eval storage rebuild-index /path/to/workspace EXPERIMENT_UUID
 agentskill-eval report generate /path/to/workspace EXPERIMENT_UUID \
@@ -123,6 +124,18 @@ tests/                    unit / integration / e2e
 
 该数据集及 grader 完全公开，只用于工程 Demo 和开发回归，不支持稳定泛化结论。详细说明见
 [P0 Python Review Demo Dataset](./docs/demo-dataset.md)。
+
+## 一条命令配对实验
+
+默认命令无凭据、无费用地运行 72 个模拟逻辑 Run，并完成持久化、统计与报告全链路：
+
+```bash
+agentskill-eval demo run --workspace .agentskill-eval/demo
+```
+
+模拟结果在 Manifest、JSON 和 HTML 中强制标记，不能作为性能证据。真实模式需要显式选择
+`--mode skill-up`、指定 Engine/Secret，并传入 `--confirm-real-run`，防止误消耗额度。详见
+[一条命令运行 P0 配对实验](./docs/one-command-demo.md)。
 
 ## 开发原则
 

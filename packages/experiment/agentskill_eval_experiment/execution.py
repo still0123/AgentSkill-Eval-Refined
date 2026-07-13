@@ -7,7 +7,7 @@ import mimetypes
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import PurePosixPath
-from typing import Any, Dict, List, Mapping, Optional, Tuple
+from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple
 from uuid import UUID, uuid4
 
 from agentskill_eval_contracts import (
@@ -68,13 +68,16 @@ class LocalExperimentExecutor:
         adapter: RunnerAdapter,
         *,
         worker_id: str = "local-worker",
+        progress_sink: Optional[Callable[[ExecutionRecord, int, int], None]] = None,
     ) -> None:
         self.store = store
         self.adapter = adapter
         self.worker_id = worker_id
+        self.progress_sink = progress_sink
 
     async def execute(self, plan: PlannedExperiment) -> LocalExecutionSummary:
         records: List[ExecutionRecord] = []
+        total_runs = sum(len(block.runs) for block in plan.blocks)
         for planned_block in plan.blocks:
             runs = {run.variant_id: run for run in planned_block.runs}
             for variant_id in planned_block.block.execution_order:
@@ -85,6 +88,8 @@ class LocalExperimentExecutor:
                     plan.runtime_for(variant_id),
                 )
                 records.append(record)
+                if self.progress_sink is not None:
+                    self.progress_sink(record, len(records), total_runs)
         return LocalExecutionSummary(plan.experiment.id, tuple(records))
 
     async def _execute_run(

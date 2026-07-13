@@ -103,6 +103,7 @@ class StaticReportWriter:
             )
         )
         evidence_rows = self._evidence_rows(experiment.id, names)
+        scope_banner = self._scope_banner(experiment)
         return f"""<!doctype html>
 <html lang="en">
 <head>
@@ -130,6 +131,7 @@ th {{ font-size: .86rem; }} code {{ overflow-wrap: anywhere; }}
 <header><p class="muted">AgentSkill-Eval · offline report</p>
 <h1>{self._escape(experiment.name)}</h1>
 <p><code>{self._escape(str(experiment.id))}</code></p></header>
+{scope_banner}
 <section><h2>Primary assignment-based estimate</h2>
 <p class="muted">Invalid terminal runs count as failures. Groups receive equal weight.</p>
 <div class="grid">
@@ -176,6 +178,23 @@ th {{ font-size: .86rem; }} code {{ overflow-wrap: anywhere; }}
 Machine-readable evidence: <code>report.json</code>.</p></footer>
 </body></html>
 """
+
+    def _scope_banner(self, experiment: ExperimentManifest) -> str:
+        mode = experiment.protocol_snapshot.get("evidence_mode")
+        demo_only = experiment.protocol_snapshot.get("demo_only") is True
+        if mode == "simulated_fixture":
+            message = (
+                "SIMULATED DEMO: outcomes are deterministic fixtures for exercising the platform "
+                "and are not Agent or Skill performance evidence."
+            )
+        elif demo_only:
+            message = (
+                "PUBLIC SYNTHETIC DEMO: outcomes are observed Agent runs on public smoke graders "
+                "and do not support generalization claims."
+            )
+        else:
+            return ""
+        return f'<p class="warning">{self._escape(message)}</p>'
 
     def _estimate_cards(
         self, control_name: str, treatment_name: str, summary: EstimandSummary

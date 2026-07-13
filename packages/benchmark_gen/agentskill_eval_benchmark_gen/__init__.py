@@ -12,6 +12,12 @@ from agentskill_eval_benchmark_gen.dataset import (
     LoadedCase,
     LoadedDataset,
 )
+from agentskill_eval_benchmark_gen.demo import (
+    DemoExperimentRunner,
+    DemoMode,
+    DemoRunConfig,
+    DemoRunResult,
+)
 
 __all__ = [
     "CaseCategory",
@@ -22,6 +28,10 @@ __all__ = [
     "DatasetLoader",
     "DatasetManifest",
     "DatasetSplit",
+    "DemoExperimentRunner",
+    "DemoMode",
+    "DemoRunConfig",
+    "DemoRunResult",
     "LoadedCase",
     "LoadedDataset",
 ]
