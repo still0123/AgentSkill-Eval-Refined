@@ -204,6 +204,7 @@ def test_real_cli_preflight_and_authorization_boundary(
             "--max-agent-runs",
             "4",
         ],
+        terminal_width=240,
     )
     assert refused.exit_code == 2
     assert "observed_agent" in refused.output
@@ -226,6 +227,7 @@ def test_real_cli_preflight_and_authorization_boundary(
             "--max-agent-runs",
             "4",
         ],
+        terminal_width=240,
     )
     assert missing_confirmation.exit_code == 2
     assert "confirm-real-run" in missing_confirmation.output

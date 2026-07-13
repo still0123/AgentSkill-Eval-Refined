@@ -18,7 +18,11 @@ def test_mcp_cli_validates_runs_reports_and_traces(tmp_path: Path) -> None:
     assert validated.exit_code == 0, validated.stdout
     assert json.loads(validated.stdout)["case_count"] == 2
 
-    denied = runner.invoke(app, ["mcp", "lab", "run", str(config), "--workspace", str(tmp_path)])
+    denied = runner.invoke(
+        app,
+        ["mcp", "lab", "run", str(config), "--workspace", str(tmp_path)],
+        terminal_width=240,
+    )
     assert denied.exit_code == 2
     assert "allow-simulation" in denied.output
 

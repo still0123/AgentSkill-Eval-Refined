@@ -19,7 +19,9 @@ def test_memory_rag_cli_validate_run_report_trace_and_replay(tmp_path: Path) -> 
     assert json.loads(validated.stdout)["case_count"] == 4
 
     denied = runner.invoke(
-        app, ["memory-rag", "lab", "run", str(config), "--workspace", str(tmp_path)]
+        app,
+        ["memory-rag", "lab", "run", str(config), "--workspace", str(tmp_path)],
+        terminal_width=240,
     )
     assert denied.exit_code == 2
     assert "allow-simulation" in denied.output

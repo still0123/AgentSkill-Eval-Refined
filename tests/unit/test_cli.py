@@ -127,6 +127,7 @@ def test_demo_real_mode_requires_explicit_cost_confirmation(tmp_path: Path) -> N
             "--mode",
             DemoMode.SKILL_UP.value,
         ],
+        terminal_width=240,
     )
 
     assert result.exit_code == 2
@@ -141,6 +142,7 @@ def test_optimizer_simulation_requires_explicit_acknowledgement() -> None:
             "search",
             str(ROOT / "examples/optimizer/python-review-search/search.example.yaml"),
         ],
+        terminal_width=240,
     )
 
     assert result.exit_code == 2
@@ -155,6 +157,7 @@ def test_final_evaluation_simulation_requires_explicit_acknowledgement() -> None
             "evaluate",
             str(ROOT / "examples/optimizer/python-review-search/final.example.yaml"),
         ],
+        terminal_width=240,
     )
 
     assert result.exit_code == 2
@@ -162,7 +165,9 @@ def test_final_evaluation_simulation_requires_explicit_acknowledgement() -> None
 
 
 def test_real_smoke_requires_explicit_budget_options() -> None:
-    result = runner.invoke(app, ["real", "smoke", str(ROOT / "README.md")])
+    result = runner.invoke(
+        app, ["real", "smoke", str(ROOT / "README.md")], terminal_width=240
+    )
 
     assert result.exit_code == 2
     assert "max-cost-microusd" in result.output
@@ -175,6 +180,7 @@ def test_real_smoke_requires_explicit_budget_options() -> None:
             "--max-cost-microusd",
             "1000",
         ],
+        terminal_width=240,
     )
     assert second.exit_code == 2
     assert "max-agent-runs" in second.output
