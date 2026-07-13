@@ -2,13 +2,13 @@
 
 AgentSkill-Eval 是一个面向 Agent Skill 的可复现评测与回归分析项目。平台以受控配对实验为核心，比较同一 Agent 在 without-Skill、with-Skill 或不同 Skill 版本下的任务质量、成本、时延与稳定性。
 
-当前仓库已完成 **P0 目标 1～3：Python 项目初始化、核心数据契约与本地可靠存储**。目前提供可安装的 monorepo、Typer CLI、冻结的 Pydantic 领域模型、稳定内容哈希、Run 状态机、JSON Schema 导出、原子 Manifest、内容寻址 Blob、崩溃恢复和可重建 SQLite 索引；Runner 防腐层、实验编排与报告会在后续目标中依次实现。完整设计见 [开发设计文档](./AgentSkillEval_%E5%BC%80%E5%8F%91%E8%AE%BE%E8%AE%A1%E6%96%87%E6%A1%A3_v1.0.md)。
+当前仓库已完成 **P0 目标 1～4：Python 项目初始化、核心数据契约、本地可靠存储与 Runner 防腐层**。目前提供可安装的 monorepo、Typer CLI、冻结的 Pydantic 领域模型、稳定内容哈希、Run 状态机、JSON Schema 导出、原子 Manifest、内容寻址 Blob、崩溃恢复、可重建 SQLite 索引，以及支持取消的 Mock/`skill-up v0.5.0` Runner Adapter；实验编排与报告会在后续目标中实现。完整设计见 [开发设计文档](./AgentSkillEval_%E5%BC%80%E5%8F%91%E8%AE%BE%E8%AE%A1%E6%96%87%E6%A1%A3_v1.0.md)。
 
 ## 环境要求
 
 - Python 3.9 或更高版本
 - Git
-- 后续真实 Runner 目标需要固定版本的 `skill-up v0.5.0`，当前初始化阶段不要求安装
+- 真实 Runner 集成需要固定版本和二进制哈希的 `skill-up v0.5.0`；其他开发与 Mock 测试不要求安装
 
 ## 快速开始
 
@@ -75,6 +75,17 @@ tests/                    unit / integration / e2e
 - 每个 Run 使用非阻塞 POSIX advisory lock，避免两个本地 Worker 同时领取同一逻辑任务。
 
 详细协议见 [P0 本地存储与恢复](./docs/local-storage.md)。
+
+## Runner 防腐层
+
+- `MockRunnerAdapter` 提供确定性结果、事件与取消，用于编排层测试。
+- `SkillUpRunnerAdapter` 只依赖上游公开 CLI/JSON，运行前校验固定版本和二进制 SHA-256。
+- baseline/treatment 被编译为隔离的单 Case 目录；关闭上游 benchmark、并发和 retry，避免双重实验语义。
+- Runner 退出码仅用于诊断，Case 的通过/失败以 `result.json` 为准。
+- 超时和取消会终止进程组；Runner HOME、缓存和临时目录按运行隔离。
+- Golden parser 测试无需外部依赖；发现固定二进制时自动执行真实 Custom Engine 集成测试。
+
+详细协议见 [Runner 防腐层与兼容协议](./docs/runner-adapters.md)。
 
 ## 开发原则
 
