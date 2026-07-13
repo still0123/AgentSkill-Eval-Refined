@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import os
 import re
 import shutil
+from dataclasses import replace
 from pathlib import Path
 from typing import Any, Mapping, Optional
 
@@ -221,6 +223,8 @@ class SkillUpRunnerAdapter:
                 self._environment(request, home),
                 request.timeout_seconds + 15,
             )
+        except asyncio.CancelledError:
+            return self._error_result(request, ExitReason.CANCELLED, "execution cancelled")
         except (OSError, ValueError) as exc:
             return self._error_result(request, ExitReason.CLI_ERROR, str(exc))
         if outcome.cancelled:
@@ -253,11 +257,51 @@ class SkillUpRunnerAdapter:
             return self._error_result(
                 request, ExitReason.CLI_ERROR, str(exc), outcome.exit_code, outcome.stdout
             )
+        result = self._with_qwen_usage(request, result)
         await self._emit_trace_events(result.raw_result, event_sink, request.execution_id)
         await event_sink(
             RunnerEvent(request.execution_id, "runner.finished", {"status": result.status.value})
         )
         return result
+
+    @staticmethod
+    def _with_qwen_usage(request: RunnerRequest, result: RunnerResult) -> RunnerResult:
+        """Account for Qwen main and sub-Agent calls without persisting transcript content."""
+        if request.engine.get("name") != "qwen_code":
+            return result
+        usage_root = request.run_dir / "runner-home" / ".qwen" / "usage"
+        totals = {"inputTokens": 0, "outputTokens": 0, "cachedTokens": 0}
+        records = 0
+        for path in sorted(usage_root.glob("token-usage-*.jsonl")):
+            if path.is_symlink() or not path.is_file():
+                continue
+            for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+                try:
+                    item = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if not isinstance(item, dict):
+                    continue
+                records += 1
+                for field in totals:
+                    value = item.get(field)
+                    if isinstance(value, int) and not isinstance(value, bool) and value >= 0:
+                        totals[field] += value
+        if records == 0:
+            return result
+        raw = dict(result.raw_result)
+        raw["usage_accounting"] = {
+            "source": "qwen_local_usage_aggregate",
+            "record_count": records,
+            "includes_subagents": True,
+        }
+        return replace(
+            result,
+            input_tokens=totals["inputTokens"],
+            output_tokens=totals["outputTokens"],
+            cached_input_tokens=totals["cachedTokens"],
+            raw_result=raw,
+        )
 
     @staticmethod
     async def _emit_trace_events(

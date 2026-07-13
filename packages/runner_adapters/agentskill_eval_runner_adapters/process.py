@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import os
 import signal
+import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Mapping, Optional, Sequence
@@ -79,15 +81,51 @@ class ProcessSupervisor:
     async def _terminate_group(process: asyncio.subprocess.Process) -> None:
         if process.returncode is not None:
             return
-        try:
-            os.killpg(process.pid, signal.SIGTERM)
-        except ProcessLookupError:
-            return
-        try:
+        groups = ProcessSupervisor._descendant_process_groups(process.pid)
+        ProcessSupervisor._signal_groups(groups, signal.SIGTERM)
+        with contextlib.suppress(asyncio.TimeoutError):
             await asyncio.wait_for(process.wait(), 2)
-        except asyncio.TimeoutError:
-            try:
-                os.killpg(process.pid, signal.SIGKILL)
-            except ProcessLookupError:
-                return
+        await asyncio.sleep(0.1)
+        ProcessSupervisor._signal_groups(groups, signal.SIGKILL)
+        if process.returncode is None:
             await process.wait()
+
+    @staticmethod
+    def _descendant_process_groups(root_pid: int) -> tuple[int, ...]:
+        groups = {root_pid}
+        try:
+            completed = subprocess.run(
+                ("ps", "-eo", "pid=,ppid=,pgid="),
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=2,
+            )
+        except (OSError, subprocess.SubprocessError):
+            return (root_pid,)
+        rows: list[tuple[int, int, int]] = []
+        for line in completed.stdout.splitlines():
+            try:
+                pid, ppid, pgid = (int(value) for value in line.split())
+            except (ValueError, TypeError):
+                continue
+            rows.append((pid, ppid, pgid))
+        descendants = {root_pid}
+        changed = True
+        while changed:
+            changed = False
+            for pid, ppid, pgid in rows:
+                if ppid in descendants and pid not in descendants:
+                    descendants.add(pid)
+                    groups.add(pgid)
+                    changed = True
+        groups.discard(os.getpgrp())
+        return tuple(sorted((group for group in groups if group > 0), reverse=True))
+
+    @staticmethod
+    def _signal_groups(groups: Sequence[int], sig: signal.Signals) -> None:
+        for group in groups:
+            try:
+                os.killpg(group, sig)
+            except ProcessLookupError:
+                continue

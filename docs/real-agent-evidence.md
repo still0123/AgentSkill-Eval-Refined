@@ -42,6 +42,8 @@ OPENAI_API_KEY="$(security find-generic-password \
 配置；路径逃逸和 Secret 值会被拒绝，文件权限固定为 `0600`，其内容哈希进入冻结输入。DeepSeek
 配置使用 `base_url: https://api.deepseek.com`，并在 `.qwen/settings.json` 中设置
 `generationConfig.reasoning: false`，使 V4 明确发送 `thinking: {type: disabled}`，避免持久化隐藏推理。
+Qwen smoke 还应禁用不必要的 `agent` 子 Agent，并设置 `maxWallTimeSeconds`、`maxToolCalls`、
+`sessionTokenLimit` 和循环检测；这些限制属于冻结 Agent 配置，不能在双臂间变化。
 
 真实数据集必须由 Automatic Benchmark Generation 发布：fixture 来自修复前 commit，oracle 在
 修复前失败、修复后通过，包含许可证和 provenance，离线可复现且版本不可变。当前 smoke 使用两个
@@ -77,6 +79,11 @@ agentskill-eval real run CONFIG \
 授权、哈希/版本漂移或 Secret 缺失都会失败。达到预算后不再创建新 Run；一次已在飞行中的请求可能
 使实测费用最多超出一个 Run，所以还须在 Agent 侧设置单次 Token 上限。真实失败不回退 Mock 或
 simulation。已完成实验幂等读取，不再次收费；未完成的付费实验禁止自动恢复。
+
+对于支持缓存计费的 Provider，价格表必须分别记录 cache miss/cache hit 单价及预计命中 Token。
+Qwen Code 的 Runner 适配器会汇总隔离 HOME 下本 Run 的本地 usage 记录，包括主 Agent 与子 Agent，
+而不能只信任 skill-up 主会话中的 Token。用户中断会递归终止嵌套进程组，并将 Run/Experiment 标记为
+`CANCELLED`；取消的付费实验仍禁止自动恢复。
 
 `smoke` 使用 2 Case × 2 臂 × 1 次，共 4 Run，只验证真实链路。`run` 使用 2 Case × 2 臂 ×
 3 次，共 12 Run，PairBlock 顺序按冻结 seed 随机化。唯一实验变量是是否加载 Skill。由于只有两个

@@ -3,6 +3,8 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import subprocess
+import sys
 from pathlib import Path
 from typing import Optional
 
@@ -13,6 +15,7 @@ from agentskill_eval_runner_adapters import (
     MockRunnerAdapter,
     ResultParseError,
     RunnerRequest,
+    RunnerResult,
     RunnerStatus,
     SkillUpRunnerAdapter,
     compile_evaluation,
@@ -193,3 +196,66 @@ def test_process_supervisor_marks_external_cancellation(tmp_path: Path) -> None:
         assert outcome.timed_out is False
 
     asyncio.run(scenario())
+
+
+def test_process_supervisor_terminates_nested_process_groups(tmp_path: Path) -> None:
+    async def scenario() -> None:
+        child_pid = tmp_path / "child.pid"
+        code = (
+            "import pathlib,subprocess,time;"
+            f"p=subprocess.Popen(['/bin/sleep','10'],start_new_session=True);"
+            f"pathlib.Path({str(child_pid)!r}).write_text(str(p.pid));"
+            "time.sleep(10)"
+        )
+        supervisor = ProcessSupervisor()
+        task = asyncio.create_task(
+            supervisor.run(
+                "nested-process",
+                [sys.executable, "-c", code],
+                tmp_path,
+                {"PATH": "/usr/bin:/bin"},
+                30,
+            )
+        )
+        for _ in range(50):
+            if child_pid.exists():
+                break
+            await asyncio.sleep(0.02)
+        assert child_pid.exists()
+        pid = int(child_pid.read_text())
+        assert await supervisor.cancel("nested-process") is True
+        outcome = await task
+        assert outcome.cancelled is True
+        await asyncio.sleep(0.1)
+        probe = subprocess.run(("ps", "-p", str(pid)), check=False, capture_output=True)
+        assert probe.returncode != 0
+
+    asyncio.run(scenario())
+
+
+def test_qwen_usage_aggregates_main_and_subagent_tokens(tmp_path: Path) -> None:
+    req = request(tmp_path)
+    req = RunnerRequest(**{**req.__dict__, "engine": {"name": "qwen_code"}})
+    usage = tmp_path / "runner-home/.qwen/usage/token-usage-2026-07.jsonl"
+    usage.parent.mkdir(parents=True)
+    usage.write_text(
+        '\n'.join(
+            (
+                json.dumps({"inputTokens": 100, "outputTokens": 10, "cachedTokens": 80}),
+                json.dumps({"inputTokens": 50, "outputTokens": 5, "cachedTokens": 40}),
+            )
+        ),
+        encoding="utf-8",
+    )
+    result = RunnerResult(
+        execution_id=req.execution_id,
+        case_id=req.case_id,
+        status=RunnerStatus.PASS,
+        exit_reason=ExitReason.COMPLETED,
+        process_exit_code=0,
+    )
+    accounted = SkillUpRunnerAdapter._with_qwen_usage(req, result)
+    assert accounted.input_tokens == 150
+    assert accounted.output_tokens == 15
+    assert accounted.cached_input_tokens == 120
+    assert accounted.raw_result["usage_accounting"]["includes_subagents"] is True

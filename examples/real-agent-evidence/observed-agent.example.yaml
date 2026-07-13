@@ -38,8 +38,10 @@ agent:
   home_config_files: {}
 pricing:
   input_microusd_per_million_tokens: 0
+  input_cache_hit_microusd_per_million_tokens: 0
   output_microusd_per_million_tokens: 0
   estimated_input_tokens_per_run: 30000
+  estimated_cache_hit_tokens_per_run: 0
   estimated_output_tokens_per_run: 5000
 protocol:
   evidence_repeats: 3

@@ -89,14 +89,34 @@ class AgentSpec(ExecutableSpec):
 
 class PricingSpec(StrictModel):
     input_microusd_per_million_tokens: int = Field(ge=0)
+    input_cache_hit_microusd_per_million_tokens: Optional[int] = Field(default=None, ge=0)
     output_microusd_per_million_tokens: int = Field(ge=0)
     estimated_input_tokens_per_run: int = Field(ge=1)
+    estimated_cache_hit_tokens_per_run: int = Field(default=0, ge=0)
     estimated_output_tokens_per_run: int = Field(ge=1)
+
+    @model_validator(mode="after")
+    def cache_estimate_is_bounded(self) -> "PricingSpec":
+        if self.estimated_cache_hit_tokens_per_run > self.estimated_input_tokens_per_run:
+            raise ValueError("estimated cache-hit tokens cannot exceed input tokens")
+        return self
+
+    @property
+    def cache_hit_rate_microusd(self) -> int:
+        return (
+            self.input_cache_hit_microusd_per_million_tokens
+            if self.input_cache_hit_microusd_per_million_tokens is not None
+            else self.input_microusd_per_million_tokens
+        )
 
     @property
     def estimated_cost_per_run_microusd(self) -> int:
+        cache_miss = (
+            self.estimated_input_tokens_per_run - self.estimated_cache_hit_tokens_per_run
+        )
         numerator = (
-            self.estimated_input_tokens_per_run * self.input_microusd_per_million_tokens
+            cache_miss * self.input_microusd_per_million_tokens
+            + self.estimated_cache_hit_tokens_per_run * self.cache_hit_rate_microusd
             + self.estimated_output_tokens_per_run * self.output_microusd_per_million_tokens
         )
         return max(1, (numerator + 999_999) // 1_000_000)

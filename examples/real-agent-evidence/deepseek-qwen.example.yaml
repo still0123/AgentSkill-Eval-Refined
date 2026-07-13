@@ -40,6 +40,23 @@ agent:
           selectedType: openai
       model:
         name: deepseek-v4-pro
+        maxSessionTurns: 12
+        maxWallTimeSeconds: 240
+        maxToolCalls: 24
+        maxSubagentDepth: 1
+        sessionTokenLimit: 350000
+        skipLoopDetection: false
+        skipStartupContext: true
+      tools:
+        disabled: [agent]
+        toolSearch:
+          enabled: false
+      ui:
+        enableFollowupSuggestions: false
+      memory:
+        enableManagedAutoMemory: false
+        enableManagedAutoDream: false
+        enableAutoSkill: false
       modelProviders:
         openai:
           - id: deepseek-v4-pro
@@ -52,8 +69,10 @@ agent:
               maxRetries: 0
 pricing:
   input_microusd_per_million_tokens: 435000
+  input_cache_hit_microusd_per_million_tokens: 3625
   output_microusd_per_million_tokens: 870000
-  estimated_input_tokens_per_run: 30000
+  estimated_input_tokens_per_run: 400000
+  estimated_cache_hit_tokens_per_run: 300000
   estimated_output_tokens_per_run: 5000
 protocol:
   evidence_repeats: 3

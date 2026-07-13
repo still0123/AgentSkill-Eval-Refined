@@ -145,6 +145,18 @@ def test_spec_rejects_literal_secret_in_agent_home_config(published_dataset: Pat
         RealAgentEvidenceSpec.model_validate(payload)
 
 
+def test_pricing_accounts_for_cache_hits() -> None:
+    pricing = PricingSpec(
+        input_microusd_per_million_tokens=435_000,
+        input_cache_hit_microusd_per_million_tokens=3_625,
+        output_microusd_per_million_tokens=870_000,
+        estimated_input_tokens_per_run=400_000,
+        estimated_cache_hit_tokens_per_run=300_000,
+        estimated_output_tokens_per_run=5_000,
+    )
+    assert pricing.estimated_cost_per_run_microusd == 48_938
+
+
 def test_preflight_rejects_hash_version_and_missing_secret(
     published_dataset: Path, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
