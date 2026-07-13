@@ -76,8 +76,9 @@ Attempt 在 `CLAIMED/PREPARING/RUNNING` 阶段持续原子更新。Attempt ID、
 1. 归档原始 Runner 字节；
 2. 写入内容寻址对象；
 3. 写终态 Attempt；
-4. 写 Artifact Manifest；
-5. 原子更新 Run 的 active Attempt、selected Attempt hash 和终态。
+4. 写不可变 RunMeasurement；
+5. 写 Artifact Manifest；
+6. 原子更新 Run 的 active Attempt、selected Attempt hash 和终态。
 
 ## 原始产物
 

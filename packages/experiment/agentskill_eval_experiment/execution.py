@@ -18,6 +18,7 @@ from agentskill_eval_contracts import (
     ExecutionStatus,
     Run,
     RunAttempt,
+    RunMeasurement,
 )
 from agentskill_eval_experiment.planning import (
     CaseExecutionSpec,
@@ -303,7 +304,8 @@ class LocalExperimentExecutor:
                 ExecutionStatus.INFRA_FAILED,
                 evaluation_outcome=EvaluationOutcome.INVALID,
             )
-        selected = self.store.commit_attempt(run, attempt, artifacts)
+        measurement = self._measurement(run, attempt, result)
+        selected = self.store.commit_attempt(run, attempt, artifacts, measurement)
         return ExecutionRecord(
             selected.id,
             selected.variant_id,
@@ -332,7 +334,15 @@ class LocalExperimentExecutor:
             ExecutionStatus.INFRA_FAILED,
             evaluation_outcome=EvaluationOutcome.INVALID,
         )
-        selected = self.store.commit_attempt(run, attempt, ArtifactManifest())
+        measurement = RunMeasurement(
+            run_id=run.id,
+            attempt_id=attempt.id,
+            runner_status=runner_status.value,
+            runner_exit_reason=error_code,
+        )
+        selected = self.store.commit_attempt(
+            run, attempt, ArtifactManifest(), measurement
+        )
         return ExecutionRecord(
             selected.id,
             selected.variant_id,
@@ -391,6 +401,22 @@ class LocalExperimentExecutor:
         if isinstance(score, (int, float)) and not isinstance(score, bool) and 0 <= score <= 1:
             return float(score)
         return default
+
+    @staticmethod
+    def _measurement(
+        run: Run, attempt: RunAttempt, result: RunnerResult
+    ) -> RunMeasurement:
+        return RunMeasurement(
+            run_id=run.id,
+            attempt_id=attempt.id,
+            runner_status=result.status.value,
+            runner_exit_reason=result.exit_reason.value,
+            process_exit_code=result.process_exit_code,
+            duration_ms=result.duration_ms,
+            turns=result.turns,
+            input_tokens=result.input_tokens,
+            output_tokens=result.output_tokens,
+        )
 
     @staticmethod
     def _status_for_terminal_run(run: Run) -> RunnerStatus:

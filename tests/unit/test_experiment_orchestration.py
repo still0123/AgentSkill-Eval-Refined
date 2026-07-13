@@ -231,10 +231,12 @@ def test_executor_persists_paired_outcomes_attempts_and_order(tmp_path: Path) ->
     for planned_run in plan.blocks[0].runs:
         run = store.load_run(experiment_id, planned_run.id)
         attempt = store.load_attempt(experiment_id, run.id, 1)
+        measurement = store.load_measurement(experiment_id, run.id, 1)
         assert run.execution_status == ExecutionStatus.COMPLETED
         assert run.active_attempt_id == attempt.id
         assert run.selected_attempt_sha256 is not None
         assert attempt.status == AttemptStatus.COMPLETED
+        assert measurement.attempt_id == attempt.id
         layout = ExperimentLayout(store.workspace, experiment_id)
         assert layout.artifact_manifest(run.id, 1).is_file()
 

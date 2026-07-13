@@ -15,8 +15,11 @@ workspace/
 │   │   ├── run.lock
 │   │   └── attempts/{attempt_no}/
 │   │       ├── attempt.json
+│   │       ├── measurement.json
 │   │       ├── raw-runner/
 │   │       └── artifacts/manifest.json
+│   ├── reports/report.json
+│   ├── reports/report.html
 │   └── index.sqlite
 ├── objects/sha256/{prefix}/{digest}
 └── quarantine/
@@ -50,11 +53,12 @@ workspace/
 Attempt 提交额外遵循：
 
 1. 验证 Run ID、终态和 lease generation；
-2. 写入不可变 `attempt.json`；
-3. 写入不可变 Artifact Manifest；
-4. 最后更新 `run.json` 的 active Attempt 和 selected Attempt hash。
+2. 将 `attempt.json` 推进到终态，终态后禁止修改；
+3. 写入与 Attempt ID 绑定的不可变 `measurement.json`；
+4. 写入不可变 Artifact Manifest；
+5. 最后更新 `run.json` 的 active Attempt 和 selected Attempt hash。
 
-因此，第四步前崩溃只会留下可审计的物理 Attempt，不会让逻辑 Run 指向半写入结果。
+因此，第五步前崩溃只会留下可审计的物理 Attempt 和证据，不会让逻辑 Run 指向半写入结果。`reports/` 是可重建派生视图，不属于提交真值链。
 
 ## 启动恢复
 

@@ -23,6 +23,7 @@ from agentskill_eval_contracts.experiment import (
     PairBlock,
     VariantReference,
 )
+from agentskill_eval_contracts.measurements import RunMeasurement
 from agentskill_eval_contracts.run import (
     ALLOWED_ATTEMPT_TRANSITIONS,
     ALLOWED_RUN_TRANSITIONS,
@@ -66,6 +67,7 @@ __all__ = [
     "PriceSnapshot",
     "Run",
     "RunAttempt",
+    "RunMeasurement",
     "RunPlanFingerprint",
     "RunnerSnapshot",
     "SandboxSnapshot",

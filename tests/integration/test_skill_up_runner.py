@@ -21,11 +21,14 @@ from agentskill_eval_contracts import (
     VariantRole,
 )
 from agentskill_eval_experiment import (
+    AnalysisConfig,
     CaseExecutionSpec,
+    ExperimentAnalyzer,
     ExperimentLayout,
     LocalExperimentExecutor,
     LocalExperimentPlanner,
     LocalExperimentStore,
+    StaticReportWriter,
     VariantRuntimeSpec,
 )
 from agentskill_eval_runner_adapters import (
@@ -188,3 +191,19 @@ def test_paired_executor_runs_both_arms_with_real_skill_up(tmp_path: Path) -> No
         for run in block.runs:
             assert layout.artifact_manifest(run.id, 1).is_file()
             assert (layout.raw_runner(run.id, 1) / "result.json").is_file()
+
+    statistics = ExperimentAnalyzer(store).analyze(
+        experiment_id,
+        AnalysisConfig(
+            baseline.id,
+            treatment.id,
+            bootstrap_resamples=10,
+            min_independent_groups=1,
+        ),
+    )
+    assert statistics.primary_assignment_based.absolute_gain == 0
+    assert statistics.tokens.control_mean == 10
+    assert statistics.tokens.treatment_mean == 10
+    report = StaticReportWriter(store).write(experiment_id, statistics)
+    assert report.html_path.is_file()
+    assert report.json_path.is_file()

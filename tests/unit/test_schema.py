@@ -19,7 +19,9 @@ def test_schema_bundle_contains_core_persisted_models() -> None:
 
     assert bundle["schema_version"] == "ase/v1alpha1"
     assert isinstance(schemas, dict)
-    assert {"ExperimentVariant", "PairBlock", "Run", "RunAttempt"} <= set(schemas)
+    assert {"ExperimentVariant", "PairBlock", "Run", "RunAttempt", "RunMeasurement"} <= set(
+        schemas
+    )
 
 
 def test_cli_exports_valid_json_schema_bundle(tmp_path: Path) -> None:

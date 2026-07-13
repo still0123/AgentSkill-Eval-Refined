@@ -19,6 +19,7 @@ from agentskill_eval_contracts import (
     PairBlock,
     Run,
     RunAttempt,
+    RunMeasurement,
     validate_attempt_transition,
     validate_run_transition,
 )
@@ -63,6 +64,7 @@ KNOWN_MANIFEST_MODELS: Dict[str, Type[BaseModel]] = {
         PairBlock,
         Run,
         RunAttempt,
+        RunMeasurement,
     )
 }
 
@@ -91,6 +93,10 @@ class ExperimentLayout:
     def index(self) -> Path:
         return self.root / "index.sqlite"
 
+    @property
+    def reports(self) -> Path:
+        return self.root / "reports"
+
     def variant(self, variant_id: UUID) -> Path:
         return self.root / "variants" / f"{variant_id}.json"
 
@@ -116,6 +122,9 @@ class ExperimentLayout:
 
     def artifact_manifest(self, run_id: UUID, attempt_no: int) -> Path:
         return self.attempt_root(run_id, attempt_no) / "artifacts" / "manifest.json"
+
+    def measurement(self, run_id: UUID, attempt_no: int) -> Path:
+        return self.attempt_root(run_id, attempt_no) / "measurement.json"
 
     def raw_runner(self, run_id: UUID, attempt_no: int) -> Path:
         path = self.attempt_root(run_id, attempt_no) / "raw-runner"
@@ -150,6 +159,13 @@ class LocalExperimentStore:
         layout = ExperimentLayout(self.workspace, experiment_id)
         return self._load_model(layout.variant(variant_id), ExperimentVariant)
 
+    def list_variants(self, experiment_id: UUID) -> Tuple[ExperimentVariant, ...]:
+        layout = ExperimentLayout(self.workspace, experiment_id)
+        return tuple(
+            self._load_model(path, ExperimentVariant)
+            for path in sorted((layout.root / "variants").glob("*.json"))
+        )
+
     def save_pair_block(self, block: PairBlock) -> None:
         layout = ExperimentLayout(self.workspace, block.experiment_id)
         self._write_model(layout, layout.pair_block(block.id), block, immutable=True)
@@ -157,6 +173,13 @@ class LocalExperimentStore:
     def load_pair_block(self, experiment_id: UUID, block_id: UUID) -> PairBlock:
         layout = ExperimentLayout(self.workspace, experiment_id)
         return self._load_model(layout.pair_block(block_id), PairBlock)
+
+    def list_pair_blocks(self, experiment_id: UUID) -> Tuple[PairBlock, ...]:
+        layout = ExperimentLayout(self.workspace, experiment_id)
+        return tuple(
+            self._load_model(path, PairBlock)
+            for path in sorted((layout.root / "pair-blocks").glob("*.json"))
+        )
 
     def save_run(self, run: Run) -> None:
         layout = ExperimentLayout(self.workspace, run.experiment_id)
@@ -174,6 +197,37 @@ class LocalExperimentStore:
     def load_run(self, experiment_id: UUID, run_id: UUID) -> Run:
         layout = ExperimentLayout(self.workspace, experiment_id)
         return self._load_model(layout.run(run_id), Run)
+
+    def list_runs(self, experiment_id: UUID) -> Tuple[Run, ...]:
+        layout = ExperimentLayout(self.workspace, experiment_id)
+        return tuple(
+            self._load_model(path, Run)
+            for path in sorted(layout.root.glob("runs/*/run.json"))
+        )
+
+    def load_selected_measurement(
+        self, experiment_id: UUID, run: Run
+    ) -> Optional[RunMeasurement]:
+        attempt = self.load_selected_attempt(experiment_id, run)
+        if attempt is None:
+            return None
+        layout = ExperimentLayout(self.workspace, experiment_id)
+        measurement_path = layout.measurement(run.id, attempt.attempt_no)
+        if not measurement_path.is_file():
+            return None
+        return self._load_model(measurement_path, RunMeasurement)
+
+    def load_selected_attempt(
+        self, experiment_id: UUID, run: Run
+    ) -> Optional[RunAttempt]:
+        if run.active_attempt_id is None:
+            return None
+        layout = ExperimentLayout(self.workspace, experiment_id)
+        for attempt_path in sorted(layout.run_root(run.id).glob("attempts/*/attempt.json")):
+            attempt = self._load_model(attempt_path, RunAttempt)
+            if attempt.id == run.active_attempt_id:
+                return attempt
+        return None
 
     def save_attempt(self, experiment_id: UUID, attempt: RunAttempt) -> None:
         """Persist a physical Attempt and enforce monotonic state transitions."""
@@ -221,11 +275,36 @@ class LocalExperimentStore:
             entity_id=str(attempt_id),
         )
 
+    def save_measurement(
+        self,
+        experiment_id: UUID,
+        run_id: UUID,
+        attempt_no: int,
+        measurement: RunMeasurement,
+    ) -> None:
+        if measurement.run_id != run_id:
+            raise ValueError("measurement.run_id must match run_id")
+        layout = ExperimentLayout(self.workspace, experiment_id)
+        self._write_model(
+            layout,
+            layout.measurement(run_id, attempt_no),
+            measurement,
+            immutable=True,
+            entity_id=str(measurement.attempt_id),
+        )
+
+    def load_measurement(
+        self, experiment_id: UUID, run_id: UUID, attempt_no: int
+    ) -> RunMeasurement:
+        layout = ExperimentLayout(self.workspace, experiment_id)
+        return self._load_model(layout.measurement(run_id, attempt_no), RunMeasurement)
+
     def commit_attempt(
         self,
         run: Run,
         attempt: RunAttempt,
         artifacts: Optional[ArtifactManifest] = None,
+        measurement: Optional[RunMeasurement] = None,
     ) -> Run:
         """Persist a terminal Attempt before atomically advancing its Run pointer."""
         if attempt.run_id != run.id:
@@ -236,9 +315,18 @@ class LocalExperimentStore:
             raise ValueError("committed attempts require a terminal Run result")
         if attempt.lease_generation != run.lease_generation:
             raise ValueError("attempt lease_generation must match the Run generation")
+        if measurement is not None and measurement.attempt_id != attempt.id:
+            raise ValueError("measurement.attempt_id must match attempt.id")
 
         attempt_envelope = envelope_for_model(attempt)
         self.save_attempt(run.experiment_id, attempt)
+        if measurement is not None:
+            self.save_measurement(
+                run.experiment_id,
+                run.id,
+                attempt.attempt_no,
+                measurement,
+            )
         if artifacts is not None:
             self.save_artifact_manifest(
                 run.experiment_id,
@@ -379,6 +467,7 @@ class LocalExperimentStore:
             "pair-blocks/*.json",
             "runs/*/run.json",
             "runs/*/attempts/*/attempt.json",
+            "runs/*/attempts/*/measurement.json",
             "runs/*/attempts/*/artifacts/manifest.json",
             "runs/*/grading/*.json",
         )

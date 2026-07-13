@@ -12,6 +12,19 @@ from agentskill_eval_experiment.planning import (
     PlannedExperiment,
     VariantRuntimeSpec,
 )
+from agentskill_eval_experiment.reporting import StaticReportPaths, StaticReportWriter
+from agentskill_eval_experiment.statistics import (
+    AnalysisConfig,
+    CaseComparison,
+    ConfidenceInterval,
+    EfficiencyComparison,
+    EstimandSummary,
+    ExperimentAnalyzer,
+    ExperimentStatistics,
+    StatisticsError,
+    VariantRunSummary,
+    WtlSummary,
+)
 from agentskill_eval_experiment.storage import (
     AtomicFileWriter,
     BlobReference,
@@ -32,11 +45,18 @@ from agentskill_eval_experiment.storage import (
 
 __all__ = [
     "AtomicFileWriter",
+    "AnalysisConfig",
     "BlobReference",
     "CaseExecutionSpec",
+    "CaseComparison",
+    "ConfidenceInterval",
     "ContentAddressedBlobStore",
+    "EfficiencyComparison",
+    "EstimandSummary",
     "ExecutionRecord",
+    "ExperimentAnalyzer",
     "ExperimentLayout",
+    "ExperimentStatistics",
     "ImmutableManifestError",
     "IntegrityError",
     "LocalExecutionSummary",
@@ -53,5 +73,10 @@ __all__ = [
     "RecoveryReport",
     "StagedWrite",
     "StorageError",
+    "StatisticsError",
+    "StaticReportPaths",
+    "StaticReportWriter",
+    "VariantRunSummary",
     "VariantRuntimeSpec",
+    "WtlSummary",
 ]

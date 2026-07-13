@@ -2,7 +2,7 @@
 
 AgentSkill-Eval 是一个面向 Agent Skill 的可复现评测与回归分析项目。平台以受控配对实验为核心，比较同一 Agent 在 without-Skill、with-Skill 或不同 Skill 版本下的任务质量、成本、时延与稳定性。
 
-当前仓库已完成 **P0 目标 1～5：Python 项目初始化、核心数据契约、本地可靠存储、Runner 防腐层与本地配对实验编排**。目前提供可安装的 monorepo、Typer CLI、冻结的 Pydantic 领域模型、稳定内容哈希、Run/Attempt 状态机、原子 Manifest、内容寻址 Blob、崩溃恢复、可重建 SQLite 索引、Mock/`skill-up v0.5.0` Adapter，以及确定性 PairBlock 计划和 baseline/treatment 执行闭环；统计与静态报告会在后续目标中实现。完整设计见 [开发设计文档](./AgentSkillEval_%E5%BC%80%E5%8F%91%E8%AE%BE%E8%AE%A1%E6%96%87%E6%A1%A3_v1.0.md)。
+当前仓库已完成 **P0 目标 1～6：Python 项目初始化、核心数据契约、本地可靠存储、Runner 防腐层、本地配对实验编排及可信统计报告**。目前提供冻结领域模型、原子 Manifest、内容寻址 Blob、Mock/`skill-up v0.5.0` Adapter、确定性 PairBlock 执行、RunMeasurement、group/case 层级统计、W/T/L、invalid 双口径、效率指标和安全离线 HTML；Demo Dataset 会在后续目标中补齐。完整设计见 [开发设计文档](./AgentSkillEval_%E5%BC%80%E5%8F%91%E8%AE%BE%E8%AE%A1%E6%96%87%E6%A1%A3_v1.0.md)。
 
 ## 环境要求
 
@@ -23,6 +23,8 @@ agentskill-eval version
 agentskill-eval schema export /tmp/agentskill-eval-schema.json
 agentskill-eval storage recover /path/to/workspace
 agentskill-eval storage rebuild-index /path/to/workspace EXPERIMENT_UUID
+agentskill-eval report generate /path/to/workspace EXPERIMENT_UUID \
+  --control CONTROL_VARIANT_UUID --treatment TREATMENT_VARIANT_UUID
 ```
 
 ## 本地验证
@@ -97,6 +99,16 @@ tests/                    unit / integration / e2e
 - 真实集成测试使用 `skill-up` Custom Engine 跑完整 baseline/treatment 两臂，无需模型凭据。
 
 详细协议见 [P0 本地配对实验引擎](./docs/local-experiment-engine.md)。
+
+## 统计与报告
+
+- 主口径将终态 invalid 保守计为失败；capability 敏感性口径只使用双臂均有效的 PairBlock。
+- repeats 先在 Case 内聚合，再按 independence group 等权，避免大仓库支配总体结论。
+- 成功率、增益、Token、时延和成本均使用固定 seed 的 group→case 层级 bootstrap。
+- 报告 W/T/L、完整/有效 block 比例、invalid 数、配对效率差和 cost per success。
+- `report.json` 保留机器结果；`report.html` 可离线打开、严格转义且不执行脚本。
+
+详细方法见 [配对统计与静态报告](./docs/statistics-and-reports.md)。
 
 ## 开发原则
 
