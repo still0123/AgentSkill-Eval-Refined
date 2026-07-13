@@ -1755,7 +1755,7 @@ Python wheel 的 10 个包导入，以及 Dashboard typecheck、ESLint、9 项 V
 
 ---
 
-## 23. 实际完成状态：Cross-Repository Benchmark Generation MVP
+## 27. 实际完成状态：Cross-Repository Benchmark Generation MVP
 
 截至 2026-07-14，Automatic Benchmark Generation 从单仓库协议扩展为兼容旧 v1alpha1 的
 v1alpha2 multi-source 协议：一个冻结 Job 可以引用多个本地 Git source，机器本地 clone 路径

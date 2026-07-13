@@ -101,20 +101,7 @@ candidates:
     production_paths: [src/cachetools/_cachedmethod.py]
     regression_test_paths: [tests/test_cachedmethod.py]
     test_command: ["${PYTHON}", -m, unittest, tests.test_cachedmethod.AutospecTest.test_autospec_no_warnings]
-    alternative_patch: |
-      diff --git a/src/cachetools/_cachedmethod.py b/src/cachetools/_cachedmethod.py
-      index cdf63d4..9f0ff17 100644
-      --- a/src/cachetools/_cachedmethod.py
-      +++ b/src/cachetools/_cachedmethod.py
-      @@ -77,6 +77,8 @@ class _DescriptorBase:
-       
-           def __get__(self, obj, objtype=None):
-               wrapper = self.Wrapper(obj)
-      +        if obj is None:
-      +            return wrapper
-               if self.__attrname is not None:
-                   # replace descriptor instance with wrapper in instance dict
-                   try:
+    alternative_patch: "diff --git a/src/cachetools/_cachedmethod.py b/src/cachetools/_cachedmethod.py\nindex cdf63d4..9f0ff17 100644\n--- a/src/cachetools/_cachedmethod.py\n+++ b/src/cachetools/_cachedmethod.py\n@@ -77,6 +77,8 @@ class _DescriptorBase:\n \n     def __get__(self, obj, objtype=None):\n         wrapper = self.Wrapper(obj)\n+        if obj is None:\n+            return wrapper\n         if self.__attrname is not None:\n             # replace descriptor instance with wrapper in instance dict\n             try:\n"
     category: positive
     tags: [python, regression, descriptor, mocking]
   - key: cachetools-hashkey-pickle
@@ -129,36 +116,6 @@ candidates:
     production_paths: [cachetools/keys.py]
     regression_test_paths: [tests/test_keys.py]
     test_command: ["${PYTHON}", -m, unittest, tests.test_keys.CacheKeysTest.test_pickle]
-    alternative_patch: |
-      diff --git a/cachetools/keys.py b/cachetools/keys.py
-      index adb9dad..623ee3a 100644
-      --- a/cachetools/keys.py
-      +++ b/cachetools/keys.py
-      @@ -2,6 +2,8 @@
-       
-       from __future__ import absolute_import
-       
-      +import enum
-      +
-       __all__ = ('hashkey', 'typedkey')
-       
-       
-      @@ -21,8 +23,15 @@ class _HashedTuple(tuple):
-           def __radd__(self, other, add=tuple.__add__):
-               return _HashedTuple(add(other, self))
-       
-      +    def __reduce__(self):
-      +        return (_HashedTuple, (tuple(self),))
-      +
-      +
-      +class _KeywordMarker(enum.Enum):
-      +    separator = 0
-      +
-       
-      -_kwmark = (object(),)
-      +_kwmark = (_KeywordMarker.separator,)
-       
-       
-       def hashkey(*args, **kwargs):
+    alternative_patch: "diff --git a/cachetools/keys.py b/cachetools/keys.py\nindex adb9dad..623ee3a 100644\n--- a/cachetools/keys.py\n+++ b/cachetools/keys.py\n@@ -2,6 +2,8 @@\n \n from __future__ import absolute_import\n \n+import enum\n+\n __all__ = ('hashkey', 'typedkey')\n \n \n@@ -21,8 +23,15 @@ class _HashedTuple(tuple):\n     def __radd__(self, other, add=tuple.__add__):\n         return _HashedTuple(add(other, self))\n \n+    def __reduce__(self):\n+        return (_HashedTuple, (tuple(self),))\n+\n+\n+class _KeywordMarker(enum.Enum):\n+    separator = 0\n+\n \n-_kwmark = (object(),)\n+_kwmark = (_KeywordMarker.separator,)\n \n \n def hashkey(*args, **kwargs):\n"
     category: positive
     tags: [python, regression, pickle, cache-key]
