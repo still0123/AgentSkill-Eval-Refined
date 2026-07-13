@@ -1,0 +1,1 @@
+"""Benchmark candidate generation package."""
