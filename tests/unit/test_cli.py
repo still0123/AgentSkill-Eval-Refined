@@ -13,6 +13,8 @@ def test_cli_help_lists_project_description() -> None:
 
     assert result.exit_code == 0
     assert "Agent Skill evaluation" in result.stdout
+    assert "schema" in result.stdout
+    assert "storage" in result.stdout
     assert "version" in result.stdout
 
 

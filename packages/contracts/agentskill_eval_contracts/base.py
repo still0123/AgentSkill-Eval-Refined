@@ -18,6 +18,7 @@ class FrozenModel(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
         frozen=True,
+        protected_namespaces=(),
         str_strip_whitespace=True,
         validate_default=True,
     )
