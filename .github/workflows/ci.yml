@@ -84,25 +84,24 @@ jobs:
         working-directory: apps/web
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.15.1
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-          cache: npm
-          cache-dependency-path: apps/web/package-lock.json
-      - name: Pin npm used by the lockfile build
-        run: npm install --global npm@11.12.1
-      - name: Show Node and npm versions
+          cache: pnpm
+          cache-dependency-path: apps/web/pnpm-lock.yaml
+      - name: Show Node and pnpm versions
         run: |
           node --version
-          npm --version
+          pnpm --version
       - name: Install locked Dashboard dependencies
-        run: |
-          npm install --no-audit --no-fund
-          git diff --exit-code -- package-lock.json
-      - run: npm run typecheck
-      - run: npm run lint
-      - run: npm test
-      - run: npm run build
+        run: pnpm install --frozen-lockfile
+      - run: pnpm run typecheck
+      - run: pnpm run lint
+      - run: pnpm test
+      - run: pnpm run build
       - uses: actions/upload-artifact@v4
         with:
           name: dashboard-dist

@@ -21,7 +21,6 @@ def test_mcp_cli_validates_runs_reports_and_traces(tmp_path: Path) -> None:
     denied = runner.invoke(
         app,
         ["mcp", "lab", "run", str(config), "--workspace", str(tmp_path)],
-        env={"COLUMNS": "240"},
         terminal_width=240,
     )
     assert denied.exit_code == 2
