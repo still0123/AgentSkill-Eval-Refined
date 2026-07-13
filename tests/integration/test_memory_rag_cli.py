@@ -22,7 +22,7 @@ def test_memory_rag_cli_validate_run_report_trace_and_replay(tmp_path: Path) -> 
         app, ["memory-rag", "lab", "run", str(config), "--workspace", str(tmp_path)]
     )
     assert denied.exit_code == 2
-    assert "allow-simulation" in denied.stdout
+    assert "allow-simulation" in denied.output
 
     command = [
         "memory-rag",

@@ -206,7 +206,7 @@ def test_real_cli_preflight_and_authorization_boundary(
         ],
     )
     assert refused.exit_code == 2
-    assert "observed_agent" in refused.stdout
+    assert "observed_agent" in refused.output
 
     observed = integration.model_copy(
         update={"evidence_class": RealEvidenceClass.OBSERVED_AGENT, "simulated": False}
@@ -228,7 +228,7 @@ def test_real_cli_preflight_and_authorization_boundary(
         ],
     )
     assert missing_confirmation.exit_code == 2
-    assert "confirm-real-run" in missing_confirmation.stdout
+    assert "confirm-real-run" in missing_confirmation.output
 
 
 def test_fake_process_smoke_is_auditable_secret_safe_and_idempotent(

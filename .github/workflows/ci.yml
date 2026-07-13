@@ -89,7 +89,13 @@ jobs:
           node-version: "22"
           cache: npm
           cache-dependency-path: apps/web/package-lock.json
-      - run: npm ci
+      - name: Pin npm used by the lockfile build
+        run: npm install --global npm@11.12.1
+      - name: Show Node and npm versions
+        run: |
+          node --version
+          npm --version
+      - run: npm ci --no-audit --no-fund
       - run: npm run typecheck
       - run: npm run lint
       - run: npm test

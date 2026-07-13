@@ -130,7 +130,7 @@ def test_demo_real_mode_requires_explicit_cost_confirmation(tmp_path: Path) -> N
     )
 
     assert result.exit_code == 2
-    assert "confirm-real-run" in result.stdout
+    assert "confirm-real-run" in result.output
 
 
 def test_optimizer_simulation_requires_explicit_acknowledgement() -> None:
@@ -144,7 +144,7 @@ def test_optimizer_simulation_requires_explicit_acknowledgement() -> None:
     )
 
     assert result.exit_code == 2
-    assert "allow-simulation" in result.stdout
+    assert "allow-simulation" in result.output
 
 
 def test_final_evaluation_simulation_requires_explicit_acknowledgement() -> None:
@@ -158,14 +158,14 @@ def test_final_evaluation_simulation_requires_explicit_acknowledgement() -> None
     )
 
     assert result.exit_code == 2
-    assert "allow-simulation" in result.stdout
+    assert "allow-simulation" in result.output
 
 
 def test_real_smoke_requires_explicit_budget_options() -> None:
     result = runner.invoke(app, ["real", "smoke", str(ROOT / "README.md")])
 
     assert result.exit_code == 2
-    assert "max-cost-microusd" in result.stdout
+    assert "max-cost-microusd" in result.output
     second = runner.invoke(
         app,
         [
@@ -177,4 +177,4 @@ def test_real_smoke_requires_explicit_budget_options() -> None:
         ],
     )
     assert second.exit_code == 2
-    assert "max-agent-runs" in second.stdout
+    assert "max-agent-runs" in second.output
