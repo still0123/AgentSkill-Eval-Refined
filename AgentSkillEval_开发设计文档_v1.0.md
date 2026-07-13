@@ -1692,3 +1692,26 @@ Mock Agent 场景：
 真实付费实验必须在代码检查全部通过后，单独向用户报告 Provider、model、Run 数、最大预算、
 预计 Token 和完整命令，获得明确授权后才能运行。两个 Case 的结果只能解释为 descriptive evidence。
 详细运行协议见 `docs/real-agent-evidence.md`。
+
+---
+
+## 23. MCP Tool Evaluation MVP 实现状态
+
+当前已实现独立、离线、强制 simulated 的 MCP 评测纵切：严格 Case 与 Trace 契约、确定性 Mock
+MCP Lab、工具选择/参数/序列/恢复/效率/副作用安全 grader、固定条件的 with/without guidance
+配对统计、CLI 和离线 JSON/HTML 报告。Process adapter 只实现固定 executable 与 SHA-256、
+无 shell、最小环境、超时进程组终止及响应复杂度限制的扩展边界。本阶段没有连接生产 MCP
+Server、真实 Agent 或付费模型，也没有实现通用 MCP 管理平台。完整协议与命令见
+[`docs/mcp-tool-evaluation.md`](./docs/mcp-tool-evaluation.md)。
+
+---
+
+## 24. Memory/RAG Evaluation MVP 实现状态
+
+当前已实现独立、离线、强制 simulated 的 Memory/RAG 评测纵切：Retrieval 与
+Generation/Grounding 分层指标、Memory 生命周期与安全评分、确定性 embedding/ranking fixture、
+Mock Retriever/Memory、四类固定条件配对实验、专项 Trace、CLI 和无脚本 JSON/HTML 报告。
+Process Retriever/Memory adapter 只实现固定 executable/SHA-256、无 shell、最小环境、超时终止
+与响应复杂度限制的接入边界。本阶段没有 Milvus、自研向量库、生产知识库、真实 Agent、
+Embedding 服务或付费模型调用。完整协议见
+[`docs/memory-rag-evaluation.md`](./docs/memory-rag-evaluation.md)。
