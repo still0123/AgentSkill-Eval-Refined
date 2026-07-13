@@ -22,6 +22,7 @@ def test_schema_bundle_contains_core_persisted_models() -> None:
     assert {"ExperimentVariant", "PairBlock", "Run", "RunAttempt", "RunMeasurement"} <= set(schemas)
     assert {"TraceManifest", "FailureDiagnosis", "PairTraceDiff"} <= set(schemas)
     assert {"OptimizationJob", "SkillCandidate"} <= set(schemas)
+    assert {"FinalEvaluationJob", "FinalEvaluationReport"} <= set(schemas)
 
 
 def test_cli_exports_valid_json_schema_bundle(tmp_path: Path) -> None:

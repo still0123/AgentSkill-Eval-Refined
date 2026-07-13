@@ -142,5 +142,6 @@ optimization-jobs/<job-id>/
 - 不实现 validation_confirm、regression_dev 和最终发布审批；
 - 不实现 FastAPI、Redis、Vue、MCP 或 Memory/RAG。
 
-下一纵切应建立独立 `final-evaluation` 权限域，将唯一 frozen base/winner 送入一次未见
-确认批次；如果查看结果后再次修改 Skill，该确认数据版本必须烧毁。
+该纵切已经实现为 [Independent Final Evaluation](./independent-final-evaluation.md)：独立
+权限域只读取 frozen base/winner，并在 `validation_confirm` 或一次性 `locked_test` 上配对
+复评；如果查看结果后再次修改 Skill，原确认结论不再适用于新版本。

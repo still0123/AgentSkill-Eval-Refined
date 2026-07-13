@@ -1154,7 +1154,19 @@ OptimizationJobResult:
 - 支持严格 JSON Process Evaluator 接真实 Agent Runtime；离线 evaluator 强制标记 simulated；
 - 搜索契约不包含 locked-test 字段，Job 固定记录 `locked_test_accessed=false`。
 
-详细协议见 `docs/benchmark-guided-skill-search.md`。下一纵切才实现独立 final-evaluation 权限域、一次冻结确认批次和人工发布审批；不得把本阶段 validation winner 表述为确认性性能提升。
+详细协议见 `docs/benchmark-guided-skill-search.md`。不得把本阶段 validation winner 表述为确认性性能提升。
+
+### 10.9 Independent Final Evaluation MVP 实现基线（2026-07-13）
+
+搜索 winner 必须在独立权限域中复评，搜索过程不得访问 `validation_confirm` 或
+`locked_test`。最终评测只接受状态为 `FROZEN` 的 OptimizationJob，复制并复验 original
+base 与唯一 winner 内容哈希，然后在单一 split DatasetVersion 上执行相同 case、Evaluator
+和重复次数的配对实验。
+
+`validation_confirm` 用于确认泛化；`locked_test` 为每个 OptimizationJob 原子写入唯一消费
+凭证，失败也不得更换配置重试。最终报告保存逐 case W/T/L、成功率增益、Token 开销、独立
+缺陷组数量、退化门结果和明确 claim limit。模拟模式只能证明控制器工程闭环，不能成为
+Agent 性能证据。详细协议见 `docs/independent-final-evaluation.md`。
 
 ---
 

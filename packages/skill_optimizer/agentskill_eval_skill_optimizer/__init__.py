@@ -7,6 +7,19 @@ from agentskill_eval_skill_optimizer.evaluator import (
     SimulatedKeywordEvaluator,
     build_evaluator,
 )
+from agentskill_eval_skill_optimizer.final_evaluation import (
+    FinalEvaluationError,
+    FinalEvaluationResult,
+    FinalEvaluationStore,
+    IndependentFinalEvaluator,
+)
+from agentskill_eval_skill_optimizer.final_spec import (
+    FinalEvaluationCase,
+    FinalGateSpec,
+    FinalSpecError,
+    IndependentFinalEvaluationSpec,
+    SimulatedFinalDataset,
+)
 from agentskill_eval_skill_optimizer.search import (
     BenchmarkGuidedSkillSearch,
     OptimizationStore,
@@ -30,7 +43,15 @@ __all__ = [
     "CandidateEvaluator",
     "EvaluationError",
     "EvaluatorSpec",
+    "FinalEvaluationCase",
+    "FinalEvaluationError",
+    "FinalEvaluationResult",
+    "FinalEvaluationStore",
+    "FinalGateSpec",
+    "FinalSpecError",
     "MutationSpec",
+    "IndependentFinalEvaluationSpec",
+    "IndependentFinalEvaluator",
     "OptimizationSearchSpec",
     "OptimizationStore",
     "ProcessEvaluator",
@@ -40,6 +61,7 @@ __all__ = [
     "SearchConstraintSpec",
     "SearchSpecError",
     "SimulatedKeywordEvaluator",
+    "SimulatedFinalDataset",
     "SkillSearchError",
     "SkillSearchResult",
     "ValidationSearchDataset",

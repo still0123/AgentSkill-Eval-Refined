@@ -43,6 +43,16 @@ from agentskill_eval_contracts.experiment import (
     PairBlock,
     VariantReference,
 )
+from agentskill_eval_contracts.final_evaluation import (
+    FinalCaseComparison,
+    FinalDecision,
+    FinalEvaluationJob,
+    FinalEvaluationReport,
+    FinalEvaluationStage,
+    FinalEvaluationStatus,
+    LockedTestReceipt,
+    PairClassification,
+)
 from agentskill_eval_contracts.measurements import RunMeasurement
 from agentskill_eval_contracts.optimizer import (
     ALLOWED_SKILL_CANDIDATE_TRANSITIONS,
@@ -124,11 +134,19 @@ __all__ = [
     "CommandEvidence",
     "FailureDiagnosis",
     "FailureLabel",
+    "FinalCaseComparison",
+    "FinalDecision",
+    "FinalEvaluationJob",
+    "FinalEvaluationReport",
+    "FinalEvaluationStage",
+    "FinalEvaluationStatus",
     "HexDigest",
     "MemoryRagSnapshot",
+    "LockedTestReceipt",
     "OptimizationJob",
     "OptimizationJobStatus",
     "PairBlock",
+    "PairClassification",
     "PairTraceDiff",
     "PriceSnapshot",
     "PublishedCase",

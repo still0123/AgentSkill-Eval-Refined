@@ -43,6 +43,8 @@ class CandidateOrigin(str, Enum):
 class SearchEvaluationStage(str, Enum):
     SUBSET = "validation_subset"
     FULL = "validation_search_full"
+    VALIDATION_CONFIRM = "validation_confirm"
+    LOCKED_TEST = "locked_test"
 
 
 ALLOWED_SKILL_CANDIDATE_TRANSITIONS = {

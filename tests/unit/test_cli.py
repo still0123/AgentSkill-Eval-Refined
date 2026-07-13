@@ -25,6 +25,7 @@ def test_cli_help_lists_project_description() -> None:
     assert "dataset" in result.stdout
     assert "trace" in result.stdout
     assert "optimize" in result.stdout
+    assert "final" in result.stdout
     assert "version" in result.stdout
 
 
@@ -134,6 +135,20 @@ def test_optimizer_simulation_requires_explicit_acknowledgement() -> None:
             "optimize",
             "search",
             str(ROOT / "examples/optimizer/python-review-search/search.example.yaml"),
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert "allow-simulation" in result.stdout
+
+
+def test_final_evaluation_simulation_requires_explicit_acknowledgement() -> None:
+    result = runner.invoke(
+        app,
+        [
+            "final",
+            "evaluate",
+            str(ROOT / "examples/optimizer/python-review-search/final.example.yaml"),
         ],
     )
 

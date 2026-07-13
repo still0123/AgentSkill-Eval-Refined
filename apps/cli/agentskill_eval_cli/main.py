@@ -29,6 +29,9 @@ from agentskill_eval_experiment import (
 )
 from agentskill_eval_skill_optimizer import (
     BenchmarkGuidedSkillSearch,
+    FinalEvaluationStore,
+    IndependentFinalEvaluationSpec,
+    IndependentFinalEvaluator,
     OptimizationSearchSpec,
     OptimizationStore,
 )
@@ -58,6 +61,8 @@ benchmark_app = typer.Typer(help="Generate, review, and publish audited benchmar
 app.add_typer(benchmark_app, name="benchmark")
 optimize_app = typer.Typer(help="Search validation data for a frozen Skill candidate.")
 app.add_typer(optimize_app, name="optimize")
+final_app = typer.Typer(help="Evaluate a frozen base/winner pair on an independent split.")
+app.add_typer(final_app, name="final")
 
 
 def _version_callback(value: bool) -> None:
@@ -83,6 +88,65 @@ def main(
 def version() -> None:
     """Show the installed AgentSkill-Eval version."""
     typer.echo(__version__)
+
+
+@final_app.command("evaluate")
+def final_evaluate(
+    spec_path: Path = typer.Argument(  # noqa: B008
+        ..., exists=True, dir_okay=False, help="Independent final-evaluation spec."
+    ),
+    workspace: Path = typer.Option(  # noqa: B008
+        Path(".agentskill-eval-workspace"), "--workspace", file_okay=False
+    ),
+    allow_simulation: bool = typer.Option(  # noqa: B008
+        False,
+        "--allow-simulation",
+        help="Required for simulated evaluators; results are never performance evidence.",
+    ),
+) -> None:
+    """Run paired confirmation or one-shot locked-test evaluation."""
+    spec = IndependentFinalEvaluationSpec.load(spec_path)
+    if spec.evaluator.simulated and not allow_simulation:
+        raise typer.BadParameter(
+            "simulated evaluator requires --allow-simulation",
+            param_hint="--allow-simulation",
+        )
+    result = IndependentFinalEvaluator(workspace).run(spec)
+    typer.echo(
+        json.dumps(
+            {
+                "absolute_gain": result.report.absolute_gain,
+                "base_pass_rate": result.report.base_pass_rate,
+                "decision": result.report.decision.value,
+                "job_id": str(result.job.id),
+                "loss_count": result.report.loss_count,
+                "report_html": str(result.report_html),
+                "report_json": str(result.report_json),
+                "simulated": result.job.simulated,
+                "stage": result.job.stage.value,
+                "winner_pass_rate": result.report.winner_pass_rate,
+            },
+            sort_keys=True,
+        )
+    )
+
+
+@final_app.command("status")
+def final_status(
+    workspace: Path = typer.Argument(..., exists=True, file_okay=False),  # noqa: B008
+    job_id: UUID = typer.Argument(...),  # noqa: B008
+) -> None:
+    """Show one persisted independent final-evaluation report."""
+    store = FinalEvaluationStore(workspace)
+    job = store.load_job(job_id)
+    report = store.load_report(job_id)
+    typer.echo(
+        json.dumps(
+            {"job": job.model_dump(mode="json"), "report": report.model_dump(mode="json")},
+            ensure_ascii=False,
+            sort_keys=True,
+        )
+    )
 
 
 @optimize_app.command("search")

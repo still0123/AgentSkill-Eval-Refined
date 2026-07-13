@@ -2,7 +2,7 @@
 
 AgentSkill-Eval 是一个面向 Agent Skill 的可复现评测与回归分析项目。平台以受控配对实验为核心，比较同一 Agent 在 without-Skill、with-Skill 或不同 Skill 版本下的任务质量、成本、时延与稳定性。
 
-当前仓库已完成 **P0 可信配对闭环、P1 Trace Intelligence 纵切和 P2 Automatic Benchmark Generation MVP**。平台在执行前冻结 Case 与 Skill 输入；逐 Attempt 保存 Skill 安装或 baseline 洁净证据；在 Runner 输出持久化前执行精确 Secret 扫描；生成确定性的离线审计与再分析包；同时采集有能力声明的规范化事件，执行证据引用的规则诊断，并从真实 Git 历史重建、验证和发布可审计 Benchmark。完整设计见 [开发设计文档](./AgentSkillEval_%E5%BC%80%E5%8F%91%E8%AE%BE%E8%AE%A1%E6%96%87%E6%A1%A3_v1.0.md)。
+当前仓库已完成 **P0 可信配对闭环、P1 Trace Intelligence 纵切、P2 Automatic Benchmark Generation、Benchmark-guided Skill Search 与 Independent Final Evaluation MVP**。平台冻结 Case 与 Skill 输入，保存执行和诊断证据，从真实 Git 历史发布可审计 Benchmark；随后在 `validation_search` 上筛选 Skill 候选，并在独立 `validation_confirm`／一次性 `locked_test` 上对 frozen base/winner 进行配对复评。完整设计见 [开发设计文档](./AgentSkillEval_%E5%BC%80%E5%8F%91%E8%AE%BE%E8%AE%A1%E6%96%87%E6%A1%A3_v1.0.md)。
 
 ## 环境要求
 
@@ -40,6 +40,9 @@ agentskill-eval benchmark publish .agentskill-eval/benchmark JOB_UUID --publishe
 agentskill-eval optimize search examples/optimizer/python-review-search/search.example.yaml \
   --workspace .agentskill-eval/optimizer --allow-simulation
 agentskill-eval optimize status .agentskill-eval/optimizer OPTIMIZATION_JOB_UUID
+agentskill-eval final evaluate examples/optimizer/python-review-search/final.example.yaml \
+  --workspace .agentskill-eval/optimizer --allow-simulation
+agentskill-eval final status .agentskill-eval/optimizer FINAL_EVALUATION_JOB_UUID
 ```
 
 ## 本地验证

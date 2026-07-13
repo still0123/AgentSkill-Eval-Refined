@@ -1,0 +1,18 @@
+schema_version: ase/independent-final-evaluation/v1alpha1
+name: python-review-independent-confirmation-demo
+optimization_job_id: 8aed86ce-71eb-5e70-963e-046d9c9ae156
+dataset_path: examples/optimizer/python-review-search/final-validation.yaml
+stage: validation_confirm
+repeats: 3
+timeout_seconds: 60
+gates:
+  min_absolute_gain: 0.5
+  max_loss_cases: 0
+  max_token_overhead_ratio: 0.25
+  min_independent_groups: 3
+  bootstrap_resamples: 2000
+  bootstrap_seed: 2026
+evaluator:
+  type: simulated_keyword
+  version: final-controller-demo-v1
+  simulated: true
