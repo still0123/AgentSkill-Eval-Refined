@@ -23,6 +23,13 @@ def test_schema_bundle_contains_core_persisted_models() -> None:
     assert {"TraceManifest", "FailureDiagnosis", "PairTraceDiff"} <= set(schemas)
     assert {"OptimizationJob", "SkillCandidate"} <= set(schemas)
     assert {"FinalEvaluationJob", "FinalEvaluationReport"} <= set(schemas)
+    assert {
+        "RealPreflightReport",
+        "RealAttemptEvidence",
+        "RealEvidenceRunManifest",
+        "RealExperimentReport",
+    } <= set(schemas)
+    assert len(schemas) == len(set(schemas))
 
 
 def test_cli_exports_valid_json_schema_bundle(tmp_path: Path) -> None:

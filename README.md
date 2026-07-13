@@ -235,6 +235,13 @@ Generation/Grounding，覆盖 Recall@K、Precision@K、MRR、nDCG、引用与证
 adapter 目前仅提供固定 executable/SHA-256、无 shell、最小环境和响应限制的安全边界。详见
 [Memory/RAG Evaluation MVP](./docs/memory-rag-evaluation.md)。
 
+## Read-only Evaluation Dashboard MVP
+
+`apps/web` 提供 Vue 3 + TypeScript 的只读本地研究报告 Dashboard，可加载配对实验、Trace/
+Diagnosis、Benchmark Generation 和 Skill Search fixture，展示指标、W/T/L、候选状态与证据引用。
+输入经运行时校验和文本转义，不执行报告中的 HTML/脚本，也不提供实验写入、真实模型调用或服务端
+能力。完整启动、测试和安全边界见 [Dashboard MVP](./docs/dashboard-mvp.md)。
+
 ## 开发原则
 
 - P0 优先跑通无服务依赖的本地可信闭环。

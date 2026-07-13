@@ -24,9 +24,13 @@ def test_cli_help_lists_project_description() -> None:
     assert "storage" in result.stdout
     assert "dataset" in result.stdout
     assert "trace" in result.stdout
+    assert "experiment" in result.stdout
+    assert "benchmark" in result.stdout
     assert "optimize" in result.stdout
     assert "final" in result.stdout
     assert "real" in result.stdout
+    assert "mcp" in result.stdout
+    assert "memory-rag" in result.stdout
     assert "version" in result.stdout
 
 

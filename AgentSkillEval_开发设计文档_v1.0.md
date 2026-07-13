@@ -1715,3 +1715,13 @@ Process Retriever/Memory adapter 只实现固定 executable/SHA-256、无 shell�
 与响应复杂度限制的接入边界。本阶段没有 Milvus、自研向量库、生产知识库、真实 Agent、
 Embedding 服务或付费模型调用。完整协议见
 [`docs/memory-rag-evaluation.md`](./docs/memory-rag-evaluation.md)。
+
+---
+
+## 25. Read-only Evaluation Dashboard MVP 实现状态
+
+当前 `apps/web` 已实现 Vue 3 + TypeScript 的只读本地 Dashboard，可加载已冻结的配对实验、
+Trace/Diagnosis、Benchmark Generation 与 Skill Search fixture，展示研究指标、候选状态、W/T/L
+和 evidence reference。输入使用运行时 Schema 校验，文本按 Vue 默认规则转义，不执行报告中的
+HTML 或外部脚本。本阶段不包含实验写入 API、FastAPI、真实模型调用或生产鉴权；完整边界见
+[`docs/dashboard-mvp.md`](./docs/dashboard-mvp.md)。

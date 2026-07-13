@@ -4,3 +4,4 @@
 
 - [MCP Tool Evaluation MVP](./mcp-tool-evaluation.md)
 - [Memory/RAG Evaluation MVP](./memory-rag-evaluation.md)
+- [Read-only Evaluation Dashboard MVP](./dashboard-mvp.md)

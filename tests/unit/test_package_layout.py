@@ -9,6 +9,7 @@ PACKAGE_NAMES = (
     "agentskill_eval_experiment",
     "agentskill_eval_mcp_lab",
     "agentskill_eval_memory_rag_lab",
+    "agentskill_eval_real_evidence",
     "agentskill_eval_runner_adapters",
     "agentskill_eval_skill_optimizer",
     "agentskill_eval_trace_intelligence",
