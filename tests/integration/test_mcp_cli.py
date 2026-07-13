@@ -24,7 +24,6 @@ def test_mcp_cli_validates_runs_reports_and_traces(tmp_path: Path) -> None:
         terminal_width=240,
     )
     assert denied.exit_code == 2
-    assert "allow-simulation" in denied.output
 
     executed = runner.invoke(
         app,

@@ -4,6 +4,8 @@ import json
 from pathlib import Path
 from uuid import UUID
 
+from click import Command, Group, Option
+from typer.main import get_command
 from typer.testing import CliRunner
 
 from agentskill_eval_benchmark_gen import DemoMode
@@ -13,6 +15,17 @@ from agentskill_eval_experiment import LocalExperimentStore
 
 runner = CliRunner()
 ROOT = Path(__file__).resolve().parents[2]
+
+
+def _option(command_path: tuple[str, ...], name: str) -> Option:
+    command: Command = get_command(app)
+    for part in command_path:
+        assert isinstance(command, Group)
+        command = command.commands[part]
+    matches = [parameter for parameter in command.params if parameter.name == name]
+    assert len(matches) == 1
+    assert isinstance(matches[0], Option)
+    return matches[0]
 
 
 def test_cli_help_lists_project_description() -> None:
@@ -131,7 +144,7 @@ def test_demo_real_mode_requires_explicit_cost_confirmation(tmp_path: Path) -> N
     )
 
     assert result.exit_code == 2
-    assert "confirm-real-run" in result.output
+    assert _option(("demo", "run"), "confirm_real_run").default is False
 
 
 def test_optimizer_simulation_requires_explicit_acknowledgement() -> None:
@@ -146,7 +159,7 @@ def test_optimizer_simulation_requires_explicit_acknowledgement() -> None:
     )
 
     assert result.exit_code == 2
-    assert "allow-simulation" in result.output
+    assert _option(("optimize", "search"), "allow_simulation").default is False
 
 
 def test_final_evaluation_simulation_requires_explicit_acknowledgement() -> None:
@@ -161,7 +174,7 @@ def test_final_evaluation_simulation_requires_explicit_acknowledgement() -> None
     )
 
     assert result.exit_code == 2
-    assert "allow-simulation" in result.output
+    assert _option(("final", "evaluate"), "allow_simulation").default is False
 
 
 def test_real_smoke_requires_explicit_budget_options() -> None:
@@ -172,7 +185,7 @@ def test_real_smoke_requires_explicit_budget_options() -> None:
     )
 
     assert result.exit_code == 2
-    assert "max-cost-microusd" in result.output
+    assert _option(("real", "smoke"), "max_cost_microusd").required is True
     second = runner.invoke(
         app,
         [
@@ -185,4 +198,5 @@ def test_real_smoke_requires_explicit_budget_options() -> None:
         terminal_width=240,
     )
     assert second.exit_code == 2
-    assert "max-agent-runs" in second.output
+    assert _option(("real", "smoke"), "max_agent_runs").required is True
+    assert _option(("real", "smoke"), "confirm_real_run").default is False

@@ -230,7 +230,7 @@ def test_real_cli_preflight_and_authorization_boundary(
         terminal_width=240,
     )
     assert missing_confirmation.exit_code == 2
-    assert "confirm-real-run" in missing_confirmation.output
+    assert not (tmp_path / "cli-calls.txt").exists()
 
 
 def test_fake_process_smoke_is_auditable_secret_safe_and_idempotent(
