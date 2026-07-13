@@ -2,7 +2,7 @@
 
 AgentSkill-Eval 是一个面向 Agent Skill 的可复现评测与回归分析项目。平台以受控配对实验为核心，比较同一 Agent 在 without-Skill、with-Skill 或不同 Skill 版本下的任务质量、成本、时延与稳定性。
 
-当前仓库处于 **P0 目标 1：Python 项目初始化**。本阶段只提供可安装的 monorepo 骨架、Typer CLI 和基础测试工具；Runner 防腐层、领域契约、实验编排与报告会在后续目标中依次实现。完整设计见 [开发设计文档](./AgentSkillEval_%E5%BC%80%E5%8F%91%E8%AE%BE%E8%AE%A1%E6%96%87%E6%A1%A3_v1.0.md)。
+当前仓库已完成 **P0 目标 1～2：Python 项目初始化与核心数据契约**。目前提供可安装的 monorepo、Typer CLI、冻结的 Pydantic 领域模型、稳定内容哈希、Run 状态机和 JSON Schema 导出；Runner 防腐层、持久化恢复、实验编排与报告会在后续目标中依次实现。完整设计见 [开发设计文档](./AgentSkillEval_%E5%BC%80%E5%8F%91%E8%AE%BE%E8%AE%A1%E6%96%87%E6%A1%A3_v1.0.md)。
 
 ## 环境要求
 
@@ -20,6 +20,7 @@ python -m pip install -e ".[dev]"
 
 agentskill-eval --help
 agentskill-eval version
+agentskill-eval schema export /tmp/agentskill-eval-schema.json
 ```
 
 ## 本地验证
@@ -52,6 +53,15 @@ runner_compatibility/     固定 Runner 版本与 Golden Contract
 examples/                 演示 Skill 与 Dataset
 tests/                    unit / integration / e2e
 ```
+
+## 已实现的核心契约
+
+- `ExperimentVariant`：保存 Runner、Agent、Skill、工具、Memory/RAG、沙箱和价格快照，并生成与数据库 ID 无关的内容指纹。
+- `PairBlock`：冻结 Case、independence group、repeat、seed 和 Variant 执行顺序。
+- `Run`：区分执行生命周期与 `pass/fail/invalid` 评测结果，提供稳定幂等键和合法状态迁移表。
+- `RunAttempt`：记录物理尝试、lease generation、fencing token、错误和 observed environment fingerprint。
+- `ArtifactManifest`：保存内容哈希、大小、媒体类型和敏感级别，拒绝绝对路径、路径穿越及非规范路径。
+- `ExperimentManifest`：冻结数据集、协议、统计计划、预算和 Variant 引用。
 
 ## 开发原则
 
