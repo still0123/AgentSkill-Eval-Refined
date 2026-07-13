@@ -27,6 +27,7 @@ from agentskill_eval_experiment import (
     ReplayBundleWriter,
     StaticReportWriter,
 )
+from agentskill_eval_mcp_lab import LabConfig, McpDataset, McpLabRunner, find_trace, load_report
 from agentskill_eval_skill_optimizer import (
     BenchmarkGuidedSkillSearch,
     FinalEvaluationStore,
@@ -63,6 +64,10 @@ optimize_app = typer.Typer(help="Search validation data for a frozen Skill candi
 app.add_typer(optimize_app, name="optimize")
 final_app = typer.Typer(help="Evaluate a frozen base/winner pair on an independent split.")
 app.add_typer(final_app, name="final")
+mcp_app = typer.Typer(help="Validate and run auditable MCP tool-evaluation experiments.")
+app.add_typer(mcp_app, name="mcp")
+mcp_lab_app = typer.Typer(help="Run the deterministic offline MCP lab.")
+mcp_app.add_typer(mcp_lab_app, name="lab")
 
 
 def _version_callback(value: bool) -> None:
@@ -88,6 +93,71 @@ def main(
 def version() -> None:
     """Show the installed AgentSkill-Eval version."""
     typer.echo(__version__)
+
+
+@mcp_app.command("validate")
+def mcp_validate(
+    dataset: Path = typer.Argument(..., exists=True, dir_okay=False),  # noqa: B008
+) -> None:
+    """Validate a strict MCP evaluation dataset contract."""
+    loaded = McpDataset.load(dataset, allowed_root=dataset.parent)
+    typer.echo(
+        json.dumps(
+            {
+                "name": loaded.name,
+                "case_count": len(loaded.cases),
+                "case_ids": [case.case_id for case in loaded.cases],
+                "simulated": loaded.simulated,
+            },
+            sort_keys=True,
+        )
+    )
+
+
+@mcp_lab_app.command("run")
+def mcp_lab_run(
+    config: Path = typer.Argument(..., exists=True, dir_okay=False),  # noqa: B008
+    workspace: Path = typer.Option(..., "--workspace", file_okay=False),  # noqa: B008
+    allow_simulation: bool = typer.Option(False, "--allow-simulation"),  # noqa: B008
+) -> None:
+    """Run the deterministic paired Mock MCP experiment."""
+    loaded = LabConfig.load(config)
+    if loaded.simulated and not allow_simulation:
+        raise typer.BadParameter(
+            "Mock MCP Lab requires --allow-simulation and cannot support real-agent claims",
+            param_hint="--allow-simulation",
+        )
+    artifacts = McpLabRunner(workspace).run(loaded)
+    typer.echo(
+        json.dumps(
+            {
+                "experiment_id": str(artifacts.report.experiment_id),
+                "report_json": str(artifacts.report_json),
+                "report_html": str(artifacts.report_html),
+                "simulated": artifacts.report.simulated,
+                "claim_limit": artifacts.report.claim_limit,
+            },
+            sort_keys=True,
+        )
+    )
+
+
+@mcp_app.command("report")
+def mcp_report(
+    workspace: Path = typer.Argument(..., exists=True, file_okay=False),  # noqa: B008
+    experiment_id: UUID = typer.Argument(...),  # noqa: B008
+) -> None:
+    """Show one persisted MCP paired report."""
+    typer.echo(load_report(workspace, experiment_id).model_dump_json(indent=2))
+
+
+@mcp_app.command("trace")
+def mcp_trace(
+    workspace: Path = typer.Argument(..., exists=True, file_okay=False),  # noqa: B008
+    run_id: UUID = typer.Argument(...),  # noqa: B008
+) -> None:
+    """Show one normalized MCP trace by run ID."""
+    typer.echo(json.dumps(find_trace(workspace, run_id), ensure_ascii=False, sort_keys=True))
 
 
 @final_app.command("evaluate")

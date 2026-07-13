@@ -198,6 +198,14 @@ successive halving、original/manual/random/search 完整对照、Pareto 排序�
 只证明控制器行为。真实 Agent 可通过严格 JSON Process Evaluator 接入。详见
 [Benchmark-guided Skill Search MVP](./docs/benchmark-guided-skill-search.md)。
 
+## MCP Tool Evaluation MVP
+
+新增完全离线的 Mock MCP Lab、严格 Case/Trace 契约、六类确定性 grader、配对统计和无脚本
+JSON/HTML 报告。Lab 覆盖工具选择、参数、序列、故障恢复、效率及副作用确认；模拟执行必须显式
+传 `--allow-simulation`，报告禁止把结果表述为真实 Agent 提升。真实 Process adapter 目前仅定义
+固定 executable/SHA-256、无 shell、最小环境和响应限制的安全边界，不连接生产 MCP Server。
+示例与限制见 [MCP Tool Evaluation MVP](./docs/mcp-tool-evaluation.md)。
+
 ## 开发原则
 
 - P0 优先跑通无服务依赖的本地可信闭环。

@@ -1665,3 +1665,14 @@ Mock Agent 场景：
 - [GEPA](https://arxiv.org/abs/2507.19457)：反思式 Prompt/策略搜索参考；
 - [RAGAS](https://aclanthology.org/2024.eacl-demo.16/) 与 [ARES](https://aclanthology.org/2024.naacl-long.20/)：RAG 分层评测与少量人工校准；
 - [LongMemEval](https://arxiv.org/abs/2410.10813)：长期 Memory 的信息提取、推理、更新与拒答任务。
+
+---
+
+## 22. MCP Tool Evaluation MVP 实现状态
+
+当前已实现独立、离线、强制 simulated 的 MCP 评测纵切：严格 Case 与 Trace 契约、确定性 Mock
+MCP Lab、工具选择/参数/序列/恢复/效率/副作用安全 grader、固定条件的 with/without guidance
+配对统计、CLI 和离线 JSON/HTML 报告。Process adapter 只实现固定 executable 与 SHA-256、
+无 shell、最小环境、超时进程组终止及响应复杂度限制的扩展边界。本阶段没有连接生产 MCP
+Server、真实 Agent 或付费模型，也没有实现通用 MCP 管理平台。完整协议与命令见
+[`docs/mcp-tool-evaluation.md`](./docs/mcp-tool-evaluation.md)。
