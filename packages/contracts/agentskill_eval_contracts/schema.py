@@ -9,6 +9,11 @@ from typing import Dict, Type
 from pydantic import BaseModel, JsonValue
 
 from agentskill_eval_contracts.artifacts import ArtifactManifest
+from agentskill_eval_contracts.benchmark import (
+    BenchmarkCandidate,
+    BenchmarkDatasetVersion,
+    BenchmarkJob,
+)
 from agentskill_eval_contracts.evidence import (
     FrozenInputManifest,
     ReplayBundleManifest,
@@ -37,6 +42,9 @@ SCHEMA_MODELS: Dict[str, Type[BaseModel]] = {
         TraceManifest,
         FailureDiagnosis,
         PairTraceDiff,
+        BenchmarkJob,
+        BenchmarkCandidate,
+        BenchmarkDatasetVersion,
     )
 }
 

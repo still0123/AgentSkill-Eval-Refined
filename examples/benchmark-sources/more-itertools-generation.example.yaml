@@ -1,0 +1,77 @@
+schema_version: ase/benchmark-generation/v1alpha1
+name: more-itertools-real-defects
+version: "2026.07.13"
+repository_path: /absolute/path/to/offline/more-itertools
+repository_url: https://github.com/more-itertools/more-itertools.git
+fork_lineage: github.com/more-itertools/more-itertools
+license_spdx: MIT
+license_path: LICENSE
+target_split: validation_search
+generator_profile: local-git-history/v1
+verifier_profile: deterministic-subprocess/v1
+contamination_risk: high
+quality_gate:
+  repeat_count: 3
+  timeout_seconds: 30
+  mutation_required: true
+  alternative_required: true
+  prohibit_network_time_random: true
+  prohibit_patch_leakage: true
+  max_repository_files: 5000
+  max_repository_bytes: 50000000
+budget:
+  max_candidates: 2
+  max_commands: 24
+  wall_seconds: 600
+candidates:
+  - key: more-itertools-last-reversed-none
+    before_commit: c834d6e4a0c4280b7b7750cb0de8dd8acb3d4c2c
+    after_commit: cca32949f12d473fd823e37a5530c30d2faa1332
+    task: >-
+      Fix last() so an iterable whose __reversed__ attribute is explicitly disabled with None
+      still returns its final element instead of raising an exception. Preserve existing behavior.
+    issue_url: https://github.com/more-itertools/more-itertools/commit/cca32949f12d473fd823e37a5530c30d2faa1332
+    production_paths: [more_itertools/more.py]
+    regression_test_paths: [tests/test_more.py]
+    test_command: ["${PYTHON}", -m, unittest, tests.test_more.LastTests.test_reversed_is_none]
+    alternative_patch: |
+      diff --git a/more_itertools/more.py b/more_itertools/more.py
+      index 3cd42e8..1111111 100755
+      --- a/more_itertools/more.py
+      +++ b/more_itertools/more.py
+      @@ -283,7 +283,8 @@ def last(iterable, default=_marker):
+               if isinstance(iterable, Sequence):
+                   return iterable[-1]
+               # Work around https://bugs.python.org/issue38525
+      -        if hasattr(iterable, '__reversed__'):
+      +        if (hasattr(iterable, '__reversed__')
+      +                and iterable.__reversed__ is not None):
+                   return next(reversed(iterable))
+               return deque(iterable, maxlen=1)[-1]
+           except (IndexError, TypeError, StopIteration):
+    category: positive
+    tags: [python, regression, iterator]
+  - key: more-itertools-sample-strict-counts
+    before_commit: f36c88fe03688fa442154ef14f429bcfa4c38525
+    after_commit: ae37eb38a1d3958d764ff3ec43107116dfe29135
+    task: >-
+      Fix strict counted sampling so requesting more samples than the counted population raises
+      ValueError, including when population exhaustion occurs inside the sampling loop.
+    issue_url: https://github.com/more-itertools/more-itertools/commit/ae37eb38a1d3958d764ff3ec43107116dfe29135
+    production_paths: [more_itertools/more.py]
+    regression_test_paths: [tests/test_more.py]
+    test_command: ["${PYTHON}", -m, unittest, tests.test_more.SampleTests.test_error_cases]
+    alternative_patch: |
+      diff --git a/more_itertools/more.py b/more_itertools/more.py
+      index 91ca300..2222222 100755
+      --- a/more_itertools/more.py
+      +++ b/more_itertools/more.py
+      @@ -3879,3 +3879,6 @@ def sample(iterable, k, weights=None, *, counts=None, strict=False):
+           elif counts is not None:
+      +        counts = list(counts)
+      +        if strict and sum(counts) < k:
+      +            raise ValueError('Sample larger than population')
+               counts = iter(counts)
+               return _sample_counted(iterator, k, counts, strict)
+    category: positive
+    tags: [python, regression, sampling]

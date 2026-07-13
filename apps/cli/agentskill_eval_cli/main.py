@@ -9,13 +9,16 @@ from uuid import UUID
 import typer
 
 from agentskill_eval_benchmark_gen import (
+    AutomaticBenchmarkGenerator,
+    BenchmarkGenerationSpec,
+    BenchmarkStore,
     DatasetLoader,
     DemoExperimentRunner,
     DemoMode,
     DemoRunConfig,
 )
 from agentskill_eval_cli import __version__
-from agentskill_eval_contracts import export_schema_bundle
+from agentskill_eval_contracts import ReviewDecision, export_schema_bundle
 from agentskill_eval_experiment import (
     AnalysisConfig,
     ExecutionRecord,
@@ -46,6 +49,8 @@ experiment_app = typer.Typer(help="Package and inspect persisted experiments.")
 app.add_typer(experiment_app, name="experiment")
 trace_app = typer.Typer(help="Inspect normalized traces and rule-based diagnoses.")
 app.add_typer(trace_app, name="trace")
+benchmark_app = typer.Typer(help="Generate, review, and publish audited benchmark candidates.")
+app.add_typer(benchmark_app, name="benchmark")
 
 
 def _version_callback(value: bool) -> None:
@@ -71,6 +76,91 @@ def main(
 def version() -> None:
     """Show the installed AgentSkill-Eval version."""
     typer.echo(__version__)
+
+
+@benchmark_app.command("generate")
+def generate_benchmark(
+    spec_path: Path = typer.Argument(  # noqa: B008
+        ..., exists=True, dir_okay=False, help="Pinned local Git-history generation spec."
+    ),
+    workspace: Path = typer.Option(  # noqa: B008
+        Path(".agentskill-eval-workspace"), "--workspace", file_okay=False
+    ),
+) -> None:
+    """Reconstruct, repeatedly verify, and deduplicate benchmark candidates."""
+    result = AutomaticBenchmarkGenerator(workspace).generate(
+        BenchmarkGenerationSpec.load(spec_path)
+    )
+    typer.echo(
+        json.dumps(
+            {
+                "job_id": str(result.job.id),
+                "status": result.job.status.value,
+                "candidates": [
+                    {"id": str(item.id), "key": item.key, "status": item.status.value}
+                    for item in result.candidates
+                ],
+            },
+            sort_keys=True,
+        )
+    )
+
+
+@benchmark_app.command("status")
+def benchmark_status(
+    workspace: Path = typer.Argument(..., exists=True, file_okay=False),  # noqa: B008
+    job_id: UUID = typer.Argument(...),  # noqa: B008
+) -> None:
+    """Show candidate lifecycles, gates, and retained rejection reasons."""
+    store = BenchmarkStore(workspace)
+    job = store.load_job(job_id)
+    typer.echo(
+        json.dumps(
+            {
+                "job": job.model_dump(mode="json"),
+                "candidates": [item.model_dump(mode="json") for item in store.list_candidates(job)],
+            },
+            ensure_ascii=False,
+            sort_keys=True,
+        )
+    )
+
+
+@benchmark_app.command("review")
+def review_benchmark_candidate(
+    workspace: Path = typer.Argument(..., exists=True, file_okay=False),  # noqa: B008
+    job_id: UUID = typer.Argument(...),  # noqa: B008
+    candidate_id: UUID = typer.Argument(...),  # noqa: B008
+    reviewer: str = typer.Option(..., "--reviewer"),  # noqa: B008
+    approve: bool = typer.Option(False, "--approve/--reject"),  # noqa: B008
+    reason: str = typer.Option(..., "--reason"),  # noqa: B008
+) -> None:
+    """Record an explicit human approval or rejection decision."""
+    decision = ReviewDecision.APPROVED if approve else ReviewDecision.REJECTED
+    candidate = AutomaticBenchmarkGenerator(workspace).review(
+        job_id, candidate_id, reviewer, decision, reason
+    )
+    typer.echo(json.dumps(candidate.model_dump(mode="json"), ensure_ascii=False, sort_keys=True))
+
+
+@benchmark_app.command("publish")
+def publish_benchmark(
+    workspace: Path = typer.Argument(..., exists=True, file_okay=False),  # noqa: B008
+    job_id: UUID = typer.Argument(...),  # noqa: B008
+    publisher: str = typer.Option(..., "--publisher"),  # noqa: B008
+) -> None:
+    """Publish approved candidates as an immutable DatasetVersion."""
+    version, path = AutomaticBenchmarkGenerator(workspace).publish(job_id, publisher)
+    typer.echo(
+        json.dumps(
+            {
+                "dataset_version_id": str(version.id),
+                "content_sha256": version.content_sha256,
+                "path": str(path),
+            },
+            sort_keys=True,
+        )
+    )
 
 
 @dataset_app.command("validate")

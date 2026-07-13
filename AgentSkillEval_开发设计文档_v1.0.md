@@ -1027,6 +1027,20 @@ BenchmarkJobResult:
 
 最小纵切验收：从一个许可明确的仓库固定两个历史缺陷，自动重建 fixture，验证 before-fail/after-pass，运行 mutation test 与一个替代修复，通过人工 review 后发布一个 DatasetVersion。P2 扩展前必须先证明这条链路可审计，而不是只展示 LLM 生成 YAML。
 
+### 9.8 MVP 实现基线（2026-07-13）
+
+当前实现已将上述最小纵切冻结为 CLI 与持久化契约：
+
+- `benchmark generate/status/review/publish` 分离自动生成和人工发布权限；
+- 每个候选保存逐转换不可变快照、阶段输入/输出哈希、命令证据和拒绝原因；
+- 通过 Git tree/blob 安全重建 before/after fixture，禁止 symlink、submodule 和路径逃逸；
+- before、after、反向参考补丁 mutation、替代修复各重复验证至少三次；
+- 质量门检查离线确定性、参考补丁泄露、许可证/provenance、Agent 分数选择独立性和同源去重；
+- 只有全部质量门通过且人工批准的候选可进入不可覆盖的 DatasetVersion；
+- 使用 MIT 许可 `more-itertools` 的两个真实历史缺陷作为离线验收样本，并记录公开历史数据的高污染风险。
+
+详细可执行协议见 `docs/automatic-benchmark-generation.md`。本阶段仍不包含自动 GitHub 抓取、embedding 近似去重、难度校准服务或任何 Skill 搜索逻辑。
+
 ---
 
 ## 10. Benchmark-guided Skill Search

@@ -1,4 +1,4 @@
-"""Dataset ingestion now; provenance-aware benchmark generation later."""
+"""Dataset ingestion and auditable benchmark generation primitives."""
 
 from agentskill_eval_benchmark_gen.dataset import (
     CaseCategory,
@@ -18,13 +18,32 @@ from agentskill_eval_benchmark_gen.demo import (
     DemoRunConfig,
     DemoRunResult,
 )
+from agentskill_eval_benchmark_gen.generator import (
+    AutomaticBenchmarkGenerator,
+    BenchmarkGenerationError,
+    BenchmarkStore,
+    GenerationResult,
+)
+from agentskill_eval_benchmark_gen.spec import (
+    BenchmarkGenerationSpec,
+    BudgetSpec,
+    CandidateSpec,
+    QualityGateSpec,
+    SpecError,
+)
 
 __all__ = [
+    "AutomaticBenchmarkGenerator",
+    "BenchmarkGenerationError",
+    "BenchmarkGenerationSpec",
+    "BenchmarkStore",
+    "BudgetSpec",
     "CaseCategory",
     "CaseGroupKeys",
     "CaseMetadata",
     "CaseOracle",
     "CaseProvenance",
+    "CandidateSpec",
     "DatasetLoader",
     "DatasetManifest",
     "DatasetSplit",
@@ -34,4 +53,7 @@ __all__ = [
     "DemoRunResult",
     "LoadedCase",
     "LoadedDataset",
+    "GenerationResult",
+    "QualityGateSpec",
+    "SpecError",
 ]

@@ -24,6 +24,9 @@ class DatasetError(ValueError):
 class DatasetSplit(str, Enum):
     REGRESSION_DEV = "regression_dev"
     CHALLENGE = "challenge"
+    VALIDATION_SEARCH = "validation_search"
+    VALIDATION_CONFIRM = "validation_confirm"
+    LOCKED_TEST = "locked_test"
 
 
 class CaseCategory(str, Enum):

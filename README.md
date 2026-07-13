@@ -2,7 +2,7 @@
 
 AgentSkill-Eval 是一个面向 Agent Skill 的可复现评测与回归分析项目。平台以受控配对实验为核心，比较同一 Agent 在 without-Skill、with-Skill 或不同 Skill 版本下的任务质量、成本、时延与稳定性。
 
-当前仓库已完成 **P0 可信配对闭环，并进入 P1 Trace Intelligence 纵切**。平台在执行前冻结 Case 与 Skill 输入；逐 Attempt 保存 Skill 安装或 baseline 洁净证据；在 Runner 输出持久化前执行精确 Secret 扫描；生成确定性的离线审计与再分析包；同时采集有能力声明的规范化事件，执行证据引用的规则诊断，并比较配对轨迹。完整设计见 [开发设计文档](./AgentSkillEval_%E5%BC%80%E5%8F%91%E8%AE%BE%E8%AE%A1%E6%96%87%E6%A1%A3_v1.0.md)。
+当前仓库已完成 **P0 可信配对闭环、P1 Trace Intelligence 纵切和 P2 Automatic Benchmark Generation MVP**。平台在执行前冻结 Case 与 Skill 输入；逐 Attempt 保存 Skill 安装或 baseline 洁净证据；在 Runner 输出持久化前执行精确 Secret 扫描；生成确定性的离线审计与再分析包；同时采集有能力声明的规范化事件，执行证据引用的规则诊断，并从真实 Git 历史重建、验证和发布可审计 Benchmark。完整设计见 [开发设计文档](./AgentSkillEval_%E5%BC%80%E5%8F%91%E8%AE%BE%E8%AE%A1%E6%96%87%E6%A1%A3_v1.0.md)。
 
 ## 环境要求
 
@@ -32,6 +32,11 @@ agentskill-eval experiment verify-bundle /tmp/evidence.tar
 agentskill-eval trace show /path/to/workspace EXPERIMENT_UUID RUN_UUID
 agentskill-eval trace compare /path/to/workspace EXPERIMENT_UUID PAIR_BLOCK_UUID \
   --control CONTROL_VARIANT_UUID --treatment TREATMENT_VARIANT_UUID
+agentskill-eval benchmark generate /tmp/generation.yaml --workspace .agentskill-eval/benchmark
+agentskill-eval benchmark status .agentskill-eval/benchmark JOB_UUID
+agentskill-eval benchmark review .agentskill-eval/benchmark JOB_UUID CANDIDATE_UUID \
+  --reviewer NAME --approve --reason "evidence reviewed"
+agentskill-eval benchmark publish .agentskill-eval/benchmark JOB_UUID --publisher NAME
 ```
 
 ## 本地验证
@@ -170,6 +175,14 @@ agentskill-eval demo run --workspace .agentskill-eval/demo
 - 静态 JSON/HTML 报告包含逐 Run Trace/Diagnosis 链接和 PairTraceDiff 汇总。
 
 详细协议见 [Trace Intelligence 与规则诊断](./docs/trace-intelligence.md)。
+
+## 可审计 Automatic Benchmark Generation
+
+P2 纵切支持从固定本地 Git 历史自动重建 before/after fixture，执行三次重复的
+before-fail/after-pass、反向补丁 mutation 和替代修复验证，经确定性去重与人工审核后
+发布不可变 DatasetVersion。仓库包含 MIT 许可 `more-itertools` 的离线 Git bundle 和
+两个真实历史缺陷，不需要调用模型或访问网络。协议、状态机、质量门和重放命令见
+[Automatic Benchmark Generation MVP](./docs/automatic-benchmark-generation.md)。
 
 ## 开发原则
 
