@@ -57,6 +57,7 @@ source = [
   "agentskill_eval_runner_adapters",
   "agentskill_eval_skill_optimizer",
   "agentskill_eval_mcp_lab",
+  "agentskill_eval_memory_rag_lab",
 ]
 
 [tool.coverage.report]
@@ -87,6 +88,7 @@ known-first-party = [
   "agentskill_eval_runner_adapters",
   "agentskill_eval_skill_optimizer",
   "agentskill_eval_mcp_lab",
+  "agentskill_eval_memory_rag_lab",
 ]
 
 [tool.mypy]

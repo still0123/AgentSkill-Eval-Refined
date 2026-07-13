@@ -206,6 +206,15 @@ JSON/HTML 报告。Lab 覆盖工具选择、参数、序列、故障恢复、效
 固定 executable/SHA-256、无 shell、最小环境和响应限制的安全边界，不连接生产 MCP Server。
 示例与限制见 [MCP Tool Evaluation MVP](./docs/mcp-tool-evaluation.md)。
 
+## Memory/RAG Evaluation MVP
+
+新增完全离线、无需模型或向量数据库的 Memory/RAG 专项 Lab。它分别审计 Retrieval 与
+Generation/Grounding，覆盖 Recall@K、Precision@K、MRR、nDCG、引用与证据归因、上下文污染，
+以及 Memory write/read/update/overwrite/expiration/forget、跨 Session 隔离、poisoning 和敏感
+持久化。四类配对实验、Trace 与 JSON/HTML 报告均强制 simulated claim limit。真实 Process
+adapter 目前仅提供固定 executable/SHA-256、无 shell、最小环境和响应限制的安全边界。详见
+[Memory/RAG Evaluation MVP](./docs/memory-rag-evaluation.md)。
+
 ## 开发原则
 
 - P0 优先跑通无服务依赖的本地可信闭环。

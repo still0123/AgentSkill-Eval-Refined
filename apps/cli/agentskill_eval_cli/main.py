@@ -28,6 +28,19 @@ from agentskill_eval_experiment import (
     StaticReportWriter,
 )
 from agentskill_eval_mcp_lab import LabConfig, McpDataset, McpLabRunner, find_trace, load_report
+from agentskill_eval_memory_rag_lab import (
+    LabConfig as MemoryRagLabConfig,
+)
+from agentskill_eval_memory_rag_lab import (
+    MemoryRagDataset,
+    MemoryRagLabRunner,
+)
+from agentskill_eval_memory_rag_lab import (
+    find_trace as find_memory_rag_trace,
+)
+from agentskill_eval_memory_rag_lab import (
+    load_report as load_memory_rag_report,
+)
 from agentskill_eval_skill_optimizer import (
     BenchmarkGuidedSkillSearch,
     FinalEvaluationStore,
@@ -68,6 +81,10 @@ mcp_app = typer.Typer(help="Validate and run auditable MCP tool-evaluation exper
 app.add_typer(mcp_app, name="mcp")
 mcp_lab_app = typer.Typer(help="Run the deterministic offline MCP lab.")
 mcp_app.add_typer(mcp_lab_app, name="lab")
+memory_rag_app = typer.Typer(help="Validate and run auditable Memory/RAG evaluations.")
+app.add_typer(memory_rag_app, name="memory-rag")
+memory_rag_lab_app = typer.Typer(help="Run the deterministic offline Memory/RAG lab.")
+memory_rag_app.add_typer(memory_rag_lab_app, name="lab")
 
 
 def _version_callback(value: bool) -> None:
@@ -158,6 +175,73 @@ def mcp_trace(
 ) -> None:
     """Show one normalized MCP trace by run ID."""
     typer.echo(json.dumps(find_trace(workspace, run_id), ensure_ascii=False, sort_keys=True))
+
+
+@memory_rag_app.command("validate")
+def memory_rag_validate(
+    dataset: Path = typer.Argument(..., exists=True, dir_okay=False),  # noqa: B008
+) -> None:
+    """Validate a strict Memory/RAG evaluation dataset."""
+    loaded = MemoryRagDataset.load(dataset, allowed_root=dataset.parent)
+    typer.echo(
+        json.dumps(
+            {
+                "name": loaded.name,
+                "case_count": len(loaded.cases),
+                "case_ids": [case.case_id for case in loaded.cases],
+                "simulated": loaded.simulated,
+            },
+            sort_keys=True,
+        )
+    )
+
+
+@memory_rag_lab_app.command("run")
+def memory_rag_lab_run(
+    config: Path = typer.Argument(..., exists=True, dir_okay=False),  # noqa: B008
+    workspace: Path = typer.Option(..., "--workspace", file_okay=False),  # noqa: B008
+    allow_simulation: bool = typer.Option(False, "--allow-simulation"),  # noqa: B008
+) -> None:
+    """Run deterministic paired Memory/RAG controller validation."""
+    loaded = MemoryRagLabConfig.load(config)
+    if loaded.simulated and not allow_simulation:
+        raise typer.BadParameter(
+            "Memory/RAG Lab requires --allow-simulation and cannot support real-agent claims",
+            param_hint="--allow-simulation",
+        )
+    artifacts = MemoryRagLabRunner(workspace).run(loaded)
+    typer.echo(
+        json.dumps(
+            {
+                "experiment_id": str(artifacts.report.experiment_id),
+                "report_json": str(artifacts.report_json),
+                "report_html": str(artifacts.report_html),
+                "simulated": artifacts.report.simulated,
+                "claim_limit": artifacts.report.claim_limit,
+            },
+            sort_keys=True,
+        )
+    )
+
+
+@memory_rag_app.command("report")
+def memory_rag_report(
+    workspace: Path = typer.Argument(..., exists=True, file_okay=False),  # noqa: B008
+    experiment_id: UUID = typer.Argument(...),  # noqa: B008
+) -> None:
+    """Show one persisted Memory/RAG paired report."""
+    typer.echo(load_memory_rag_report(workspace, experiment_id).model_dump_json(indent=2))
+
+
+@memory_rag_app.command("trace")
+def memory_rag_trace(
+    workspace: Path = typer.Argument(..., exists=True, file_okay=False),  # noqa: B008
+    run_id: UUID = typer.Argument(...),  # noqa: B008
+) -> None:
+    """Show one normalized Memory/RAG trace by run ID."""
+    typer.echo(
+        json.dumps(find_memory_rag_trace(workspace, run_id), ensure_ascii=False, sort_keys=True)
+    )
 
 
 @final_app.command("evaluate")
