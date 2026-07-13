@@ -1,0 +1,52 @@
+schema_version: ase/real-agent-evidence/v1alpha1
+name: more-itertools-real-agent-evidence
+dataset_path: /absolute/path/to/published-dataset-version
+skill_path: /absolute/path/to/AgentSkill-Eval/examples/skills/python-bug-fix-v1
+case_ids:
+  - more-itertools-last-reversed-none
+  - more-itertools-sample-strict-counts
+evidence_class: observed_agent
+simulated: false
+runner:
+  type: skill_up
+  name: skill-up
+  path: /absolute/path/to/skill-up
+  expected_sha256: "0000000000000000000000000000000000000000000000000000000000000000"
+  expected_version: skill-up version 0.5.0
+  version_args: [--version]
+agent:
+  path: /absolute/path/to/agent
+  expected_sha256: "0000000000000000000000000000000000000000000000000000000000000000"
+  expected_version: REPLACE_WITH_EXACT_VERSION_OUTPUT
+  version_args: [--version]
+  engine: REPLACE_WITH_SKILL_UP_ENGINE
+  engine_version: REPLACE_WITH_ENGINE_VERSION
+  provider: REPLACE_WITH_PROVIDER
+  # Optional when the Agent speaks a different wire protocol than the evidence Provider.
+  engine_provider: REPLACE_WITH_ENGINE_PROTOCOL_PROVIDER
+  model: REPLACE_WITH_MODEL
+  base_url: https://provider.example.com
+  temperature: 0.0
+  seed: 2026
+  max_turns: 12
+  timeout_seconds: 900
+  tool_capabilities: [filesystem, shell, tests]
+  secret_env_names: [OPENAI_API_KEY]
+  max_input_tokens: 200000
+  max_output_tokens: 20000
+  # Optional non-Secret JSON files materialized under the isolated Agent HOME.
+  home_config_files: {}
+pricing:
+  input_microusd_per_million_tokens: 0
+  input_cache_hit_microusd_per_million_tokens: 0
+  output_microusd_per_million_tokens: 0
+  estimated_input_tokens_per_run: 30000
+  estimated_cache_hit_tokens_per_run: 0
+  estimated_output_tokens_per_run: 5000
+protocol:
+  evidence_repeats: 3
+  random_seed: 2026
+  bootstrap_resamples: 2000
+  min_independent_groups: 3
+sandbox_profile: runner_default
+network_policy: provider_only

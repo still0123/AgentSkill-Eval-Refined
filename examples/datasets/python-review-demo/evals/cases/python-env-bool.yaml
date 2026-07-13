@@ -1,0 +1,14 @@
+id: python-env-bool
+title: False environment value enables feature
+description: Configuration robustness defect caused by Python truthiness.
+input:
+  prompt: |
+    Review the production configuration code for behavior under realistic environment values, including
+    the string `false`. Report `DEFECT_FOUND: <CATEGORY>` with evidence, consequence, and minimal fix;
+    otherwise report `NO_ACTIONABLE_DEFECT`. Do not modify files.
+context:
+  repo_fixture: evals/fixtures/repos/python-env-bool
+expect:
+  must_contain: ["DEFECT_FOUND", "BOOLEAN_PARSE_ERROR"]
+  must_not_contain: ["NO_ACTIONABLE_DEFECT"]
+  exit_code: 0

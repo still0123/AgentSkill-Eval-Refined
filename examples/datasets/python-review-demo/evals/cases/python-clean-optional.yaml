@@ -1,0 +1,15 @@
+id: python-clean-optional
+title: Guarded optional profile
+description: Negative control with a correct None guard.
+input:
+  prompt: |
+    Review the production code in the current repository for one concrete defect. Report
+    `DEFECT_FOUND: <CATEGORY>` only with reachable evidence. Otherwise report exactly
+    `NO_ACTIONABLE_DEFECT` and explain why the likely nullability concern is already handled.
+    Do not modify files.
+context:
+  repo_fixture: evals/fixtures/repos/python-clean-optional
+expect:
+  must_contain: ["NO_ACTIONABLE_DEFECT"]
+  must_not_contain: ["DEFECT_FOUND"]
+  exit_code: 0

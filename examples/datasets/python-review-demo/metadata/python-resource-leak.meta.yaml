@@ -1,0 +1,19 @@
+schema_version: ase-case-meta/v1alpha1
+case_id: python-resource-leak
+case_ref: evals/cases/python-resource-leak.yaml
+split: regression_dev
+category: positive
+skill_applicable: true
+group_keys:
+  independence_group: synthetic/io-lifecycle
+  repository: synthetic/export-service
+  fork_lineage: synthetic/io-lifecycle
+  patch_family: file-lifetime
+provenance: &provenance
+  source_type: curated_synthetic
+  source_revision: demo-v1
+  license: Apache-2.0
+  contamination_risk: low
+  synthetic: true
+oracle: {kind: expect, expected_signal: RESOURCE_LEAK}
+tags: [python, io, review]

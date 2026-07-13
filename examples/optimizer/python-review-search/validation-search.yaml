@@ -1,0 +1,31 @@
+schema_version: ase/optimizer-validation/v1alpha1
+name: python-review-controller-simulation
+version: "1.0.0"
+split: validation_search
+simulated: true
+source_dataset: examples/datasets/python-review-demo
+cases:
+  - id: value-flow-control
+    required_terms: ["trace real values"]
+    leakage_tokens: ["CONTROL_ORACLE_A"]
+  - id: false-positive-control
+    required_terms: ["try to disprove"]
+    leakage_tokens: ["CONTROL_ORACLE_B"]
+  - id: normalization-boundary-a
+    required_terms: ["normalize at producer and consumer boundaries"]
+    leakage_tokens: ["NORMALIZATION_ORACLE_A"]
+  - id: normalization-boundary-b
+    required_terms: ["normalize at producer and consumer boundaries"]
+    leakage_tokens: ["NORMALIZATION_ORACLE_B"]
+  - id: normalization-boundary-c
+    required_terms: ["normalize at producer and consumer boundaries"]
+    leakage_tokens: ["NORMALIZATION_ORACLE_C"]
+  - id: cleanup-exception-path
+    required_terms: ["verify cleanup on every exception path"]
+    leakage_tokens: ["RESOURCE_ORACLE"]
+  - id: retry-budget-accounting
+    required_terms: ["derive the attempt count from the configured retry budget"]
+    leakage_tokens: ["RETRY_ORACLE"]
+  - id: runtime-evidence-gate
+    required_terms: ["require reachable runtime evidence before reporting"]
+    leakage_tokens: ["EVIDENCE_ORACLE"]

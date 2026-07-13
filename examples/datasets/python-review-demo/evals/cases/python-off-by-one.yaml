@@ -1,0 +1,14 @@
+id: python-off-by-one
+title: Inclusive page index boundary
+description: Review a boundary check that admits an invalid index.
+input:
+  prompt: |
+    Review the production code in the current repository for one concrete defect. Trace reachable values
+    and report `DEFECT_FOUND: <CATEGORY>` with file, symbol, evidence, consequence, and a minimal fix.
+    If no supported defect exists, report `NO_ACTIONABLE_DEFECT`. Do not modify files.
+context:
+  repo_fixture: evals/fixtures/repos/python-off-by-one
+expect:
+  must_contain: ["DEFECT_FOUND", "OFF_BY_ONE"]
+  must_not_contain: ["NO_ACTIONABLE_DEFECT"]
+  exit_code: 0

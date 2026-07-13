@@ -1,0 +1,14 @@
+id: python-normalization-contract
+title: Identifier normalization mismatch
+description: Cross-module lookup mismatch exposed by a test contract.
+input:
+  prompt: |
+    Review the production modules and tests in the current repository for one concrete defect. Trace the
+    identifier contract and report `DEFECT_FOUND: <CATEGORY>` with evidence, consequence, and minimal
+    fix. Otherwise report `NO_ACTIONABLE_DEFECT`. Do not modify files.
+context:
+  repo_fixture: evals/fixtures/repos/python-normalization-contract
+expect:
+  must_contain: ["DEFECT_FOUND", "NORMALIZATION_MISMATCH"]
+  must_not_contain: ["NO_ACTIONABLE_DEFECT"]
+  exit_code: 0

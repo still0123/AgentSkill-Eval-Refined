@@ -1,0 +1,19 @@
+schema_version: ase-case-meta/v1alpha1
+case_id: python-cross-module-cache
+case_ref: evals/cases/python-cross-module-cache.yaml
+split: regression_dev
+category: complex
+skill_applicable: true
+group_keys:
+  independence_group: synthetic/cross-module
+  repository: synthetic/cache-contract
+  fork_lineage: synthetic/cross-module
+  patch_family: cache-key-contract
+provenance: &provenance
+  source_type: curated_synthetic
+  source_revision: demo-v1
+  license: Apache-2.0
+  contamination_risk: low
+  synthetic: true
+oracle: {kind: expect, expected_signal: CACHE_KEY_MISMATCH}
+tags: [python, cross-module, cache]

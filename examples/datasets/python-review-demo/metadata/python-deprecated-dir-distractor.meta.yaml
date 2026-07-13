@@ -1,0 +1,19 @@
+schema_version: ase-case-meta/v1alpha1
+case_id: python-deprecated-dir-distractor
+case_ref: evals/cases/python-deprecated-dir-distractor.yaml
+split: challenge
+category: distractor
+skill_applicable: true
+group_keys:
+  independence_group: synthetic/distractors
+  repository: synthetic/dead-code-noise
+  fork_lineage: synthetic/distractors
+  patch_family: deprecated-directory
+provenance: &provenance
+  source_type: curated_synthetic
+  source_revision: demo-v1
+  license: Apache-2.0
+  contamination_risk: low
+  synthetic: true
+oracle: {kind: expect, expected_signal: NO_ACTIONABLE_DEFECT}
+tags: [python, distractor, dead-code]

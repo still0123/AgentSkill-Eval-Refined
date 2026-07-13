@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Environments
+.venv/
+venv/
+.env
+.env.*
+!.env.example
+
+# Build output
+build/
+dist/
+site/
+
+# AgentSkill-Eval runtime output
+.agentskill-eval/
+.agentskill-eval-workspace/
+artifacts/
+runs/
+
+# Editors and operating systems
+.DS_Store
+.idea/
+.vscode/

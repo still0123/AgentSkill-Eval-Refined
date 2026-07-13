@@ -1,0 +1,29 @@
+schema_version: ase-dataset/v1alpha1
+name: python-review-demo
+version: 1.0.0
+description: Synthetic Python code-review cases for exercising the P0 paired-evaluation loop.
+domain: python-code-review
+license: Apache-2.0
+runner_name: skill-up
+runner_version: 0.5.0
+demo_only: true
+expected_case_count: 12
+case_metadata:
+  - metadata/python-null-dereference.meta.yaml
+  - metadata/python-resource-leak.meta.yaml
+  - metadata/python-off-by-one.meta.yaml
+  - metadata/python-swallowed-exception.meta.yaml
+  - metadata/python-clean-optional.meta.yaml
+  - metadata/python-clean-context-manager.meta.yaml
+  - metadata/python-comment-bug-distractor.meta.yaml
+  - metadata/python-deprecated-dir-distractor.meta.yaml
+  - metadata/python-cross-module-cache.meta.yaml
+  - metadata/python-normalization-contract.meta.yaml
+  - metadata/python-env-bool.meta.yaml
+  - metadata/python-retry-budget.meta.yaml
+minimum_category_counts:
+  positive: 4
+  negative: 2
+  distractor: 2
+  complex: 2
+  robustness: 2

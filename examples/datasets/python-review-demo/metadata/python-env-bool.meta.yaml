@@ -1,0 +1,19 @@
+schema_version: ase-case-meta/v1alpha1
+case_id: python-env-bool
+case_ref: evals/cases/python-env-bool.yaml
+split: challenge
+category: robustness
+skill_applicable: true
+group_keys:
+  independence_group: synthetic/resilience
+  repository: synthetic/config-runtime
+  fork_lineage: synthetic/resilience
+  patch_family: boolean-environment
+provenance: &provenance
+  source_type: curated_synthetic
+  source_revision: demo-v1
+  license: Apache-2.0
+  contamination_risk: low
+  synthetic: true
+oracle: {kind: expect, expected_signal: BOOLEAN_PARSE_ERROR}
+tags: [python, configuration, robustness]

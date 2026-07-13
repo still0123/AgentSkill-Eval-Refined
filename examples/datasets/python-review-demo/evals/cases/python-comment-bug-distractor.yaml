@@ -1,0 +1,14 @@
+id: python-comment-bug-distractor
+title: BUG token in explanatory comment
+description: Distractor where a comment describes a handled historical bug.
+input:
+  prompt: |
+    Review the active production code in the current repository. Do not treat comments or words such as
+    BUG as evidence by themselves. Report `DEFECT_FOUND: <CATEGORY>` only for a reachable defect;
+    otherwise report `NO_ACTIONABLE_DEFECT`. Do not modify files.
+context:
+  repo_fixture: evals/fixtures/repos/python-comment-bug-distractor
+expect:
+  must_contain: ["NO_ACTIONABLE_DEFECT"]
+  must_not_contain: ["DEFECT_FOUND"]
+  exit_code: 0

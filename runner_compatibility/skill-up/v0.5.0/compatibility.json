@@ -1,0 +1,14 @@
+{
+  "archive_sha256_darwin_arm64": "0b88b8eae4247dbb1affaff3b25dd39bea29951f7af18471d181011cc30032f6",
+  "binary_sha256_darwin_arm64": "b8473aad3fe997f3aa8de1e9bd9bc127e5254b25371567a0e07143afc809c359",
+  "capabilities": {
+    "baseline_treatment": "emulated",
+    "cancellation": "emulated",
+    "single_case": "native",
+    "structured_result": "native"
+  },
+  "commit": "21618623c159b4dbb66e51098dbd669427bb00b8",
+  "name": "skill-up",
+  "tag": "v0.5.0",
+  "version_output": "skill-up version 0.5.0"
+}

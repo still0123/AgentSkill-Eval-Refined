@@ -1,0 +1,67 @@
+{
+  "schema_version": "ase/sanitized-real-experiment-result/v1alpha1",
+  "experiment_id": "387c674c-fefe-5728-847c-17f79f85048e",
+  "status": "COMPLETED",
+  "simulated": false,
+  "evidence_class": "observed_agent",
+  "provider": "deepseek",
+  "model": "deepseek-v4-pro",
+  "claim_limit": "Observed-Agent smoke evidence for two cases; validates the chain only.",
+  "runs": {
+    "planned": 4,
+    "completed": 4,
+    "invalid": 0
+  },
+  "outcome": {
+    "baseline_pass_rate": 1.0,
+    "treatment_pass_rate": 1.0,
+    "absolute_gain": 0.0,
+    "wtl": {
+      "win": 0,
+      "tie_positive": 2,
+      "tie_negative": 0,
+      "loss": 0
+    }
+  },
+  "cases": [
+    {
+      "case_id": "more-itertools-last-reversed-none",
+      "baseline_pass_rate": 1.0,
+      "treatment_pass_rate": 1.0,
+      "classification": "tie_positive"
+    },
+    {
+      "case_id": "more-itertools-sample-strict-counts",
+      "baseline_pass_rate": 1.0,
+      "treatment_pass_rate": 1.0,
+      "classification": "tie_positive"
+    }
+  ],
+  "usage": {
+    "input_tokens": 2177470,
+    "cached_input_tokens": 2048384,
+    "output_tokens": 13366,
+    "thinking_tokens": 0,
+    "observed_cost_microusd": 75207,
+    "authorized_max_microusd": 250000,
+    "baseline_mean_tokens": 497595.5,
+    "treatment_mean_tokens": 597822.5,
+    "treatment_relative_token_overhead": 0.2014226414828912,
+    "baseline_mean_cost_microusd": 18017.5,
+    "treatment_mean_cost_microusd": 19586.0,
+    "treatment_relative_cost_overhead": 0.08705425280976828
+  },
+  "security": {
+    "attempt_scans_clean": 4,
+    "secret_value_matches": 0,
+    "hidden_reasoning_persisted": false
+  },
+  "audit": {
+    "bundle_valid": true,
+    "bundle_file_count": 241,
+    "bundle_sha256": "9a30808881073c6e167967f92a847fb6d2eb7891bdb69535f4e78332d7fc183d",
+    "report_json_sha256": "5e12876563ad9d794613109ccb369bcdb2473e2abb05213cd980f5d108ad5ecb",
+    "report_html_sha256": "76551005b1a4382fab570e5c08239189d29e84cc02dd7189148aadc9c8e2fc30",
+    "raw_artifacts_committed": false
+  }
+}

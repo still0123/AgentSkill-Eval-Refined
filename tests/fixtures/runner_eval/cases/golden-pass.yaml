@@ -1,0 +1,7 @@
+id: golden-pass
+title: Golden pass
+input:
+  prompt: Return the deterministic fixture response.
+expect:
+  must_contain:
+    - custom-engine-handled

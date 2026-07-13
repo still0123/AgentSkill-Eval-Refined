@@ -1,0 +1,18 @@
+schema_version: ase/final-evaluation-dataset/v1alpha1
+name: python-review-confirmation-simulation
+version: "1.0.0"
+split: validation_confirm
+simulated: true
+cases:
+  - id: confirm-canonical-input
+    independence_group: confirm-family-a
+    required_terms: ["normalize at producer and consumer boundaries"]
+  - id: confirm-canonical-cache
+    independence_group: confirm-family-b
+    required_terms: ["compare the canonical values"]
+  - id: confirm-canonical-storage
+    independence_group: confirm-family-c
+    required_terms: ["normalize at producer and consumer boundaries"]
+  - id: confirm-canonical-output
+    independence_group: confirm-family-d
+    required_terms: ["compare the canonical values"]

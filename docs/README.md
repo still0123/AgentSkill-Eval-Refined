@@ -1,0 +1,30 @@
+# Project documentation
+
+本目录保存架构边界、实验协议、复现方法和各纵切的结论限制。
+
+## 可信实验基础
+
+- [P0 本地存储与恢复协议](./local-storage.md)
+- [Runner 防腐层与 `skill-up v0.5.0` 兼容协议](./runner-adapters.md)
+- [P0 本地配对实验引擎](./local-experiment-engine.md)
+- [配对统计与静态报告](./statistics-and-reports.md)
+- [执行证据、安全扫描与审计包](./evidence-and-replay.md)
+- [Trace Intelligence 与规则诊断](./trace-intelligence.md)
+
+## 数据、搜索与真实证据
+
+- [P0 Python Review Demo Dataset](./demo-dataset.md)
+- [一条命令运行 P0 配对实验](./one-command-demo.md)
+- [Automatic Benchmark Generation MVP](./automatic-benchmark-generation.md)
+- [Benchmark-guided Skill Search MVP](./benchmark-guided-skill-search.md)
+- [Independent Final Evaluation MVP](./independent-final-evaluation.md)
+- [Real Agent Evaluation Evidence MVP](./real-agent-evidence.md)
+
+## 专项 Lab 与界面
+
+- [MCP Tool Evaluation MVP](./mcp-tool-evaluation.md)
+- [Memory/RAG Evaluation MVP](./memory-rag-evaluation.md)
+- [Read-only Evaluation Dashboard MVP](./dashboard-mvp.md)
+
+这些文档会明确区分真实证据与 simulated Lab。历史纵切文档中的“不支持”描述只约束该纵切，
+不能据此推断整个集成仓库缺少其他已经合入的模块。

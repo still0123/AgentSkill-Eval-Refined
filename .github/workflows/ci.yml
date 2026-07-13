@@ -1,0 +1,121 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - "codex/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python:
+    name: Python quality, tests and wheel
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install development dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]" build
+      - name: Ruff
+        run: python -m ruff check .
+      - name: Mypy
+        run: python -m mypy apps packages
+      - name: Pytest
+        run: python -m pytest
+      - name: Export and validate public schemas
+        run: |
+          agentskill-eval schema export /tmp/agentskill-eval-schema.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          bundle = json.loads(Path("/tmp/agentskill-eval-schema.json").read_text())
+          schemas = bundle["schemas"]
+          if bundle["schema_version"] != "ase/v1alpha1":
+              raise SystemExit("unexpected schema bundle version")
+          if not schemas or len(schemas) != len(set(schemas)):
+              raise SystemExit("empty or duplicate public schema names")
+          print(f"validated {len(schemas)} public schemas")
+          PY
+      - name: Build wheel
+        run: python -m build --wheel
+      - name: Verify installed wheel layout
+        run: |
+          python -m venv /tmp/agentskill-eval-wheel
+          /tmp/agentskill-eval-wheel/bin/python -m pip install dist/*.whl
+          /tmp/agentskill-eval-wheel/bin/agentskill-eval version
+          /tmp/agentskill-eval-wheel/bin/python - <<'PY'
+          import agentskill_eval_benchmark_gen
+          import agentskill_eval_cli
+          import agentskill_eval_contracts
+          import agentskill_eval_experiment
+          import agentskill_eval_mcp_lab
+          import agentskill_eval_memory_rag_lab
+          import agentskill_eval_real_evidence
+          import agentskill_eval_runner_adapters
+          import agentskill_eval_skill_optimizer
+          import agentskill_eval_trace_intelligence
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: python-wheel
+          path: dist/*.whl
+          if-no-files-found: error
+
+  dashboard:
+    name: Dashboard quality and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.15.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+          cache-dependency-path: apps/web/pnpm-lock.yaml
+      - name: Show Node and pnpm versions
+        run: |
+          node --version
+          pnpm --version
+      - name: Install locked Dashboard dependencies
+        run: pnpm install --frozen-lockfile
+      - run: pnpm run typecheck
+      - run: pnpm run lint
+      - run: pnpm test
+      - run: pnpm run build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dashboard-dist
+          path: apps/web/dist
+          if-no-files-found: error
+
+  secret-scan:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

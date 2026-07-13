@@ -1,0 +1,83 @@
+schema_version: ase/real-agent-evidence/v1alpha1
+name: more-itertools-qwen-deepseek-v4-pro
+dataset_path: /absolute/path/to/published-dataset-version
+skill_path: /absolute/path/to/AgentSkill-Eval/examples/skills/python-bug-fix-v1
+case_ids:
+  - more-itertools-last-reversed-none
+  - more-itertools-sample-strict-counts
+evidence_class: observed_agent
+simulated: false
+runner:
+  type: skill_up
+  name: skill-up
+  path: /absolute/path/to/skill-up
+  expected_sha256: "0000000000000000000000000000000000000000000000000000000000000000"
+  expected_version: skill-up version 0.5.0
+  version_args: [--version]
+agent:
+  path: /absolute/path/to/qwen
+  expected_sha256: "0000000000000000000000000000000000000000000000000000000000000000"
+  expected_version: 0.19.9
+  version_args: [--version]
+  engine: qwen_code
+  engine_version: 0.19.9
+  provider: deepseek
+  engine_provider: openai
+  model: deepseek-v4-pro
+  base_url: https://api.deepseek.com
+  temperature: 0.0
+  seed: null
+  max_turns: 24
+  timeout_seconds: 900
+  tool_capabilities: [filesystem, shell, tests]
+  secret_env_names: [OPENAI_API_KEY]
+  max_input_tokens: 131072
+  max_output_tokens: 20000
+  home_config_files:
+    .qwen/settings.json:
+      security:
+        auth:
+          selectedType: openai
+      model:
+        name: deepseek-v4-pro
+        maxSessionTurns: 24
+        maxWallTimeSeconds: 240
+        maxToolCalls: 24
+        maxSubagentDepth: 1
+        sessionTokenLimit: 600000
+        skipLoopDetection: false
+        skipStartupContext: true
+      tools:
+        disabled: [agent]
+        toolSearch:
+          enabled: false
+      ui:
+        enableFollowupSuggestions: false
+      memory:
+        enableManagedAutoMemory: false
+        enableManagedAutoDream: false
+        enableAutoSkill: false
+      modelProviders:
+        openai:
+          - id: deepseek-v4-pro
+            name: DeepSeek V4 Pro
+            envKey: OPENAI_API_KEY
+            baseUrl: https://api.deepseek.com
+            generationConfig:
+              reasoning: false
+              timeout: 900000
+              maxRetries: 0
+pricing:
+  input_microusd_per_million_tokens: 435000
+  input_cache_hit_microusd_per_million_tokens: 3625
+  output_microusd_per_million_tokens: 870000
+  estimated_input_tokens_per_run: 600000
+  estimated_cache_hit_tokens_per_run: 500000
+  estimated_output_tokens_per_run: 8000
+protocol:
+  evidence_repeats: 3
+  random_seed: 2026
+  bootstrap_resamples: 2000
+  min_independent_groups: 3
+sandbox_profile: runner_default
+network_policy: provider_only
