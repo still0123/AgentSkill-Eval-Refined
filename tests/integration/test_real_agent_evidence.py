@@ -136,6 +136,15 @@ def _set_fake_secrets(monkeypatch: pytest.MonkeyPatch, counter: Path) -> str:
     return secret
 
 
+def test_spec_rejects_literal_secret_in_agent_home_config(published_dataset: Path) -> None:
+    payload = _spec(published_dataset).model_dump(mode="python")
+    payload["agent"]["home_config_files"] = {
+        ".qwen/settings.json": {"security": {"apiKey": "plaintext-value"}}
+    }
+    with pytest.raises(ValueError, match="literal Secret field"):
+        RealAgentEvidenceSpec.model_validate(payload)
+
+
 def test_preflight_rejects_hash_version_and_missing_secret(
     published_dataset: Path, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:

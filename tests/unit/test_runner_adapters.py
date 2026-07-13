@@ -14,6 +14,7 @@ from agentskill_eval_runner_adapters import (
     ResultParseError,
     RunnerRequest,
     RunnerStatus,
+    SkillUpRunnerAdapter,
     compile_evaluation,
     parse_skill_up_result,
 )
@@ -81,6 +82,57 @@ def test_compiler_rejects_symlinks(tmp_path: Path) -> None:
     )
     with pytest.raises(ValueError, match="symlink"):
         compile_evaluation(req)
+
+
+def test_agent_home_files_are_isolated_and_never_contain_secrets(tmp_path: Path) -> None:
+    home = tmp_path / "home"
+    req = request(tmp_path / "run")
+    req = RunnerRequest(
+        **{
+            **req.__dict__,
+            "agent_home_files": {
+                ".qwen/settings.json": {
+                    "modelProviders": {
+                        "openai": [{"envKey": "OPENAI_API_KEY", "baseUrl": "https://api.test"}]
+                    }
+                }
+            },
+            "secret_env": {"OPENAI_API_KEY": "never-persist-this-value"},
+        }
+    )
+    SkillUpRunnerAdapter._materialize_agent_home_files(req, home)
+    settings = home / ".qwen/settings.json"
+    assert settings.is_file()
+    assert settings.stat().st_mode & 0o777 == 0o600
+    assert "never-persist-this-value" not in settings.read_text(encoding="utf-8")
+
+    unsafe = RunnerRequest(
+        **{
+            **req.__dict__,
+            "agent_home_files": {"../escaped.json": {"value": "safe"}},
+        }
+    )
+    with pytest.raises(ValueError, match="unsafe Agent HOME"):
+        SkillUpRunnerAdapter._materialize_agent_home_files(unsafe, home)
+
+    leaked = RunnerRequest(
+        **{
+            **req.__dict__,
+            "agent_home_files": {"settings.json": {"value": "never-persist-this-value"}},
+        }
+    )
+    with pytest.raises(ValueError, match="contains a Secret"):
+        SkillUpRunnerAdapter._materialize_agent_home_files(leaked, home)
+
+    (home / "linked").symlink_to(tmp_path)
+    linked = RunnerRequest(
+        **{
+            **req.__dict__,
+            "agent_home_files": {"linked/escaped.json": {"value": "safe"}},
+        }
+    )
+    with pytest.raises(ValueError, match="escapes isolated HOME|contains a symlink"):
+        SkillUpRunnerAdapter._materialize_agent_home_files(linked, home)
 
 
 def test_parser_preserves_unknown_fields_and_does_not_trust_exit_code(tmp_path: Path) -> None:

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import re
 import shutil
@@ -33,6 +34,7 @@ SKILL_UP_VERSION = "0.5.0"
 SKILL_UP_BINARY_SHA256 = "b8473aad3fe997f3aa8de1e9bd9bc127e5254b25371567a0e07143afc809c359"
 _RESERVED_ENV = {"HOME", "PATH", "TMPDIR", "XDG_CACHE_HOME", "XDG_CONFIG_HOME"}
 _TRACE_KIND = re.compile(r"^(tool|file|command|test|runner)\.[a-z0-9_.-]+$")
+_SAFE_HOME_PATH = re.compile(r"^[A-Za-z0-9._/-]+$")
 
 
 class IncompatibleRunnerError(RuntimeError):
@@ -97,7 +99,42 @@ class SkillUpRunnerAdapter:
         environment.update(request.secret_env)
         for directory in (home / ".config", home / ".cache", home / "tmp"):
             directory.mkdir(parents=True, exist_ok=True)
+        self._materialize_agent_home_files(request, home)
         return environment
+
+    @staticmethod
+    def _materialize_agent_home_files(request: RunnerRequest, home: Path) -> None:
+        """Write declarative, non-secret Agent settings inside the isolated HOME."""
+        home.mkdir(parents=True, exist_ok=True)
+        if home.is_symlink():
+            raise ValueError("isolated Agent HOME cannot be a symlink")
+        root = home.resolve()
+        secret_values = {value for value in request.secret_env.values() if value}
+        for relative, payload in request.agent_home_files.items():
+            path = Path(relative)
+            if (
+                not relative
+                or _SAFE_HOME_PATH.fullmatch(relative) is None
+                or path.is_absolute()
+                or ".." in path.parts
+            ):
+                raise ValueError(f"unsafe Agent HOME file path: {relative!r}")
+            serialized = json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+            if any(secret in serialized for secret in secret_values):
+                raise ValueError(f"Agent HOME file {relative!r} contains a Secret value")
+            destination = (root / path).resolve()
+            if not destination.is_relative_to(root):
+                raise ValueError(f"Agent HOME file escapes isolated HOME: {relative!r}")
+            current = root
+            for part in path.parts[:-1]:
+                current /= part
+                if current.is_symlink():
+                    raise ValueError(f"Agent HOME path contains a symlink: {relative!r}")
+            if destination.is_symlink():
+                raise ValueError(f"Agent HOME file cannot be a symlink: {relative!r}")
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            destination.write_text(serialized, encoding="utf-8")
+            destination.chmod(0o600)
 
     async def _version_report(self, request: RunnerRequest, home: Path) -> ValidationReport:
         outcome = await self._supervisor.run(

@@ -42,6 +42,7 @@ class VariantRuntimeSpec:
     skill_path: Optional[Path] = None
     mcp: Mapping[str, Any] = field(default_factory=lambda: {"servers": []})
     collect_artifacts: Tuple[str, ...] = ()
+    agent_home_files: Mapping[str, Mapping[str, Any]] = field(default_factory=dict)
     secret_env: Mapping[str, str] = field(default_factory=dict, repr=False)
     timeout_seconds: int = 300
     max_turns: int = 10
@@ -224,6 +225,7 @@ class LocalExperimentPlanner:
                 "environment": dict(runtime.environment),
                 "mcp": dict(runtime.mcp),
                 "collect_artifacts": list(runtime.collect_artifacts),
+                "agent_home_files": dict(runtime.agent_home_files),
                 "timeout_seconds": runtime.timeout_seconds,
                 "max_turns": runtime.max_turns,
             }

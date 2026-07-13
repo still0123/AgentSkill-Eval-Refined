@@ -321,6 +321,7 @@ class LocalExperimentExecutor:
             skill_path=frozen_skill if frozen_skill.is_dir() else runtime.skill_path,
             mcp=runtime.mcp,
             collect_artifacts=runtime.collect_artifacts,
+            agent_home_files=runtime.agent_home_files,
             secret_env=runtime.secret_env,
         )
 

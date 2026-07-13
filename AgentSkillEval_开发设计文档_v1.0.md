@@ -1684,6 +1684,10 @@ Mock Agent 场景：
 6. 输出离线 JSON/HTML real experiment report，拒绝混合 real/simulated、Provider 或 model；
 7. 使用本地 Fake Process Agent 完成无费用端到端测试，覆盖预算、哈希/版本漂移、Secret 不落盘、
    invalid、报告转义和幂等重放；Fake 结果始终标为 simulated，不构成性能证据。
+8. 增加通用、受限的 Agent HOME 配置文件注入：配置只能使用相对安全路径，内容不得包含运行时
+   Secret，生成文件权限为 `0600`，内容哈希进入冻结输入。该能力已用于验证
+   `Qwen Code 0.19.9 + DeepSeek V4 Pro`，其中证据 Provider 为 DeepSeek、线协议 Provider 为
+   OpenAI-compatible，且通过 `generationConfig.reasoning: false` 显式禁用 V4 thinking。
 
 真实付费实验必须在代码检查全部通过后，单独向用户报告 Provider、model、Run 数、最大预算、
 预计 Token 和完整命令，获得明确授权后才能运行。两个 Case 的结果只能解释为 descriptive evidence。

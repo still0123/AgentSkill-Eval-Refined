@@ -417,6 +417,9 @@ class RealAgentEvidenceRunner:
         )
         generation: dict[str, JsonValue] = {
             "provider": spec.agent.provider,
+            "engine_provider": spec.agent.resolved_engine_provider,
+            "base_url": spec.agent.base_url,
+            "home_config_sha256": stable_sha256(spec.agent.home_config_files),
             "temperature": spec.agent.temperature,
             "seed": spec.agent.seed,
             "max_input_tokens": spec.agent.max_input_tokens,
@@ -481,12 +484,14 @@ class RealAgentEvidenceRunner:
             price_snapshot=price,
         )
         engine_model = {
-            "provider": spec.agent.provider,
+            "provider": spec.agent.resolved_engine_provider,
             "name": spec.agent.model,
             "temperature": spec.agent.temperature,
             "max_input_tokens": spec.agent.max_input_tokens,
             "max_output_tokens": spec.agent.max_output_tokens,
         }
+        if spec.agent.base_url is not None:
+            engine_model["base_url"] = spec.agent.base_url
         if spec.agent.seed is not None:
             engine_model["seed"] = spec.agent.seed
         engine = {"name": spec.agent.engine, "model": engine_model}
@@ -498,6 +503,7 @@ class RealAgentEvidenceRunner:
                 environment={"type": "none"},
                 timeout_seconds=spec.agent.timeout_seconds,
                 max_turns=spec.agent.max_turns,
+                agent_home_files=spec.agent.home_config_files,
                 secret_env=secrets,
             ),
             VariantRuntimeSpec(
@@ -507,6 +513,7 @@ class RealAgentEvidenceRunner:
                 skill_path=spec.skill_path.resolve(strict=True),
                 timeout_seconds=spec.agent.timeout_seconds,
                 max_turns=spec.agent.max_turns,
+                agent_home_files=spec.agent.home_config_files,
                 secret_env=secrets,
             ),
         )

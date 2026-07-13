@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Literal, Optional, Tuple
+from typing import Dict, Literal, Mapping, Optional, Sequence, Tuple
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -35,7 +35,9 @@ class AgentSpec(ExecutableSpec):
     engine: str = Field(min_length=1)
     engine_version: str = Field(min_length=1)
     provider: str = Field(min_length=1)
+    engine_provider: Optional[str] = Field(default=None, min_length=1)
     model: str = Field(min_length=1)
+    base_url: Optional[str] = Field(default=None, pattern=r"^https://")
     temperature: float = Field(ge=0, le=2)
     seed: Optional[int] = None
     max_turns: int = Field(ge=1, le=100)
@@ -44,6 +46,7 @@ class AgentSpec(ExecutableSpec):
     secret_env_names: Tuple[str, ...] = Field(min_length=1)
     max_input_tokens: int = Field(ge=1)
     max_output_tokens: int = Field(ge=1)
+    home_config_files: Dict[str, Dict[str, object]] = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def names_are_unique(self) -> "AgentSpec":
@@ -54,7 +57,34 @@ class AgentSpec(ExecutableSpec):
         for name in self.secret_env_names:
             if not name or not name.replace("_", "").isalnum() or name[0].isdigit():
                 raise ValueError(f"invalid secret environment name: {name!r}")
+        for relative, payload in self.home_config_files.items():
+            path = Path(relative)
+            if path.is_absolute() or ".." in path.parts or not relative:
+                raise ValueError(f"unsafe Agent HOME config path: {relative!r}")
+            lowered = str(payload).lower()
+            if any(marker in lowered for marker in ("sk-", "bearer ")):
+                raise ValueError(f"Agent HOME config {relative!r} appears to contain a Secret")
+            self._reject_literal_secrets(relative, payload)
         return self
+
+    @classmethod
+    def _reject_literal_secrets(cls, relative: str, value: object) -> None:
+        if isinstance(value, Mapping):
+            for key, child in value.items():
+                normalized = str(key).lower().replace("_", "").replace("-", "")
+                if normalized in {"apikey", "token", "password", "secret", "authorization"}:
+                    raise ValueError(
+                        f"Agent HOME config {relative!r} contains a literal Secret field"
+                    )
+                cls._reject_literal_secrets(relative, child)
+        elif isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
+            for child in value:
+                cls._reject_literal_secrets(relative, child)
+
+    @property
+    def resolved_engine_provider(self) -> str:
+        """Protocol provider used by the Agent engine; defaults to evidence provider."""
+        return self.engine_provider or self.provider
 
 
 class PricingSpec(StrictModel):

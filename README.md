@@ -212,6 +212,8 @@ successive halving、original/manual/random/search 完整对照、Pareto 排序�
 - 逐 Attempt 保存 Trace、失败诊断、激活/洁净证据、环境指纹、Token、时延、费用和离线审计包；
 - CI 使用明确标记为 simulated 的 Fake Process Agent，绝不产生模型费用或冒充性能证据；
 - 只有两个同源真实 Case，因此报告强制声明 descriptive evidence 的结论边界。
+- 已通过无费用 preflight 验证 Qwen Code 0.19.9 + DeepSeek V4 Pro 接入；DeepSeek 使用
+  OpenAI-compatible 线协议和隔离 HOME 配置，显式关闭 thinking，配置中不保存 API Key。
 
 完整配置、预算门、命令、报告字段和故障排查见
 [Real Agent Evaluation Evidence MVP](./docs/real-agent-evidence.md)。

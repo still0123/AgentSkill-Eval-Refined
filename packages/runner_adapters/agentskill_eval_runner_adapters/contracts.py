@@ -54,6 +54,7 @@ class RunnerRequest:
     skill_path: Optional[Path] = None
     mcp: Mapping[str, Any] = field(default_factory=lambda: {"servers": []})
     collect_artifacts: Tuple[str, ...] = ()
+    agent_home_files: Mapping[str, Mapping[str, Any]] = field(default_factory=dict)
     secret_env: Mapping[str, str] = field(default_factory=dict, repr=False)
 
 

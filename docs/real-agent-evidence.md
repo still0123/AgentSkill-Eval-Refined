@@ -13,6 +13,10 @@ Codex/skill-up 当前支持的 Engine，或 OpenAI-compatible Process Agent；Pr
 seed、max turns、timeout、工具能力、Skill/DatasetVersion 哈希、价格表和环境指纹。Runner 不提供
 的 request id、区域或镜像 digest 会明确记为 `capability unavailable`。
 
+已验证的首个真实组合是 `skill-up v0.5.0 + Qwen Code 0.19.9 + DeepSeek V4 Pro`。Qwen Code
+作为 OpenAI-compatible Process Agent 接入；实验中的证据 Provider 仍记录为 `deepseek`，而
+`engine_provider: openai` 只描述线协议，二者不会混淆。
+
 ## 安装、Secret 与真实 Benchmark
 
 ```bash
@@ -26,6 +30,19 @@ sha256sum /absolute/path/to/skill-up /absolute/path/to/agent
 Secret 名称写入配置，值只能来自环境变量。平台只将白名单 Secret 和 Runner 管理的最小环境传给
 子进程；Manifest、Trace、日志和报告只保存变量名。输出在持久化前进行精确 Secret 扫描。
 
+macOS 可将 DeepSeek Key 保存在 Keychain，运行时临时映射到 Qwen Code 读取的变量：
+
+```bash
+OPENAI_API_KEY="$(security find-generic-password \
+  -a "$USER" -s agentskill-eval-deepseek -w)" \
+  agentskill-eval real preflight CONFIG
+```
+
+不要将 Key 写入 YAML。`home_config_files` 只允许在每个 Run 的隔离 HOME 中生成非 Secret JSON
+配置；路径逃逸和 Secret 值会被拒绝，文件权限固定为 `0600`，其内容哈希进入冻结输入。DeepSeek
+配置使用 `base_url: https://api.deepseek.com`，并在 `.qwen/settings.json` 中设置
+`generationConfig.reasoning: false`，使 V4 明确发送 `thinking: {type: disabled}`，避免持久化隐藏推理。
+
 真实数据集必须由 Automatic Benchmark Generation 发布：fixture 来自修复前 commit，oracle 在
 修复前失败、修复后通过，包含许可证和 provenance，离线可复现且版本不可变。当前 smoke 使用两个
 `more-itertools` Git 历史候选。`python-bug-fix-v1` 是不含 Case ID、补丁或答案的通用 Skill，
@@ -34,7 +51,8 @@ preflight 会验证 metadata 哈希并执行 leakage lint。
 ## 配置与 Preflight
 
 复制 `examples/real-agent-evidence/observed-agent.example.yaml`，替换绝对路径、哈希、版本、
-Provider、model 和价格。真实配置必须为 `evidence_class: observed_agent`、`simulated: false`。
+Provider、线协议 Provider、model、base URL、无 Secret HOME 配置和价格。真实配置必须为
+`evidence_class: observed_agent`、`simulated: false`。
 
 ```bash
 agentskill-eval real preflight /absolute/path/to/observed-agent.yaml
