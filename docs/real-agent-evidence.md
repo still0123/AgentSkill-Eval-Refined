@@ -123,3 +123,12 @@ agentskill-eval experiment verify-bundle WORKSPACE/real-evidence-bundles/EXPERIM
 - `invalid`：基础设施、超时、取消或 Runner 结果错误，不计为成功。
 
 Fake Process 测试只验证接口、预算、Trace、Secret、报告和幂等语义，不产生费用，也不构成性能证据。
+
+## 首个完整真实 smoke
+
+2026-07-13 使用 Qwen Code 0.19.9、DeepSeek V4 Pro、skill-up 0.5.0 和两个
+`more-itertools` Git 历史 Case 完成 4/4 Run，0 invalid。baseline/treatment 均为 100% 通过，
+因此该 smoke 只证明真实链路与审计闭环，不证明 Skill 增益；总记录费用为 75,207 microusd，
+四次 Secret 扫描均为 clean，replay bundle 校验通过。仓库只提交
+`experiments/real-deepseek-v4-pro-smoke-2026-07-13/` 下的脱敏配置与聚合结果，原始日志、缓存、
+会话和审计包保持本地且不跟踪。

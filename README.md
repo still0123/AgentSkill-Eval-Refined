@@ -223,6 +223,9 @@ successive halving、original/manual/random/search 完整对照、Pareto 排序�
 
 完整配置、预算门、命令、报告字段和故障排查见
 [Real Agent Evaluation Evidence MVP](./docs/real-agent-evidence.md)。
+首个完整真实 smoke 已使用 Qwen Code 0.19.9 + DeepSeek V4 Pro 完成 4/4 Run、0 invalid；
+脱敏配置和结果见
+[2026-07-13 DeepSeek smoke evidence](./experiments/real-deepseek-v4-pro-smoke-2026-07-13/README.md)。
 
 ## MCP Tool Evaluation MVP
 

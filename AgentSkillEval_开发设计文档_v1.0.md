@@ -1742,6 +1742,7 @@ Generation、Benchmark-guided Skill Search、Independent Final Evaluation、Real
 Python wheel 的 10 个包导入，以及 Dashboard typecheck、ESLint、9 项 Vitest 和 production build。
 这些结果证明代码和发布产物在本地通过，不替代目标提交上的远端 CI。
 
-真实 Agent 能力仍遵循独立证据边界：无费用 preflight、Fake Process 集成和被取消/invalid 的付费
-尝试都不构成成功的真实 smoke。只有 4/4 有效 smoke、Secret 审计和后续 12 Run evidence 全部完成，
-才能发布脱敏真实报告；两个同源 Case 仍只支持 descriptive evidence，不支持泛化提升声明。
+截至 2026-07-13，首个完整真实 smoke 已使用 Qwen Code 0.19.9 + DeepSeek V4 Pro 完成：
+4/4 Run、0 invalid、双臂均 100% 通过、记录费用 75,207 microusd、Secret 扫描 0 命中、
+241 文件审计包校验通过。由于只有两个同源 Case 且 W/T/L 为 0/2/0，该结果仅证明真实执行、
+计费、Trace、诊断、报告和审计链路可用，不构成 Skill 普遍有效或存在增益的结论。
