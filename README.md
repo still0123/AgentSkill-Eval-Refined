@@ -1,66 +1,92 @@
 # AgentSkill-Eval
 
-AgentSkill-Eval 是一个面向 Agent Skill 的可复现评测与回归分析项目。平台以受控配对实验为核心，比较同一 Agent 在 without-Skill、with-Skill 或不同 Skill 版本下的任务质量、成本、时延与稳定性。
+[![CI](https://github.com/ranmaoxia0123/AgentSkill-Eval/actions/workflows/ci.yml/badge.svg)](https://github.com/ranmaoxia0123/AgentSkill-Eval/actions/workflows/ci.yml)
+[![Python](https://img.shields.io/badge/Python-3.9%2B-blue)](./pyproject.toml)
+[![License](https://img.shields.io/badge/License-Apache--2.0-green)](./LICENSE)
 
-当前仓库已完成 **P0 可信配对闭环、P1 Trace Intelligence 纵切、P2 Automatic Benchmark Generation、Benchmark-guided Skill Search、Independent Final Evaluation 与 Real Agent Evaluation Evidence MVP**。平台冻结 Case 与 Skill 输入，保存执行和诊断证据，从真实 Git 历史发布可审计 Benchmark；随后可筛选 Skill 候选、执行独立终评，并通过显式确认与预算门运行真实 Agent 配对实验。完整设计见 [开发设计文档](./AgentSkillEval_%E5%BC%80%E5%8F%91%E8%AE%BE%E8%AE%A1%E6%96%87%E6%A1%A3_v1.0.md)。
+AgentSkill-Eval 用可复现的 A/B 实验回答一个问题：
 
-当前版本为 `v0.1.0-rc1` 发布候选：核心研究闭环和本地只读 Dashboard 已集成；FastAPI 等
-服务化控制面不在本版本范围。模拟 Lab、Fake Process Agent 和真实 Agent 证据在契约、报告与
-结论边界上严格隔离。RC1 只有在远端 CI 通过后才能合入 `main`；完整真实付费证据另行发布。
+> 给 Agent 加载某个 `SKILL.md` 后，任务成功率是否真正提升，又额外消耗了多少 Token、时间和费用？
 
-## 环境要求
+它会在相同 Agent、模型、Case 和环境下运行 `without-Skill` 与 `with-Skill`
+两组实验，保存结果、执行轨迹、失败诊断和审计证据，并支持后续回归分析。
 
-- Python 3.9 或更高版本
-- Git
-- 真实 Runner 集成需要固定版本和二进制哈希的 `skill-up v0.5.0`；其他开发与 Mock 测试不要求安装
+**当前版本：[`v0.1.0-rc1`](https://github.com/ranmaoxia0123/AgentSkill-Eval/tree/v0.1.0-rc1)**
 
-## 快速开始
+## 30 秒理解工作流
+
+```text
+           同一个 Case
+                │
+       ┌────────┴────────┐
+       │                 │
+without-Skill        with-Skill
+       │                 │
+       └────────┬────────┘
+                │
+       结果 + Trace + 费用
+                │
+       增益分析 + 失败诊断
+```
+
+配对设计的关键是：**除了是否加载 Skill，其他条件尽量保持一致。**
+因此结果表达的是 Skill 的边际价值，而不是 Agent 的绝对能力。
+
+## 能做什么
+
+| 能力 | 用途 | 当前状态 |
+|---|---|---|
+| Skill 配对评测 | 比较 without/with Skill 的通过率、Token、时延和费用 | 已实现 |
+| Trace Intelligence | 保存规范化轨迹，定位超时、工具、环境或验证失败 | 已实现 |
+| Benchmark Generation | 从真实 Git 历史重建 before-fail / after-pass 评测 Case | 已实现 |
+| Skill Search | 在固定预算下生成、筛选和冻结 Skill 候选 | 已实现，离线演示为 simulated |
+| Independent Final Evaluation | 用隔离的 locked test 检查搜索结果 | 已实现 |
+| Real Agent Evidence | 通过显式授权和预算门运行真实 Agent 实验 | 已实现 |
+| MCP Evaluation Lab | 评测工具选择、参数、顺序、恢复和副作用 | 离线 simulated Lab |
+| Memory/RAG Lab | 评测检索、引用、污染、记忆更新和会话隔离 | 离线 simulated Lab |
+| Dashboard | 查看已冻结的报告、Trace、W/T/L 和候选状态 | 本地只读版 |
+
+`simulated` 只证明评测管线可用，不能当作真实模型能力证据。
+
+## 5 分钟跑通演示
+
+### 1. 安装
+
+需要 Python 3.9+ 和 Git。默认演示不调用真实模型，也不需要 API Key。
 
 ```bash
+git clone https://github.com/ranmaoxia0123/AgentSkill-Eval.git
+cd AgentSkill-Eval
+
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
 python -m pip install -e ".[dev]"
-
-agentskill-eval --help
-agentskill-eval version
-agentskill-eval schema export /tmp/agentskill-eval-schema.json
-agentskill-eval dataset validate examples/datasets/python-review-demo
-agentskill-eval demo run --workspace .agentskill-eval/demo
-agentskill-eval storage recover /path/to/workspace
-agentskill-eval storage rebuild-index /path/to/workspace EXPERIMENT_UUID
-agentskill-eval report generate /path/to/workspace EXPERIMENT_UUID \
-  --control CONTROL_VARIANT_UUID --treatment TREATMENT_VARIANT_UUID
-agentskill-eval experiment bundle /path/to/workspace EXPERIMENT_UUID /tmp/evidence.tar
-agentskill-eval experiment verify-bundle /tmp/evidence.tar
-agentskill-eval trace show /path/to/workspace EXPERIMENT_UUID RUN_UUID
-agentskill-eval trace compare /path/to/workspace EXPERIMENT_UUID PAIR_BLOCK_UUID \
-  --control CONTROL_VARIANT_UUID --treatment TREATMENT_VARIANT_UUID
-agentskill-eval benchmark generate /tmp/generation.yaml --workspace .agentskill-eval/benchmark
-agentskill-eval benchmark status .agentskill-eval/benchmark JOB_UUID
-agentskill-eval benchmark review .agentskill-eval/benchmark JOB_UUID CANDIDATE_UUID \
-  --reviewer NAME --approve --reason "evidence reviewed"
-agentskill-eval benchmark publish .agentskill-eval/benchmark JOB_UUID --publisher NAME
-agentskill-eval optimize search examples/optimizer/python-review-search/search.example.yaml \
-  --workspace .agentskill-eval/optimizer --allow-simulation
-agentskill-eval optimize status .agentskill-eval/optimizer OPTIMIZATION_JOB_UUID
-agentskill-eval final evaluate examples/optimizer/python-review-search/final.example.yaml \
-  --workspace .agentskill-eval/optimizer --allow-simulation
-agentskill-eval final status .agentskill-eval/optimizer FINAL_EVALUATION_JOB_UUID
-agentskill-eval real preflight /absolute/path/to/observed-agent.yaml
-# 以下命令会产生真实调用费用，必须先人工确认 Provider、model、Run 数和预算：
-agentskill-eval real smoke /absolute/path/to/observed-agent.yaml \
-  --workspace .agentskill-eval/real --confirm-real-run \
-  --max-cost-microusd 100000 --max-agent-runs 4
 ```
 
-## 本地验证
+### 2. 运行本地配对实验
+
+```bash
+agentskill-eval demo run --workspace .agentskill-eval/demo
+```
+
+该命令会运行 12 个演示 Case 的配对流程，产生：
+
+- 冻结的 Experiment/Run Manifest；
+- `without-Skill` 与 `with-Skill` 结果；
+- Token、时延、成本和 W/T/L 统计；
+- 可离线打开的 JSON/HTML 报告；
+- Trace、失败诊断和审计产物。
+
+> 演示使用确定性模拟执行，结果会强制标记 `simulated=true`。
+
+### 3. 运行质量检查
 
 ```bash
 make check
 ```
 
-也可以分别运行：
+等价的 Python 命令：
 
 ```bash
 python -m ruff check .
@@ -68,205 +94,127 @@ python -m mypy apps packages
 python -m pytest
 ```
 
+Dashboard 位于 `apps/web/`，使用 pnpm 10：
+
+```bash
+cd apps/web
+pnpm install --frozen-lockfile
+pnpm test
+pnpm run build
+```
+
+## 一个真实实验结果
+
+仓库包含一组 Qwen Code 0.19.9 + DeepSeek V4 Pro 的脱敏实验记录：
+
+| 实验 | Run 情况 | Baseline | Treatment | 结论边界 |
+|---|---:|---:|---:|---|
+| Smoke | 4 完成 / 0 invalid | 100% | 100% | 只证明真实执行与审计链路可用 |
+| Evidence | 9 完成 / 3 invalid | 66.7% | 83.3% | 仅两个同源 Case，只是描述性观察 |
+
+这些数字**不能证明 Skill 具有普遍增益**：样本很小，而且 Evidence 实验包含
+3 个基础设施 invalid Run。仓库只保存脱敏配置、聚合指标和审计哈希：
+
+- [DeepSeek smoke 脱敏记录](./experiments/real-deepseek-v4-pro-smoke-2026-07-13/README.md)
+- [DeepSeek evidence 脱敏记录](./experiments/real-deepseek-v4-pro-evidence-2026-07-13/README.md)
+
+## 真实 Agent 运行安全门
+
+真实运行不会从 simulation 自动回退或升级，必须同时提供：
+
+- `--confirm-real-run`：确认允许产生真实调用；
+- `--max-cost-microusd`：最大费用上限；
+- `--max-agent-runs`：最大 Agent Run 数。
+
+先做无费用 preflight：
+
+```bash
+agentskill-eval real preflight /absolute/path/to/observed-agent.yaml
+```
+
+只有完成 Provider、model、Run 数和预算人工确认后，才应执行 smoke。完整命令与
+Secret 配置见 [Real Agent Evaluation Evidence](./docs/real-agent-evidence.md)。
+
+## 系统组成
+
+```text
+Case / Dataset / Skill
+          │
+          ▼
+Experiment Planner ────冻结 Variant、PairBlock 和预算
+          │
+          ▼
+Runner Adapter ──────Mock / skill-up / Process Agent
+          │
+          ▼
+Manifest + Trace + Artifact
+          │
+          ├── Evaluator / Statistics / Failure Diagnosis
+          └── JSON / HTML Report / Replay Bundle
+```
+
+核心原则：
+
+- 评测输入不可变，记录文件级 SHA-256；
+- 确定性脚本验证优先于 LLM Judge；
+- `pass/fail` 与基础设施 `invalid` 分开；
+- 缺少 Trace 能力时标记 `capability unavailable`，不猜测“没有发生”；
+- 不保存模型隐藏思维过程；
+- 真实证据与 simulated 结果不混合统计。
+
 ## 仓库结构
 
 ```text
-apps/                     可执行入口；P0 CLI/Worker，P1 API/Web
-packages/contracts/       Pydantic 领域契约
+apps/cli/                统一 CLI
+apps/web/                本地只读 Dashboard
+packages/contracts/      Pydantic 领域契约
+packages/experiment/     配对实验、存储、统计与报告
 packages/runner_adapters/ Runner 防腐层
-packages/experiment/      配对实验、统计与报告
 packages/trace_intelligence/
 packages/benchmark_gen/
 packages/skill_optimizer/
 packages/real_evidence/
-packages/mcp_lab/         离线 MCP Tool Evaluation Lab
-packages/memory_rag_lab/  离线 Memory/RAG Evaluation Lab
-runner_compatibility/     固定 Runner 版本与 Golden Contract
-examples/                 演示 Skill 与 Dataset
-tests/                    unit / integration / e2e
+packages/mcp_lab/
+packages/memory_rag_lab/
+examples/                演示 Skill、Dataset 和配置
+experiments/             可公开的脱敏实验记录
+tests/                   单元与集成测试
+docs/                    模块级设计和操作文档
 ```
 
-## 已实现的核心契约
+## 按任务找文档
 
-- `ExperimentVariant`：保存 Runner、Agent、Skill、工具、Memory/RAG、沙箱和价格快照，并生成与数据库 ID 无关的内容指纹。
-- `PairBlock`：冻结 Case、independence group、repeat、seed 和 Variant 执行顺序。
-- `Run`：区分执行生命周期与 `pass/fail/invalid` 评测结果，提供稳定幂等键和合法状态迁移表。
-- `RunAttempt`：记录物理尝试、lease generation、fencing token、错误和 observed environment fingerprint。
-- `ArtifactManifest`：保存内容哈希、大小、媒体类型和敏感级别，拒绝绝对路径、路径穿越及非规范路径。
-- `ExperimentManifest`：冻结数据集、协议、统计计划、预算和 Variant 引用。
-- `FrozenInputManifest`：冻结执行实际读取的 Case/Fixture/Skill 文件清单、逐文件哈希和树哈希。
-- `SkillActivationEvidence`：区分预期安装、已观测安装、baseline 洁净与上游不支持观测的行为阶段。
-- `SecurityScanEvidence`：只记录扫描器版本、计数、状态和命中的 Secret 变量名，不记录 Secret 值。
-- `ReplayBundleManifest`：冻结离线审计与再分析包的成员集合、大小和 SHA-256。
-- `TraceManifest`：保存逐 Attempt 的能力声明、规范化事件、顺序、时间和脱敏摘要。
-- `FailureDiagnosis`：保存多标签、角色、规则、置信度及引用事件；证据不足时明确 abstain/UNKNOWN。
-- `PairTraceDiff`：保存 baseline/treatment 事件计数差和事件类型序列编辑距离。
+| 我想了解…… | 文档 |
+|---|---|
+| 整体架构、阶段和数据设计 | [开发设计文档](./AgentSkillEval_%E5%BC%80%E5%8F%91%E8%AE%BE%E8%AE%A1%E6%96%87%E6%A1%A3_v1.0.md) |
+| 一条命令运行演示 | [One-command Demo](./docs/one-command-demo.md) |
+| 本地存储、恢复和幂等 | [Local Storage](./docs/local-storage.md) |
+| Runner 适配和 `skill-up` 兼容性 | [Runner Adapters](./docs/runner-adapters.md) |
+| 证据、Secret 扫描和审计包 | [Evidence and Replay](./docs/evidence-and-replay.md) |
+| Trace 和失败诊断 | [Trace Intelligence](./docs/trace-intelligence.md) |
+| 统计口径、W/T/L 和报告 | [Statistics and Reports](./docs/statistics-and-reports.md) |
+| 自动生成 Benchmark | [Automatic Benchmark Generation](./docs/automatic-benchmark-generation.md) |
+| Skill 搜索与独立终评 | [Skill Search](./docs/benchmark-guided-skill-search.md) / [Final Evaluation](./docs/independent-final-evaluation.md) |
+| 真实 Agent 评测 | [Real Agent Evidence](./docs/real-agent-evidence.md) |
+| MCP / Memory-RAG 专项 Lab | [MCP Lab](./docs/mcp-tool-evaluation.md) / [Memory-RAG Lab](./docs/memory-rag-evaluation.md) |
+| Dashboard 启动和限制 | [Dashboard](./docs/dashboard-mvp.md) |
 
-## P0 本地存储保证
+完整文档索引见 [`docs/README.md`](./docs/README.md)。
 
-- Manifest 使用 `ase/storage/v1` 完整性信封，同时验证 payload SHA-256 和领域语义指纹。
-- 文件更新采用同目录临时文件、文件 `fsync`、原子 `replace` 和父目录 `fsync`。
-- Attempt 与 Artifact 全部落盘后才更新 Run 的活动 Attempt 指针。
-- 合法临时 Manifest 会在启动恢复时晋升；重复临时文件会删除；冲突或损坏文件进入 `quarantine/`。
-- SQLite 开启 WAL，但只作为可删除查询缓存，能够完全从 Manifest 重建。
-- 每个 Run 使用非阻塞 POSIX advisory lock，避免两个本地 Worker 同时领取同一逻辑任务。
+## 当前边界
 
-详细协议见 [P0 本地存储与恢复](./docs/local-storage.md)。
+`v0.1.0-rc1` 是可本地复现的研究型 RC，不是完整生产平台：
 
-## Runner 防腐层
+- 尚无 FastAPI、账号权限、远程任务队列和多租户控制面；
+- Dashboard 只读取本地冻结报告；
+- MCP 与 Memory/RAG 目前是离线、确定性 Lab；
+- 真实 Agent 数据量很小，不支持泛化性能声明。
 
-- `MockRunnerAdapter` 提供确定性结果、事件与取消，用于编排层测试。
-- `SkillUpRunnerAdapter` 只依赖上游公开 CLI/JSON，运行前校验固定版本和二进制 SHA-256。
-- baseline/treatment 被编译为隔离的单 Case 目录；关闭上游 benchmark、并发和 retry，避免双重实验语义。
-- Runner 退出码仅用于诊断，Case 的通过/失败以 `result.json` 为准。
-- 超时和取消会终止进程组；Runner HOME、缓存和临时目录按运行隔离。
-- Golden parser 测试无需外部依赖；发现固定二进制时自动执行真实 Custom Engine 集成测试。
+## 参与与安全
 
-详细协议见 [Runner 防腐层与兼容协议](./docs/runner-adapters.md)。
+- 开发规范：[CONTRIBUTING.md](./CONTRIBUTING.md)
+- 安全和凭据事件：[SECURITY.md](./SECURITY.md)
+- 版本变更：[CHANGELOG.md](./CHANGELOG.md)
+- 第三方 Benchmark 输入：[THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md)
 
-## 本地配对实验
-
-- 计划器以 UUIDv5 和冻结 seed 确定性生成 PairBlock、Run 与 Variant 执行顺序。
-- Experiment 引用、Variant 指纹、运行时配置和预算在执行前做一致性检查。
-- Run 与 Attempt 分别持久化生命周期，任务失败和基础设施 invalid 使用不同终态。
-- Runner 原始产物复制前复验路径、大小和 SHA-256，并同步写入内容寻址对象存储。
-- 每个 Case source 与 treatment Skill 在计划持久化时复制到不可变输入区；后续修改原目录不会改变执行输入。
-- Runner stdout、stderr 和产物先在内存中完成精确 Secret 扫描；发现命中即阻断整个输出批次，避免部分泄漏。
-- 已完成 Run 可幂等重放，不会再次调用 Agent；崩溃后的未终态 Run 只报告、不静默重复计费。
-- 真实集成测试使用 `skill-up` Custom Engine 跑完整 baseline/treatment 两臂，无需模型凭据。
-
-详细协议见 [P0 本地配对实验引擎](./docs/local-experiment-engine.md)。
-
-## 统计与报告
-
-- 主口径将终态 invalid 保守计为失败；capability 敏感性口径只使用双臂均有效的 PairBlock。
-- repeats 先在 Case 内聚合，再按 independence group 等权，避免大仓库支配总体结论。
-- 成功率、增益、Token、时延和成本均使用固定 seed 的 group→case 层级 bootstrap。
-- 报告 W/T/L、完整/有效 block 比例、invalid 数、配对效率差和 cost per success。
-- `report.json` 保留机器结果；`report.html` 可离线打开、严格转义且不执行脚本。
-
-详细方法见 [配对统计与静态报告](./docs/statistics-and-reports.md)。
-
-## 演示数据集
-
-- `python-review-demo v1.0.0` 包含 12 个合成 Case：4 个正例、2 个反例、2 个干扰、
-  2 个复杂和 2 个鲁棒性样本；
-- Case 采用上游原生 YAML，平台 sidecar 冻结 split、provenance、group、oracle 和适用性；
-- Loader 将 Case、fixture、prompt 和 grader 纳入 Dataset 身份，拒绝逃逸路径、符号链接、
-  重复 ID 与类别配额不足；
-- 配套 `python-review-v1` Skill 冻结版本和 `SKILL.md` 哈希；
-- 固定 Runner 可用时，集成测试会真实编译并校验全部 12 个 Case。
-
-该数据集及 grader 完全公开，只用于工程 Demo 和开发回归，不支持稳定泛化结论。详细说明见
-[P0 Python Review Demo Dataset](./docs/demo-dataset.md)。
-
-## 一条命令配对实验
-
-默认命令无凭据、无费用地运行 72 个模拟逻辑 Run，并完成持久化、统计与报告全链路：
-
-```bash
-agentskill-eval demo run --workspace .agentskill-eval/demo
-```
-
-模拟结果在 Manifest、JSON 和 HTML 中强制标记，不能作为性能证据。真实模式需要显式选择
-`--mode skill-up`、指定 Engine/Secret，并传入 `--confirm-real-run`，防止误消耗额度。详见
-[一条命令运行 P0 配对实验](./docs/one-command-demo.md)。
-
-## 可信证据与审计包
-
-- 真实 `skill-up` Adapter 对 baseline 验证 `skills: []` 且无 selected Skill 目录；对 treatment 验证配置、`SKILL.md` 与安装树哈希。
-- `discovered/read/activated/followed` 只有在 Runner 提供直接事件时才记录；当前 `skill-up v0.5.0` 不暴露这些事件，报告明确标为 unsupported，绝不由“已安装”推断“已遵循”。
-- 审计包包含 Manifest 真值、冻结输入、逐 Attempt 原始证据与静态报告；排除 SQLite 查询缓存、锁文件和临时文件。
-- 同一实验生成的未压缩 tar 字节确定一致，校验器拒绝路径穿越、重复成员、非普通文件及大小/哈希不匹配。
-- 审计包支持离线审查、恢复 Manifest 和重新运行统计；它不包含外部 Provider 的服务端状态，因此不承诺逐 Token 重放一次外部模型请求。
-
-详细协议见 [执行证据、安全扫描与审计包](./docs/evidence-and-replay.md)。
-
-## Trace Intelligence 与失败诊断
-
-- Executor 记录平台验证、Runner 执行和终态事件，并接收 Adapter 的 Runner/Agent 事件流。
-- Trace 摘要限制深度、成员数和字符串长度，并在构造时替换配置 Secret；不保存模型隐藏思维过程。
-- Capability 按每个 Attempt 的实际事件动态标记 observed/unavailable，缺失工具、MCP、RAG 或 Memory 事件不会伪装成空轨迹。
-- 规则诊断只对 timeout/budget、Judge/Grader 和基础设施终态作确定性归因；普通任务失败但证据不足时返回 `UNKNOWN + abstained`。
-- 静态 JSON/HTML 报告包含逐 Run Trace/Diagnosis 链接和 PairTraceDiff 汇总。
-
-详细协议见 [Trace Intelligence 与规则诊断](./docs/trace-intelligence.md)。
-
-## 可审计 Automatic Benchmark Generation
-
-P2 纵切支持从固定本地 Git 历史自动重建 before/after fixture，执行三次重复的
-before-fail/after-pass、反向补丁 mutation 和替代修复验证，经确定性去重与人工审核后
-发布不可变 DatasetVersion。仓库包含 MIT 许可 `more-itertools` 的离线 Git bundle 和
-两个真实历史缺陷，不需要调用模型或访问网络。协议、状态机、质量门和重放命令见
-[Automatic Benchmark Generation MVP](./docs/automatic-benchmark-generation.md)。
-
-## Benchmark-guided Skill Search
-
-P2 搜索纵切支持 Markdown Skill 候选变异、benchmark-specific leakage lint、固定预算的
-successive halving、original/manual/random/search 完整对照、Pareto 排序和唯一 winner
-冻结。搜索进程的契约中不存在 locked-test 输入；仓库离线演示强制标记为 simulated，
-只证明控制器行为。真实 Agent 可通过严格 JSON Process Evaluator 接入。详见
-[Benchmark-guided Skill Search MVP](./docs/benchmark-guided-skill-search.md)。
-
-## Real Agent Evaluation Evidence
-
-- 真实 CLI 仅接受 `observed_agent + simulated=false`，并强制确认、费用上限和 Run 数上限；
-- preflight 冻结并复验 Runner/Agent 可执行文件哈希与版本、Skill、真实 DatasetVersion 和 Secret 名称；
-- smoke 为 4 Run 链路验证，evidence 为 12 Run 冻结 PairBlock 配对实验；
-- 逐 Attempt 保存 Trace、失败诊断、激活/洁净证据、环境指纹、Token、时延、费用和离线审计包；
-- CI 使用明确标记为 simulated 的 Fake Process Agent，绝不产生模型费用或冒充性能证据；
-- 只有两个同源真实 Case，因此报告强制声明 descriptive evidence 的结论边界。
-- 已通过无费用 preflight 验证 Qwen Code 0.19.9 + DeepSeek V4 Pro 接入；DeepSeek 使用
-  OpenAI-compatible 线协议和隔离 HOME 配置，显式关闭 thinking，配置中不保存 API Key。
-- 真实预算按 cache miss/cache hit 分开计价，并聚合 Qwen 主/子 Agent usage；Qwen 使用墙钟、工具数、
-  会话 Token 与子 Agent 限制，Ctrl-C 会递归终止进程并持久化 `CANCELLED`。
-
-完整配置、预算门、命令、报告字段和故障排查见
-[Real Agent Evaluation Evidence MVP](./docs/real-agent-evidence.md)。
-首个完整真实 smoke 已使用 Qwen Code 0.19.9 + DeepSeek V4 Pro 完成 4/4 Run、0 invalid；
-脱敏配置和结果见
-[2026-07-13 DeepSeek smoke evidence](./experiments/real-deepseek-v4-pro-smoke-2026-07-13/README.md)。
-首个 12 Run evidence 实验完成 9 次有效通过与 3 次 Runner `execution_error` invalid；baseline/
-treatment 通过率为 66.7%/83.3%，但两个 Case 同源且 invalid 比例较高，只能视为描述性证据。
-脱敏配置、聚合指标与审计哈希见
-[2026-07-13 DeepSeek evidence experiment](./experiments/real-deepseek-v4-pro-evidence-2026-07-13/README.md)。
-
-## MCP Tool Evaluation MVP
-
-新增完全离线的 Mock MCP Lab、严格 Case/Trace 契约、六类确定性 grader、配对统计和无脚本
-JSON/HTML 报告。Lab 覆盖工具选择、参数、序列、故障恢复、效率及副作用确认；模拟执行必须显式
-传 `--allow-simulation`，报告禁止把结果表述为真实 Agent 提升。真实 Process adapter 目前仅定义
-固定 executable/SHA-256、无 shell、最小环境和响应限制的安全边界，不连接生产 MCP Server。
-示例与限制见 [MCP Tool Evaluation MVP](./docs/mcp-tool-evaluation.md)。
-
-## Memory/RAG Evaluation MVP
-
-新增完全离线、无需模型或向量数据库的 Memory/RAG 专项 Lab。它分别审计 Retrieval 与
-Generation/Grounding，覆盖 Recall@K、Precision@K、MRR、nDCG、引用与证据归因、上下文污染，
-以及 Memory write/read/update/overwrite/expiration/forget、跨 Session 隔离、poisoning 和敏感
-持久化。四类配对实验、Trace 与 JSON/HTML 报告均强制 simulated claim limit。真实 Process
-adapter 目前仅提供固定 executable/SHA-256、无 shell、最小环境和响应限制的安全边界。详见
-[Memory/RAG Evaluation MVP](./docs/memory-rag-evaluation.md)。
-
-## Read-only Evaluation Dashboard MVP
-
-`apps/web` 提供 Vue 3 + TypeScript 的只读本地研究报告 Dashboard，可加载配对实验、Trace/
-Diagnosis、Benchmark Generation 和 Skill Search fixture，展示指标、W/T/L、候选状态与证据引用。
-输入经运行时校验和文本转义，不执行报告中的 HTML/脚本，也不提供实验写入、真实模型调用或服务端
-能力。完整启动、测试和安全边界见 [Dashboard MVP](./docs/dashboard-mvp.md)。
-
-## 开发原则
-
-- P0 优先跑通无服务依赖的本地可信闭环。
-- 不复制 `skill-up` 的内部实现，只依赖其公开 CLI、JSON 和产物契约。
-- 确定性验证优先于 LLM Judge。
-- 每个完成目标都必须通过自动化检查，并以独立 Git 提交推送。
-
-## 参与和安全
-
-- 开发与提交要求见 [CONTRIBUTING.md](./CONTRIBUTING.md)；
-- 漏洞和凭据事件处理见 [SECURITY.md](./SECURITY.md)；
-- 版本变化见 [CHANGELOG.md](./CHANGELOG.md)；
-- 第三方 Benchmark 输入说明见 [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md)。
-
-项目代码以 [Apache License 2.0](./LICENSE) 发布；生成数据集仍以各自冻结 provenance 中的许可为准。
+项目代码使用 [Apache License 2.0](./LICENSE)；生成数据集仍遵循各自 provenance 中记录的许可证。
