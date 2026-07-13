@@ -132,3 +132,16 @@ Fake Process 测试只验证接口、预算、Trace、Secret、报告和幂等�
 四次 Secret 扫描均为 clean，replay bundle 校验通过。仓库只提交
 `experiments/real-deepseek-v4-pro-smoke-2026-07-13/` 下的脱敏配置与聚合结果，原始日志、缓存、
 会话和审计包保持本地且不跟踪。
+
+## 首个 12 Run evidence 实验
+
+同日继续使用相同冻结配置执行 2 Case × 2 arm × 3 repeats。12 个分配 Run 中 9 个有效完成并
+通过，3 个因 Runner 返回 `ERROR`/`execution_error` 被分类为 infra invalid，且未自动补跑。
+baseline/treatment 通过率为 4/6 与 5/6，绝对差为 +16.7 个百分点；Case 级 W/T/L 为 1/1/0。
+配对聚合中 treatment 的 Token、时延和费用分别低约 6.2%、19.7% 和 5.0%，总记录费用为
+231,195 microusd，低于 750,000 microusd 授权上限。
+
+上述结果只能作为两个同源 Case 的 descriptive evidence：样本量极小，三个 invalid 会影响比较，
+不能据此声称 Skill 存在普遍增益。12 次持久化 Secret 扫描与一次覆盖 12,341 个文件的 Key 精确
+扫描均为 0 命中，389 文件 replay bundle 校验通过。公开仓库仅保存
+`experiments/real-deepseek-v4-pro-evidence-2026-07-13/` 下的脱敏配置、聚合结果和哈希。

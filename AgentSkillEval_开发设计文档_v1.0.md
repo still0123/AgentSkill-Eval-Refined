@@ -1746,3 +1746,9 @@ Python wheel 的 10 个包导入，以及 Dashboard typecheck、ESLint、9 项 V
 4/4 Run、0 invalid、双臂均 100% 通过、记录费用 75,207 microusd、Secret 扫描 0 命中、
 241 文件审计包校验通过。由于只有两个同源 Case 且 W/T/L 为 0/2/0，该结果仅证明真实执行、
 计费、Trace、诊断、报告和审计链路可用，不构成 Skill 普遍有效或存在增益的结论。
+
+随后的 12 Run evidence 实验在同一冻结配置下完成 9 次有效通过，3 次因 Runner
+`ERROR`/`execution_error` 分类为 infra invalid，未自动补跑。baseline/treatment 通过率为
+66.7%/83.3%，Case 级 W/T/L 为 1/1/0，总记录费用 231,195 microusd；12 次 Secret 扫描和
+12,341 文件 Key 精确扫描均为 0 命中，389 文件审计包校验通过。由于仅有两个同源 Case
+且存在 3 个 invalid，+16.7 个百分点只是描述性观察，不支持 Skill 普遍增益声称。

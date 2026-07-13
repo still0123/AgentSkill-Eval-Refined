@@ -1,0 +1,79 @@
+{
+  "schema_version": "ase/sanitized-real-experiment-result/v1alpha1",
+  "experiment_id": "282b1e61-8045-56c8-8806-30054d747b18",
+  "status": "COMPLETED",
+  "simulated": false,
+  "evidence_class": "observed_agent",
+  "provider": "deepseek",
+  "model": "deepseek-v4-pro",
+  "claim_limit": "Observed-Agent descriptive evidence for two independent cases; does not support general performance claims.",
+  "runs": {
+    "planned": 12,
+    "completed": 9,
+    "invalid": 3,
+    "invalid_reason": "Runner ERROR / execution_error"
+  },
+  "outcome": {
+    "baseline_pass_rate": 0.6666666666666666,
+    "treatment_pass_rate": 0.8333333333333333,
+    "absolute_gain": 0.16666666666666663,
+    "wtl": {
+      "win": 1,
+      "tie_positive": 1,
+      "tie_negative": 0,
+      "loss": 0
+    }
+  },
+  "cases": [
+    {
+      "case_id": "more-itertools-sample-strict-counts",
+      "baseline_pass_rate": 0.3333333333333333,
+      "treatment_pass_rate": 0.6666666666666666,
+      "absolute_gain": 0.3333333333333333,
+      "classification": "win"
+    },
+    {
+      "case_id": "more-itertools-last-reversed-none",
+      "baseline_pass_rate": 1.0,
+      "treatment_pass_rate": 1.0,
+      "absolute_gain": 0.0,
+      "classification": "tie_positive"
+    }
+  ],
+  "usage": {
+    "input_tokens": 6583572,
+    "cached_input_tokens": 6194432,
+    "output_tokens": 45354,
+    "thinking_tokens": 0,
+    "observed_or_reserved_cost_microusd": 231195,
+    "authorized_max_microusd": 750000,
+    "baseline_mean_tokens": 569967.6666666666,
+    "treatment_mean_tokens": 534853.3333333333,
+    "treatment_relative_token_overhead": -0.06160758826670292,
+    "baseline_mean_latency_ms": 74744.33333333333,
+    "treatment_mean_latency_ms": 60055.333333333336,
+    "treatment_relative_latency_overhead": -0.19652325928832948,
+    "baseline_mean_cost_microusd": 19763.666666666668,
+    "treatment_mean_cost_microusd": 18768.833333333332,
+    "treatment_relative_cost_overhead": -0.05033647602502921
+  },
+  "security": {
+    "attempt_scans_clean": 12,
+    "exact_scan_files": 12341,
+    "secret_value_matches": 0,
+    "hidden_reasoning_persisted": false
+  },
+  "capability_unavailable": [
+    "mcp_rag_memory",
+    "tool_file_command"
+  ],
+  "audit": {
+    "bundle_valid": true,
+    "bundle_file_count": 389,
+    "bundle_manifest_sha256": "a39b1ff098745b26e47d4592fea67be57203256204b6b209faf3371036630d6d",
+    "bundle_archive_sha256": "473690ba00ab06b3d7a47d8cc661ea1219281f2b395c1c7dbeaa213dec5ef109",
+    "report_json_sha256": "3f7b2068cfed5bbdf38f9361e1c47ace001f35af8863c3a306ee82861b809dd9",
+    "report_html_sha256": "a70b80812f7c0390450e13c758cdec2618113dd05dfab84d27ef0a8a0f94c43d",
+    "raw_artifacts_committed": false
+  }
+}

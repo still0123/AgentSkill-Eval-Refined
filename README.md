@@ -226,6 +226,10 @@ successive halving、original/manual/random/search 完整对照、Pareto 排序�
 首个完整真实 smoke 已使用 Qwen Code 0.19.9 + DeepSeek V4 Pro 完成 4/4 Run、0 invalid；
 脱敏配置和结果见
 [2026-07-13 DeepSeek smoke evidence](./experiments/real-deepseek-v4-pro-smoke-2026-07-13/README.md)。
+首个 12 Run evidence 实验完成 9 次有效通过与 3 次 Runner `execution_error` invalid；baseline/
+treatment 通过率为 66.7%/83.3%，但两个 Case 同源且 invalid 比例较高，只能视为描述性证据。
+脱敏配置、聚合指标与审计哈希见
+[2026-07-13 DeepSeek evidence experiment](./experiments/real-deepseek-v4-pro-evidence-2026-07-13/README.md)。
 
 ## MCP Tool Evaluation MVP
 
