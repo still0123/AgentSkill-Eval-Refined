@@ -240,6 +240,8 @@ def test_paired_executor_runs_both_arms_with_real_skill_up(tmp_path: Path) -> No
             assert (layout.raw_runner(run.id, 1) / "result.json").is_file()
             activation = store.load_activation_evidence(experiment_id, run.id, 1)
             security = store.load_security_scan(experiment_id, run.id, 1)
+            trace = store.load_trace_manifest(experiment_id, run.id, 1)
+            diagnosis = store.load_failure_diagnosis(experiment_id, run.id, 1)
             if run.variant_id == baseline.id:
                 assert activation.skill_expected is False
                 assert activation.installed is False
@@ -250,6 +252,10 @@ def test_paired_executor_runs_both_arms_with_real_skill_up(tmp_path: Path) -> No
                 assert activation.installed_skill_sha256 is not None
             assert activation.compiled_eval_sha256 is not None
             assert security.status == "clean"
+            assert diagnosis.status == "no_failure"
+            capabilities = {item.name: item for item in trace.capabilities}
+            assert capabilities["runner_lifecycle"].availability.value == "observed"
+            assert capabilities["tool_file_command"].availability.value == "unavailable"
 
     statistics = ExperimentAnalyzer(store).analyze(
         experiment_id,

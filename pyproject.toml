@@ -51,6 +51,7 @@ source = [
   "agentskill_eval_cli",
   "agentskill_eval_contracts",
   "agentskill_eval_experiment",
+  "agentskill_eval_trace_intelligence",
   "agentskill_eval_runner_adapters",
 ]
 
@@ -78,6 +79,7 @@ known-first-party = [
   "agentskill_eval_cli",
   "agentskill_eval_contracts",
   "agentskill_eval_experiment",
+  "agentskill_eval_trace_intelligence",
   "agentskill_eval_runner_adapters",
 ]
 

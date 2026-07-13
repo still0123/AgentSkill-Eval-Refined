@@ -2,12 +2,14 @@
 
 import json
 from pathlib import Path
+from uuid import UUID
 
 from typer.testing import CliRunner
 
 from agentskill_eval_benchmark_gen import DemoMode
 from agentskill_eval_cli import __version__
 from agentskill_eval_cli.main import app
+from agentskill_eval_experiment import LocalExperimentStore
 
 runner = CliRunner()
 ROOT = Path(__file__).resolve().parents[2]
@@ -21,6 +23,7 @@ def test_cli_help_lists_project_description() -> None:
     assert "schema" in result.stdout
     assert "storage" in result.stdout
     assert "dataset" in result.stdout
+    assert "trace" in result.stdout
     assert "version" in result.stdout
 
 
@@ -71,6 +74,39 @@ def test_demo_run_command_executes_service_free_mock_loop(tmp_path: Path) -> Non
     assert payload["logical_runs"] == 72
     assert payload["completed_runs"] == 72
     assert Path(payload["html_report"]).is_file()
+    workspace = tmp_path / "workspace"
+    store = LocalExperimentStore(workspace)
+    experiment_id = payload["experiment_id"]
+    parsed_experiment_id = UUID(experiment_id)
+    runs = store.list_runs(parsed_experiment_id)
+    selected = runs[0]
+    trace_result = runner.invoke(
+        app, ["trace", "show", str(workspace), experiment_id, str(selected.id)]
+    )
+    assert trace_result.exit_code == 0, trace_result.stdout
+    trace_payload = json.loads(trace_result.stdout)
+    assert trace_payload["trace"]["events"]
+    block_runs = [run for run in runs if run.pair_block_id == selected.pair_block_id]
+    by_variant = {str(run.variant_id): run for run in block_runs}
+    control = payload["control_variant_id"]
+    treatment = payload["treatment_variant_id"]
+    assert control in by_variant and treatment in by_variant
+    compare_result = runner.invoke(
+        app,
+        [
+            "trace",
+            "compare",
+            str(workspace),
+            experiment_id,
+            str(selected.pair_block_id),
+            "--control",
+            control,
+            "--treatment",
+            treatment,
+        ],
+    )
+    assert compare_result.exit_code == 0, compare_result.stdout
+    assert json.loads(compare_result.stdout)["pair_block_id"] == str(selected.pair_block_id)
 
 
 def test_demo_real_mode_requires_explicit_cost_confirmation(tmp_path: Path) -> None:

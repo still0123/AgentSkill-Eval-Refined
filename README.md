@@ -2,7 +2,7 @@
 
 AgentSkill-Eval 是一个面向 Agent Skill 的可复现评测与回归分析项目。平台以受控配对实验为核心，比较同一 Agent 在 without-Skill、with-Skill 或不同 Skill 版本下的任务质量、成本、时延与稳定性。
 
-当前仓库已完成 **P0 目标 1～9**：Python 项目初始化、核心数据契约、本地可靠存储、Runner 防腐层、本地配对实验编排、可信统计报告、12 Case Demo Dataset、一键 72 Run 演示，以及可信证据/审计包。平台在执行前冻结 Case 与 Skill 输入；逐 Attempt 保存 Skill 安装或 baseline 洁净证据；在任何 Runner 输出持久化前执行精确 Secret 扫描；并能生成确定性的离线审计与再分析包。完整设计见 [开发设计文档](./AgentSkillEval_%E5%BC%80%E5%8F%91%E8%AE%BE%E8%AE%A1%E6%96%87%E6%A1%A3_v1.0.md)。
+当前仓库已完成 **P0 可信配对闭环，并进入 P1 Trace Intelligence 纵切**。平台在执行前冻结 Case 与 Skill 输入；逐 Attempt 保存 Skill 安装或 baseline 洁净证据；在 Runner 输出持久化前执行精确 Secret 扫描；生成确定性的离线审计与再分析包；同时采集有能力声明的规范化事件，执行证据引用的规则诊断，并比较配对轨迹。完整设计见 [开发设计文档](./AgentSkillEval_%E5%BC%80%E5%8F%91%E8%AE%BE%E8%AE%A1%E6%96%87%E6%A1%A3_v1.0.md)。
 
 ## 环境要求
 
@@ -29,6 +29,9 @@ agentskill-eval report generate /path/to/workspace EXPERIMENT_UUID \
   --control CONTROL_VARIANT_UUID --treatment TREATMENT_VARIANT_UUID
 agentskill-eval experiment bundle /path/to/workspace EXPERIMENT_UUID /tmp/evidence.tar
 agentskill-eval experiment verify-bundle /tmp/evidence.tar
+agentskill-eval trace show /path/to/workspace EXPERIMENT_UUID RUN_UUID
+agentskill-eval trace compare /path/to/workspace EXPERIMENT_UUID PAIR_BLOCK_UUID \
+  --control CONTROL_VARIANT_UUID --treatment TREATMENT_VARIANT_UUID
 ```
 
 ## 本地验证
@@ -74,6 +77,9 @@ tests/                    unit / integration / e2e
 - `SkillActivationEvidence`：区分预期安装、已观测安装、baseline 洁净与上游不支持观测的行为阶段。
 - `SecurityScanEvidence`：只记录扫描器版本、计数、状态和命中的 Secret 变量名，不记录 Secret 值。
 - `ReplayBundleManifest`：冻结离线审计与再分析包的成员集合、大小和 SHA-256。
+- `TraceManifest`：保存逐 Attempt 的能力声明、规范化事件、顺序、时间和脱敏摘要。
+- `FailureDiagnosis`：保存多标签、角色、规则、置信度及引用事件；证据不足时明确 abstain/UNKNOWN。
+- `PairTraceDiff`：保存 baseline/treatment 事件计数差和事件类型序列编辑距离。
 
 ## P0 本地存储保证
 
@@ -154,6 +160,16 @@ agentskill-eval demo run --workspace .agentskill-eval/demo
 - 审计包支持离线审查、恢复 Manifest 和重新运行统计；它不包含外部 Provider 的服务端状态，因此不承诺逐 Token 重放一次外部模型请求。
 
 详细协议见 [执行证据、安全扫描与审计包](./docs/evidence-and-replay.md)。
+
+## Trace Intelligence 与失败诊断
+
+- Executor 记录平台验证、Runner 执行和终态事件，并接收 Adapter 的 Runner/Agent 事件流。
+- Trace 摘要限制深度、成员数和字符串长度，并在构造时替换配置 Secret；不保存模型隐藏思维过程。
+- Capability 按每个 Attempt 的实际事件动态标记 observed/unavailable，缺失工具、MCP、RAG 或 Memory 事件不会伪装成空轨迹。
+- 规则诊断只对 timeout/budget、Judge/Grader 和基础设施终态作确定性归因；普通任务失败但证据不足时返回 `UNKNOWN + abstained`。
+- 静态 JSON/HTML 报告包含逐 Run Trace/Diagnosis 链接和 PairTraceDiff 汇总。
+
+详细协议见 [Trace Intelligence 与规则诊断](./docs/trace-intelligence.md)。
 
 ## 开发原则
 

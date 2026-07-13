@@ -21,6 +21,8 @@ workspace/
 │   │       ├── measurement.json
 │   │       ├── skill-activation.json
 │   │       ├── security-scan.json
+│   │       ├── trace.json
+│   │       ├── failure-diagnosis.json
 │   │       ├── raw-runner/
 │   │       └── artifacts/manifest.json
 │   ├── reports/report.json
@@ -61,10 +63,11 @@ Attempt 提交额外遵循：
 2. 将 `attempt.json` 推进到终态，终态后禁止修改；
 3. 写入与 Attempt ID 绑定的不可变 `measurement.json`；
 4. 写入不可变 `skill-activation.json` 与 `security-scan.json`；
-5. 写入不可变 Artifact Manifest；
-6. 最后更新 `run.json` 的 active Attempt 和 selected Attempt hash。
+5. 写入不可变 `trace.json` 与 `failure-diagnosis.json`；
+6. 写入不可变 Artifact Manifest；
+7. 最后更新 `run.json` 的 active Attempt 和 selected Attempt hash。
 
-因此，第六步前崩溃只会留下可审计的物理 Attempt 和证据，不会让逻辑 Run 指向半写入结果。`reports/` 是可重建派生视图，不属于提交真值链。
+因此，第七步前崩溃只会留下可审计的物理 Attempt 和证据，不会让逻辑 Run 指向半写入结果。`reports/` 是可重建派生视图，不属于提交真值链。
 
 ## 冻结执行输入
 

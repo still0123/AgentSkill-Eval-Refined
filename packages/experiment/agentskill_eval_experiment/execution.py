@@ -37,11 +37,13 @@ from agentskill_eval_experiment.storage import ExperimentLayout, LocalExperiment
 from agentskill_eval_runner_adapters import (
     ExitReason,
     RunnerAdapter,
+    RunnerEvent,
     RunnerRequest,
     RunnerResult,
     RunnerSkillEvidence,
     RunnerStatus,
 )
+from agentskill_eval_trace_intelligence import RuleFailureDiagnoser, TraceCollector
 
 
 @dataclass(frozen=True)
@@ -90,6 +92,7 @@ class LocalExperimentExecutor:
         self.worker_id = worker_id
         self.progress_sink = progress_sink
         self.secret_scanner = ExactSecretScanner()
+        self.failure_diagnoser = RuleFailureDiagnoser()
 
     async def execute(self, plan: PlannedExperiment) -> LocalExecutionSummary:
         records: List[ExecutionRecord] = []
@@ -158,9 +161,20 @@ class LocalExperimentExecutor:
             run = self._advance_run(run, ExecutionStatus.PREPARING)
 
             request = self._request(run, attempt, case, runtime)
+            trace = TraceCollector(
+                run.id,
+                attempt.id,
+                secrets=runtime.secret_env,
+            )
+            trace.record("platform.validation", status="started")
             try:
                 validation = await self.adapter.validate(request)
             except Exception as exc:  # adapter boundary
+                trace.record(
+                    "platform.validation",
+                    status="failed",
+                    summary={"error_type": type(exc).__name__},
+                )
                 activation = self._activation_evidence(run, attempt, None, runtime)
                 return self._finalize_infra_failure(
                     run,
@@ -170,9 +184,15 @@ class LocalExperimentExecutor:
                     f"{type(exc).__name__}: {exc}",
                     activation_evidence=activation,
                     secret_env=runtime.secret_env,
+                    trace_collector=trace,
                 )
             activation = self._activation_evidence(run, attempt, validation.skill_evidence, runtime)
             if not validation.valid:
+                trace.record(
+                    "platform.validation",
+                    status="failed",
+                    summary={"error_count": len(validation.errors)},
+                )
                 detail = "\n".join(validation.errors) or validation.stderr
                 return self._finalize_infra_failure(
                     run,
@@ -182,12 +202,19 @@ class LocalExperimentExecutor:
                     detail,
                     activation_evidence=activation,
                     secret_env=runtime.secret_env,
+                    trace_collector=trace,
                 )
+            trace.record("platform.validation", status="completed")
 
             attempt = self._advance_attempt(experiment_id, attempt, AttemptStatus.RUNNING)
             run = self._advance_run(run, ExecutionStatus.RUNNING)
+            trace.record("platform.runner_execution", status="started")
             try:
-                result = await self.adapter.execute(request)
+
+                async def event_sink(event: RunnerEvent) -> None:
+                    await trace.accept_runner_event(event.kind, event.payload)
+
+                result = await self.adapter.execute(request, event_sink)
             except Exception as exc:  # adapter boundary: convert unexpected failures to evidence
                 result = RunnerResult(
                     execution_id=request.execution_id,
@@ -197,6 +224,14 @@ class LocalExperimentExecutor:
                     process_exit_code=None,
                     stderr=f"{type(exc).__name__}: {exc}",
                 )
+            trace.record(
+                "platform.runner_execution",
+                status="completed" if result.status != RunnerStatus.ERROR else "failed",
+                summary={
+                    "exit_reason": result.exit_reason.value,
+                    "runner_status": result.status.value,
+                },
+            )
 
             run = self._advance_run(run, ExecutionStatus.GRADING)
             try:
@@ -213,6 +248,7 @@ class LocalExperimentExecutor:
                     activation_evidence=activation,
                     security_scan=scan,
                     secret_env=runtime.secret_env,
+                    trace_collector=trace,
                 )
             except (OSError, ValueError) as exc:
                 return self._finalize_infra_failure(
@@ -223,6 +259,7 @@ class LocalExperimentExecutor:
                     f"{type(exc).__name__}: {exc}",
                     activation_evidence=activation,
                     secret_env=runtime.secret_env,
+                    trace_collector=trace,
                 )
             run = self._advance_run(run, ExecutionStatus.PERSISTING)
             return self._finalize_result(
@@ -232,6 +269,7 @@ class LocalExperimentExecutor:
                 archived.artifacts,
                 activation,
                 archived.security_scan,
+                trace,
             )
 
     def _request(
@@ -340,6 +378,7 @@ class LocalExperimentExecutor:
         artifacts: ArtifactManifest,
         activation_evidence: SkillActivationEvidence,
         security_scan: SecurityScanEvidence,
+        trace_collector: TraceCollector,
     ) -> ExecutionRecord:
         if result.status in {RunnerStatus.PASS, RunnerStatus.FAIL}:
             attempt = self._terminal_attempt(attempt, AttemptStatus.COMPLETED)
@@ -374,6 +413,26 @@ class LocalExperimentExecutor:
                 evaluation_outcome=EvaluationOutcome.INVALID,
             )
         measurement = self._measurement(run, attempt, result)
+        trace_collector.record(
+            "platform.run_terminal",
+            status="completed" if run.execution_status == ExecutionStatus.COMPLETED else "failed",
+            summary={
+                "evaluation_outcome": (
+                    run.evaluation_outcome.value if run.evaluation_outcome else None
+                ),
+                "execution_status": run.execution_status.value,
+            },
+        )
+        trace = trace_collector.manifest()
+        diagnosis = self.failure_diagnoser.diagnose(
+            trace,
+            run.evaluation_outcome,
+            error_code=(
+                result.exit_reason.value
+                if run.evaluation_outcome == EvaluationOutcome.INVALID
+                else None
+            ),
+        )
         selected = self.store.commit_attempt(
             run,
             attempt,
@@ -381,6 +440,8 @@ class LocalExperimentExecutor:
             measurement,
             activation_evidence,
             security_scan,
+            trace,
+            diagnosis,
         )
         return ExecutionRecord(
             selected.id,
@@ -402,6 +463,7 @@ class LocalExperimentExecutor:
         activation_evidence: Optional[SkillActivationEvidence] = None,
         security_scan: Optional[SecurityScanEvidence] = None,
         secret_env: Optional[Mapping[str, str]] = None,
+        trace_collector: Optional[TraceCollector] = None,
     ) -> ExecutionRecord:
         secret_env = secret_env or {}
         detail = self.secret_scanner.redact(detail, secret_env)
@@ -434,6 +496,20 @@ class LocalExperimentExecutor:
                 scanned_bytes=0,
                 note="Runner output was unavailable for pre-persistence scanning.",
             )
+        if trace_collector is None:
+            trace_collector = TraceCollector(run.id, attempt.id, secrets=secret_env)
+        trace_collector.record(
+            "platform.run_terminal",
+            status="failed",
+            summary={
+                "error_code": error_code,
+                "execution_status": run.execution_status.value,
+            },
+        )
+        trace = trace_collector.manifest()
+        diagnosis = self.failure_diagnoser.diagnose(
+            trace, run.evaluation_outcome, error_code=error_code
+        )
         selected = self.store.commit_attempt(
             run,
             attempt,
@@ -441,6 +517,8 @@ class LocalExperimentExecutor:
             measurement,
             activation_evidence,
             security_scan,
+            trace,
+            diagnosis,
         )
         return ExecutionRecord(
             selected.id,

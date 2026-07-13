@@ -4,12 +4,20 @@ from __future__ import annotations
 
 import html
 import json
+from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Sequence
+from typing import Dict, Optional, Sequence
 from uuid import UUID
 
-from agentskill_eval_contracts import ExperimentManifest, ExperimentVariant
+from agentskill_eval_contracts import (
+    ExperimentManifest,
+    ExperimentVariant,
+    FailureDiagnosis,
+    PairTraceDiff,
+    Run,
+    TraceManifest,
+)
 from agentskill_eval_experiment.statistics import (
     ConfidenceInterval,
     EfficiencyComparison,
@@ -17,12 +25,20 @@ from agentskill_eval_experiment.statistics import (
     ExperimentStatistics,
 )
 from agentskill_eval_experiment.storage import ExperimentLayout, LocalExperimentStore
+from agentskill_eval_trace_intelligence import compare_traces
 
 
 @dataclass(frozen=True)
 class StaticReportPaths:
     json_path: Path
     html_path: Path
+
+
+@dataclass(frozen=True)
+class TraceReportData:
+    traces: tuple[TraceManifest, ...]
+    diagnoses: tuple[FailureDiagnosis, ...]
+    pair_diffs: tuple[PairTraceDiff, ...]
 
 
 class StaticReportWriter:
@@ -39,6 +55,7 @@ class StaticReportWriter:
         if statistics.experiment_id != experiment_id:
             raise ValueError("statistics belong to another experiment")
         layout = ExperimentLayout(self.store.workspace, experiment_id)
+        trace_data = self._trace_report_data(experiment_id, statistics)
         json_path = layout.reports / "report.json"
         html_path = layout.reports / "report.html"
         bundle = {
@@ -49,6 +66,17 @@ class StaticReportWriter:
                 for variant in sorted(variants, key=lambda item: str(item.id))
             ],
             "statistics": statistics.model_dump(mode="json", round_trip=True),
+            "trace_intelligence": {
+                "traces": [
+                    item.model_dump(mode="json", round_trip=True) for item in trace_data.traces
+                ],
+                "diagnoses": [
+                    item.model_dump(mode="json", round_trip=True) for item in trace_data.diagnoses
+                ],
+                "pair_diffs": [
+                    item.model_dump(mode="json", round_trip=True) for item in trace_data.pair_diffs
+                ],
+            },
         }
         self.store.writer.write(
             json_path,
@@ -58,7 +86,7 @@ class StaticReportWriter:
         )
         self.store.writer.write(
             html_path,
-            self._html(experiment, variants, statistics).encode("utf-8"),
+            self._html(experiment, variants, statistics, trace_data).encode("utf-8"),
         )
         return StaticReportPaths(json_path=json_path, html_path=html_path)
 
@@ -67,6 +95,7 @@ class StaticReportWriter:
         experiment: ExperimentManifest,
         variants: Sequence[ExperimentVariant],
         result: ExperimentStatistics,
+        trace_data: TraceReportData,
     ) -> str:
         names = {variant.id: variant.name for variant in variants}
         control_name = names.get(result.control_variant_id, str(result.control_variant_id))
@@ -104,6 +133,7 @@ class StaticReportWriter:
         )
         evidence_rows = self._evidence_rows(experiment.id, names)
         scope_banner = self._scope_banner(experiment)
+        trace_section = self._trace_section(trace_data)
         return f"""<!doctype html>
 <html lang="en">
 <head>
@@ -170,9 +200,11 @@ th {{ font-size: .86rem; }} code {{ overflow-wrap: anywhere; }}
 <th>Case</th><th>Independence group</th><th>Control</th>
 <th>Treatment</th><th>Gain</th><th>Class</th>
 </tr></thead><tbody>{case_rows}</tbody></table></section>
+{trace_section}
 <section><h2>Evidence</h2><p class="muted">Links are relative to this offline report.</p>
 <table><thead><tr><th>Run</th><th>Variant</th><th>Outcome</th>
 <th>Attempt</th><th>Skill installed</th><th>Baseline clean</th><th>Secret scan</th>
+<th>Trace</th><th>Diagnosis</th>
 <th>Artifacts</th><th>Raw result</th></tr></thead>
 <tbody>{evidence_rows}</tbody></table></section>
 <footer class="muted"><p>No external resources or scripts.
@@ -264,6 +296,8 @@ Machine-readable evidence: <code>report.json</code>.</p></footer>
             artifact_path = layout.artifact_manifest(run.id, attempt.attempt_no)
             activation_path = layout.activation_evidence(run.id, attempt.attempt_no)
             security_path = layout.security_scan(run.id, attempt.attempt_no)
+            trace_path = layout.trace_manifest(run.id, attempt.attempt_no)
+            diagnosis_path = layout.failure_diagnosis(run.id, attempt.attempt_no)
             raw_result_path = (
                 layout.attempt_root(run.id, attempt.attempt_no) / "raw-runner" / "result.json"
             )
@@ -298,15 +332,84 @@ Machine-readable evidence: <code>report.json</code>.</p></footer>
                     self.store.load_security_scan(experiment_id, run.id, attempt.attempt_no).status
                 )
                 security = f'<a href="{prefix}/security-scan.json">{scan_status}</a>'
+            trace_link = (
+                f'<a href="{prefix}/trace.json">trace</a>' if trace_path.is_file() else "N/A"
+            )
+            diagnosis_link = (
+                f'<a href="{prefix}/failure-diagnosis.json">diagnosis</a>'
+                if diagnosis_path.is_file()
+                else "N/A"
+            )
             rows.append(
                 "<tr>"
                 f"<td><code>{self._escape(str(run.id))}</code></td>"
                 f"<td>{self._escape(names.get(run.variant_id, str(run.variant_id)))}</td>"
                 f"<td>{self._escape(outcome)}</td><td>{attempt.attempt_no}</td>"
                 f"<td>{installed}</td><td>{baseline_clean}</td><td>{security}</td>"
+                f"<td>{trace_link}</td><td>{diagnosis_link}</td>"
                 f"<td>{artifact_link}</td><td>{raw_link}</td></tr>"
             )
         return "".join(rows)
+
+    def _trace_report_data(
+        self, experiment_id: UUID, statistics: ExperimentStatistics
+    ) -> TraceReportData:
+        traces = []
+        diagnoses = []
+        trace_by_run = {}
+        runs = self.store.list_runs(experiment_id)
+        for run in runs:
+            attempt = self.store.load_selected_attempt(experiment_id, run)
+            if attempt is None:
+                continue
+            layout = ExperimentLayout(self.store.workspace, experiment_id)
+            if layout.trace_manifest(run.id, attempt.attempt_no).is_file():
+                trace = self.store.load_trace_manifest(experiment_id, run.id, attempt.attempt_no)
+                traces.append(trace)
+                trace_by_run[run.id] = trace
+            if layout.failure_diagnosis(run.id, attempt.attempt_no).is_file():
+                diagnoses.append(
+                    self.store.load_failure_diagnosis(experiment_id, run.id, attempt.attempt_no)
+                )
+        runs_by_block: Dict[UUID, Dict[UUID, Run]] = {}
+        for run in runs:
+            runs_by_block.setdefault(run.pair_block_id, {})[run.variant_id] = run
+        pair_diffs = []
+        for block_id, variants in sorted(runs_by_block.items(), key=lambda item: str(item[0])):
+            control = variants.get(statistics.control_variant_id)
+            treatment = variants.get(statistics.treatment_variant_id)
+            if control is None or treatment is None:
+                continue
+            control_trace = trace_by_run.get(control.id)
+            treatment_trace = trace_by_run.get(treatment.id)
+            if control_trace is not None and treatment_trace is not None:
+                pair_diffs.append(compare_traces(block_id, control_trace, treatment_trace))
+        return TraceReportData(tuple(traces), tuple(diagnoses), tuple(pair_diffs))
+
+    def _trace_section(self, data: TraceReportData) -> str:
+        labels = Counter(
+            finding.label.value for diagnosis in data.diagnoses for finding in diagnosis.findings
+        )
+        label_text = (
+            ", ".join(f"{self._escape(label)}={count}" for label, count in sorted(labels.items()))
+            or "none"
+        )
+        mean_distance = (
+            sum(item.sequence_edit_distance for item in data.pair_diffs) / len(data.pair_diffs)
+            if data.pair_diffs
+            else None
+        )
+        return (
+            '<section><h2>Trace intelligence</h2><div class="grid">'
+            f'<div class="card"><div>Observed traces</div>'
+            f'<div class="value">{len(data.traces)}</div></div>'
+            f'<div class="card"><div>Paired trace diffs</div>'
+            f'<div class="value">{len(data.pair_diffs)}</div></div>'
+            f'<div class="card"><div>Mean sequence edit distance</div>'
+            f'<div class="value">{self._number(mean_distance)}</div></div></div>'
+            f'<p class="muted">Rule diagnoses: {label_text}. UNKNOWN means the '
+            "system abstained because observable evidence was insufficient.</p></section>"
+        )
 
     @staticmethod
     def _optional_bool(value: Optional[bool]) -> str:

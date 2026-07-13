@@ -68,6 +68,14 @@ def test_mock_demo_runs_72_logical_runs_and_writes_labeled_reports(tmp_path: Pat
     assert "not Agent or Skill performance evidence" in html
     bundle = json.loads(result.report_paths.json_path.read_text(encoding="utf-8"))
     assert bundle["experiment"]["protocol_snapshot"]["demo_only"] is True
+    trace_data = bundle["trace_intelligence"]
+    assert len(trace_data["traces"]) == 72
+    assert len(trace_data["diagnoses"]) == 72
+    assert len(trace_data["pair_diffs"]) == 36
+    assert {item["status"] for item in trace_data["diagnoses"]} == {
+        "abstained",
+        "no_failure",
+    }
 
     first_bundle = ReplayBundleWriter(store).write(result.experiment_id, tmp_path / "first.tar")
     second_bundle = ReplayBundleWriter(store).write(result.experiment_id, tmp_path / "second.tar")
@@ -76,6 +84,8 @@ def test_mock_demo_runs_72_logical_runs_and_writes_labeled_reports(tmp_path: Pat
     assert verified == first_bundle.manifest
     paths = {entry.path for entry in verified.files}
     assert any("/inputs/case_source/" in path for path in paths)
+    assert any(path.endswith("/trace.json") for path in paths)
+    assert any(path.endswith("/failure-diagnosis.json") for path in paths)
     assert any(path.endswith("/reports/report.json") for path in paths)
     assert not any("index.sqlite" in path or path.endswith("run.lock") for path in paths)
 

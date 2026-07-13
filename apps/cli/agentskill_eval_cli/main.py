@@ -24,6 +24,7 @@ from agentskill_eval_experiment import (
     ReplayBundleWriter,
     StaticReportWriter,
 )
+from agentskill_eval_trace_intelligence import compare_traces
 
 app = typer.Typer(
     name="agentskill-eval",
@@ -43,6 +44,8 @@ demo_app = typer.Typer(help="Run the service-free P0 demonstration experiment.")
 app.add_typer(demo_app, name="demo")
 experiment_app = typer.Typer(help="Package and inspect persisted experiments.")
 app.add_typer(experiment_app, name="experiment")
+trace_app = typer.Typer(help="Inspect normalized traces and rule-based diagnoses.")
+app.add_typer(trace_app, name="trace")
 
 
 def _version_callback(value: bool) -> None:
@@ -148,6 +151,77 @@ def verify_experiment_bundle(
                 "scope": manifest.scope,
                 "valid": True,
             },
+            sort_keys=True,
+        )
+    )
+
+
+@trace_app.command("show")
+def show_trace(
+    workspace: Path = typer.Argument(  # noqa: B008
+        ..., exists=True, file_okay=False, help="AgentSkill-Eval workspace root."
+    ),
+    experiment_id: UUID = typer.Argument(..., help="Experiment UUID."),  # noqa: B008
+    run_id: UUID = typer.Argument(..., help="Logical Run UUID."),  # noqa: B008
+) -> None:
+    """Print the selected Attempt trace and diagnosis as JSON."""
+    store = LocalExperimentStore(workspace)
+    run = store.load_run(experiment_id, run_id)
+    attempt = store.load_selected_attempt(experiment_id, run)
+    if attempt is None:
+        raise typer.BadParameter("run has no selected Attempt", param_hint="run_id")
+    trace = store.load_trace_manifest(experiment_id, run_id, attempt.attempt_no)
+    diagnosis = store.load_failure_diagnosis(experiment_id, run_id, attempt.attempt_no)
+    typer.echo(
+        json.dumps(
+            {
+                "diagnosis": diagnosis.model_dump(mode="json", round_trip=True),
+                "trace": trace.model_dump(mode="json", round_trip=True),
+            },
+            ensure_ascii=False,
+            sort_keys=True,
+        )
+    )
+
+
+@trace_app.command("compare")
+def compare_trace_pair(
+    workspace: Path = typer.Argument(  # noqa: B008
+        ..., exists=True, file_okay=False, help="AgentSkill-Eval workspace root."
+    ),
+    experiment_id: UUID = typer.Argument(..., help="Experiment UUID."),  # noqa: B008
+    pair_block_id: UUID = typer.Argument(..., help="PairBlock UUID."),  # noqa: B008
+    control_variant_id: UUID = typer.Option(..., "--control"),  # noqa: B008
+    treatment_variant_id: UUID = typer.Option(..., "--treatment"),  # noqa: B008
+) -> None:
+    """Compare normalized event-kind sequences for one paired block."""
+    store = LocalExperimentStore(workspace)
+    by_variant = {
+        run.variant_id: run
+        for run in store.list_runs(experiment_id)
+        if run.pair_block_id == pair_block_id
+    }
+    try:
+        control_run = by_variant[control_variant_id]
+        treatment_run = by_variant[treatment_variant_id]
+    except KeyError as exc:
+        raise typer.BadParameter(
+            "pair block does not contain both requested variants",
+            param_hint="pair_block_id",
+        ) from exc
+    control_attempt = store.load_selected_attempt(experiment_id, control_run)
+    treatment_attempt = store.load_selected_attempt(experiment_id, treatment_run)
+    if control_attempt is None or treatment_attempt is None:
+        raise typer.BadParameter("both runs require selected Attempts", param_hint="pair_block_id")
+    diff = compare_traces(
+        pair_block_id,
+        store.load_trace_manifest(experiment_id, control_run.id, control_attempt.attempt_no),
+        store.load_trace_manifest(experiment_id, treatment_run.id, treatment_attempt.attempt_no),
+    )
+    typer.echo(
+        json.dumps(
+            diff.model_dump(mode="json", round_trip=True),
+            ensure_ascii=False,
             sort_keys=True,
         )
     )

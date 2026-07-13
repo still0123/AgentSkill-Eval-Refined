@@ -14,6 +14,8 @@ Runner 防腐层把外部 CLI 的配置、进程退出码和 JSON 产物转换�
 - `execute(request, event_sink)`：执行一个 Case 的一个 Variant，并返回 `RunnerResult`；
 - `cancel(execution_id)`：终止整个 Runner 进程组。
 
+`execute` 的 `event_sink` 是 Trace 防腐边界。Adapter 只发送已观测的生命周期或 Agent 原生事件；Executor 统一补充平台验证、执行和终态事件。当前 `skill-up v0.5.0` 可靠提供 Runner 开始/结束事件，但不保证跨 Engine 的工具、文件或命令细节，因此相应 Capability 按 Attempt 标记 unavailable。
+
 `RunnerResult` 将任务状态和进程状态分离：
 
 - `status` 保存 `PASS / FAIL / SKIP / ERROR`；

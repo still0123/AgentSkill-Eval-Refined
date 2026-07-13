@@ -54,9 +54,7 @@ def update_run(run: Run, **updates: Any) -> Run:
 def make_variants(experiment_id: UUID) -> Tuple[ExperimentVariant, ExperimentVariant]:
     common = {
         "experiment_id": experiment_id,
-        "runner_snapshot": RunnerSnapshot(
-            name="mock", version="1", binary_sha256="0" * 64
-        ),
+        "runner_snapshot": RunnerSnapshot(name="mock", version="1", binary_sha256="0" * 64),
         "agent_snapshot": AgentSnapshot(engine="mock", model="mock"),
         "tool_snapshot": ToolSnapshot(),
         "sandbox_snapshot": SandboxSnapshot(profile="runner_default"),
@@ -197,9 +195,7 @@ def _persist_terminal_run(
         run_id=run.id,
         attempt_id=attempt.id,
         runner_status=(
-            "ERROR"
-            if invalid
-            else ("PASS" if outcome == EvaluationOutcome.PASS else "FAIL")
+            "ERROR" if invalid else ("PASS" if outcome == EvaluationOutcome.PASS else "FAIL")
         ),
         runner_exit_reason="execution_error" if invalid else "completed",
         process_exit_code=1 if invalid else 0,
@@ -278,13 +274,19 @@ def test_static_report_is_offline_escaped_and_machine_readable(tmp_path: Path) -
     assert "&lt;script&gt;malicious title&lt;/script&gt;" in document
     assert "default-src 'none'" in document
     assert "<script" not in document.lower()
-    assert "src=\"http" not in document.lower()
+    assert 'src="http' not in document.lower()
     assert "artifacts/manifest.json" in document
+    assert "Trace intelligence" in document
 
     machine = json.loads(paths.json_path.read_text(encoding="utf-8"))
     assert machine["report_schema_version"] == "ase/report/v1alpha1"
     assert machine["statistics"]["run_count"] == 12
     assert machine["statistics"]["primary_assignment_based"]["absolute_gain"] == 0
+    assert machine["trace_intelligence"] == {
+        "diagnoses": [],
+        "pair_diffs": [],
+        "traces": [],
+    }
 
     cli_result = cli_runner.invoke(
         app,

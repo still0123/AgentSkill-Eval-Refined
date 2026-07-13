@@ -19,6 +19,7 @@ from agentskill_eval_contracts import (
     ExecutionStatus,
     ExperimentManifest,
     ExperimentVariant,
+    FailureDiagnosis,
     FrozenInputManifest,
     PairBlock,
     Run,
@@ -26,6 +27,7 @@ from agentskill_eval_contracts import (
     RunMeasurement,
     SecurityScanEvidence,
     SkillActivationEvidence,
+    TraceManifest,
     validate_attempt_transition,
     validate_run_transition,
 )
@@ -67,6 +69,7 @@ KNOWN_MANIFEST_MODELS: Dict[str, Type[BaseModel]] = {
         ArtifactManifest,
         ExperimentManifest,
         ExperimentVariant,
+        FailureDiagnosis,
         FrozenInputManifest,
         PairBlock,
         Run,
@@ -74,6 +77,7 @@ KNOWN_MANIFEST_MODELS: Dict[str, Type[BaseModel]] = {
         RunMeasurement,
         SecurityScanEvidence,
         SkillActivationEvidence,
+        TraceManifest,
     )
 }
 
@@ -151,6 +155,12 @@ class ExperimentLayout:
 
     def security_scan(self, run_id: UUID, attempt_no: int) -> Path:
         return self.attempt_root(run_id, attempt_no) / "security-scan.json"
+
+    def trace_manifest(self, run_id: UUID, attempt_no: int) -> Path:
+        return self.attempt_root(run_id, attempt_no) / "trace.json"
+
+    def failure_diagnosis(self, run_id: UUID, attempt_no: int) -> Path:
+        return self.attempt_root(run_id, attempt_no) / "failure-diagnosis.json"
 
     def raw_runner(self, run_id: UUID, attempt_no: int) -> Path:
         path = self.attempt_root(run_id, attempt_no) / "raw-runner"
@@ -438,6 +448,54 @@ class LocalExperimentStore:
         layout = ExperimentLayout(self.workspace, experiment_id)
         return self._load_model(layout.security_scan(run_id, attempt_no), SecurityScanEvidence)
 
+    def save_trace_manifest(
+        self,
+        experiment_id: UUID,
+        run_id: UUID,
+        attempt_no: int,
+        trace: TraceManifest,
+    ) -> None:
+        if trace.run_id != run_id:
+            raise ValueError("trace run_id must match run_id")
+        layout = ExperimentLayout(self.workspace, experiment_id)
+        self._write_model(
+            layout,
+            layout.trace_manifest(run_id, attempt_no),
+            trace,
+            immutable=True,
+            entity_id=str(trace.attempt_id),
+        )
+
+    def load_trace_manifest(
+        self, experiment_id: UUID, run_id: UUID, attempt_no: int
+    ) -> TraceManifest:
+        layout = ExperimentLayout(self.workspace, experiment_id)
+        return self._load_model(layout.trace_manifest(run_id, attempt_no), TraceManifest)
+
+    def save_failure_diagnosis(
+        self,
+        experiment_id: UUID,
+        run_id: UUID,
+        attempt_no: int,
+        diagnosis: FailureDiagnosis,
+    ) -> None:
+        if diagnosis.run_id != run_id:
+            raise ValueError("diagnosis run_id must match run_id")
+        layout = ExperimentLayout(self.workspace, experiment_id)
+        self._write_model(
+            layout,
+            layout.failure_diagnosis(run_id, attempt_no),
+            diagnosis,
+            immutable=True,
+            entity_id=str(diagnosis.attempt_id),
+        )
+
+    def load_failure_diagnosis(
+        self, experiment_id: UUID, run_id: UUID, attempt_no: int
+    ) -> FailureDiagnosis:
+        layout = ExperimentLayout(self.workspace, experiment_id)
+        return self._load_model(layout.failure_diagnosis(run_id, attempt_no), FailureDiagnosis)
+
     def commit_attempt(
         self,
         run: Run,
@@ -446,6 +504,8 @@ class LocalExperimentStore:
         measurement: Optional[RunMeasurement] = None,
         activation_evidence: Optional[SkillActivationEvidence] = None,
         security_scan: Optional[SecurityScanEvidence] = None,
+        trace: Optional[TraceManifest] = None,
+        diagnosis: Optional[FailureDiagnosis] = None,
     ) -> Run:
         """Persist a terminal Attempt before atomically advancing its Run pointer."""
         if attempt.run_id != run.id:
@@ -462,6 +522,10 @@ class LocalExperimentStore:
             raise ValueError("activation evidence attempt_id must match attempt.id")
         if security_scan is not None and security_scan.attempt_id != attempt.id:
             raise ValueError("security scan attempt_id must match attempt.id")
+        if trace is not None and trace.attempt_id != attempt.id:
+            raise ValueError("trace attempt_id must match attempt.id")
+        if diagnosis is not None and diagnosis.attempt_id != attempt.id:
+            raise ValueError("diagnosis attempt_id must match attempt.id")
 
         attempt_envelope = envelope_for_model(attempt)
         self.save_attempt(run.experiment_id, attempt)
@@ -478,6 +542,10 @@ class LocalExperimentStore:
             )
         if security_scan is not None:
             self.save_security_scan(run.experiment_id, run.id, attempt.attempt_no, security_scan)
+        if trace is not None:
+            self.save_trace_manifest(run.experiment_id, run.id, attempt.attempt_no, trace)
+        if diagnosis is not None:
+            self.save_failure_diagnosis(run.experiment_id, run.id, attempt.attempt_no, diagnosis)
         if artifacts is not None:
             self.save_artifact_manifest(
                 run.experiment_id,
@@ -622,6 +690,8 @@ class LocalExperimentStore:
             "runs/*/attempts/*/measurement.json",
             "runs/*/attempts/*/skill-activation.json",
             "runs/*/attempts/*/security-scan.json",
+            "runs/*/attempts/*/trace.json",
+            "runs/*/attempts/*/failure-diagnosis.json",
             "runs/*/attempts/*/artifacts/manifest.json",
             "runs/*/grading/*.json",
         )

@@ -251,6 +251,8 @@ def test_executor_persists_paired_outcomes_attempts_and_order(tmp_path: Path) ->
         measurement = store.load_measurement(experiment_id, run.id, 1)
         activation = store.load_activation_evidence(experiment_id, run.id, 1)
         security = store.load_security_scan(experiment_id, run.id, 1)
+        trace = store.load_trace_manifest(experiment_id, run.id, 1)
+        diagnosis = store.load_failure_diagnosis(experiment_id, run.id, 1)
         assert run.execution_status == ExecutionStatus.COMPLETED
         assert run.active_attempt_id == attempt.id
         assert run.selected_attempt_sha256 is not None
@@ -259,6 +261,15 @@ def test_executor_persists_paired_outcomes_attempts_and_order(tmp_path: Path) ->
         assert activation.attempt_id == attempt.id
         assert activation.installed is None
         assert security.status == "clean"
+        assert [event.sequence_no for event in trace.events] == list(
+            range(1, len(trace.events) + 1)
+        )
+        assert any(event.kind == "runner.started" for event in trace.events)
+        if run.variant_id == arms[0].id:
+            assert diagnosis.status == "abstained"
+            assert diagnosis.findings[0].label.value == "UNKNOWN"
+        else:
+            assert diagnosis.status == "no_failure"
         layout = ExperimentLayout(store.workspace, experiment_id)
         assert layout.artifact_manifest(run.id, 1).is_file()
 
@@ -294,6 +305,8 @@ def test_validation_failure_is_invalid_not_task_failure(tmp_path: Path) -> None:
     attempt = store.load_attempt(experiment_id, treatment_run.id, 1)
     assert attempt.status == AttemptStatus.FAILED
     assert attempt.error_code == "runner_validation_failed"
+    diagnosis = store.load_failure_diagnosis(experiment_id, treatment_run.id, 1)
+    assert diagnosis.findings[0].label.value == "ENVIRONMENT"
 
 
 def test_executor_uses_frozen_skill_after_original_changes(tmp_path: Path) -> None:

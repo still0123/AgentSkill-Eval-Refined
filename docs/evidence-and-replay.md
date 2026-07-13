@@ -45,7 +45,7 @@ Runner 可访问的 Secret 只通过 `secret_env` 传入。输出归档采用“
 agentskill-eval experiment bundle WORKSPACE EXPERIMENT_UUID evidence.tar
 ```
 
-包包含 `experiments/{id}/` 下的不可变 Manifest、冻结输入、Attempt 证据、Runner 原始产物和静态报告。成员按路径排序，统一 uid/gid、权限和 mtime，采用未压缩 PAX tar；相同实验状态产生相同字节。根目录的 `bundle-manifest.json` 固定成员集合、大小和 SHA-256。
+包包含 `experiments/{id}/` 下的不可变 Manifest、冻结输入、Attempt Trace/Diagnosis 与其他证据、Runner 原始产物和静态报告。成员按路径排序，统一 uid/gid、权限和 mtime，采用未压缩 PAX tar；相同实验状态产生相同字节。根目录的 `bundle-manifest.json` 固定成员集合、大小和 SHA-256。
 
 验证：
 
