@@ -113,6 +113,9 @@ class RunnerResult:
     turns: Optional[int] = None
     input_tokens: Optional[int] = None
     output_tokens: Optional[int] = None
+    cached_input_tokens: Optional[int] = None
+    tool_calls: Optional[int] = None
+    cost_microusd: Optional[int] = None
     final_message: str = ""
     grading: Mapping[str, Any] = field(default_factory=dict)
     artifacts: Tuple[ArtifactObservation, ...] = ()

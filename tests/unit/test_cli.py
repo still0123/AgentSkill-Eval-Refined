@@ -26,6 +26,7 @@ def test_cli_help_lists_project_description() -> None:
     assert "trace" in result.stdout
     assert "optimize" in result.stdout
     assert "final" in result.stdout
+    assert "real" in result.stdout
     assert "version" in result.stdout
 
 
@@ -154,3 +155,22 @@ def test_final_evaluation_simulation_requires_explicit_acknowledgement() -> None
 
     assert result.exit_code == 2
     assert "allow-simulation" in result.stdout
+
+
+def test_real_smoke_requires_explicit_budget_options() -> None:
+    result = runner.invoke(app, ["real", "smoke", str(ROOT / "README.md")])
+
+    assert result.exit_code == 2
+    assert "max-cost-microusd" in result.stdout
+    second = runner.invoke(
+        app,
+        [
+            "real",
+            "smoke",
+            str(ROOT / "README.md"),
+            "--max-cost-microusd",
+            "1000",
+        ],
+    )
+    assert second.exit_code == 2
+    assert "max-agent-runs" in second.stdout

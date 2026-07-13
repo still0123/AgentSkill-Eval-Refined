@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import hashlib
 import os
+import re
 import shutil
 from pathlib import Path
-from typing import Mapping, Optional
+from typing import Any, Mapping, Optional
 
 from agentskill_eval_runner_adapters.compiler import (
     CompilationError,
@@ -31,6 +32,7 @@ from agentskill_eval_runner_adapters.process import ProcessSupervisor
 SKILL_UP_VERSION = "0.5.0"
 SKILL_UP_BINARY_SHA256 = "b8473aad3fe997f3aa8de1e9bd9bc127e5254b25371567a0e07143afc809c359"
 _RESERVED_ENV = {"HOME", "PATH", "TMPDIR", "XDG_CACHE_HOME", "XDG_CONFIG_HOME"}
+_TRACE_KIND = re.compile(r"^(tool|file|command|test|runner)\.[a-z0-9_.-]+$")
 
 
 class IncompatibleRunnerError(RuntimeError):
@@ -43,10 +45,14 @@ class SkillUpRunnerAdapter:
         binary: Path,
         *,
         expected_sha256: str = SKILL_UP_BINARY_SHA256,
+        agent_executable: Optional[Path] = None,
         supervisor: Optional[ProcessSupervisor] = None,
     ) -> None:
         self.binary = binary.resolve(strict=True)
         self.expected_sha256 = expected_sha256
+        self.agent_executable = (
+            agent_executable.resolve(strict=True) if agent_executable is not None else None
+        )
         self._supervisor = supervisor or ProcessSupervisor()
 
     @property
@@ -72,6 +78,8 @@ class SkillUpRunnerAdapter:
 
     def _environment(self, request: RunnerRequest, home: Path) -> Mapping[str, str]:
         path = os.environ.get("PATH", "/usr/bin:/bin")
+        if self.agent_executable is not None:
+            path = f"{self.agent_executable.parent}{os.pathsep}{path}"
         environment = {
             "PATH": path,
             "HOME": str(home),
@@ -80,6 +88,8 @@ class SkillUpRunnerAdapter:
             "TMPDIR": str(home / "tmp"),
             "LANG": "C.UTF-8",
         }
+        if self.agent_executable is not None:
+            environment["AGENTSKILL_EVAL_AGENT_EXECUTABLE"] = str(self.agent_executable)
         conflicts = _RESERVED_ENV.intersection(request.secret_env)
         if conflicts:
             names = ", ".join(sorted(conflicts))
@@ -206,10 +216,36 @@ class SkillUpRunnerAdapter:
             return self._error_result(
                 request, ExitReason.CLI_ERROR, str(exc), outcome.exit_code, outcome.stdout
             )
+        await self._emit_trace_events(result.raw_result, event_sink, request.execution_id)
         await event_sink(
             RunnerEvent(request.execution_id, "runner.finished", {"status": result.status.value})
         )
         return result
+
+    @staticmethod
+    async def _emit_trace_events(
+        raw_result: Mapping[str, Any], event_sink: TraceEventSink, execution_id: str
+    ) -> None:
+        raw_events = raw_result.get("trace_events")
+        if not isinstance(raw_events, list):
+            return
+        for item in raw_events[:10_000]:
+            if not isinstance(item, dict):
+                continue
+            kind = item.get("kind")
+            payload = item.get("payload")
+            if not isinstance(kind, str) or _TRACE_KIND.fullmatch(kind) is None:
+                continue
+            safe_payload = (
+                {
+                    key: value
+                    for key, value in payload.items()
+                    if str(key).lower() not in {"reasoning", "chain_of_thought", "thought"}
+                }
+                if isinstance(payload, dict)
+                else {}
+            )
+            await event_sink(RunnerEvent(execution_id, kind, safe_payload))
 
     async def cancel(self, execution_id: str) -> bool:
         return await self._supervisor.cancel(execution_id)

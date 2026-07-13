@@ -1,0 +1,98 @@
+# Real Agent Evaluation Evidence MVP
+
+本模块用现有配对实验、`SkillUpRunnerAdapter`、Trace Intelligence 和审计包能力评测一个
+真实 Agent。它不引入新的 Provider 编排框架，也不会把模拟结果包装成真实证据。
+
+## 支持范围
+
+MVP 仅支持一个经固定可执行文件接入 `skill-up v0.5.0` 的 Agent Engine。Agent 可以是
+Codex/skill-up 当前支持的 Engine，或 OpenAI-compatible Process Agent；Provider 差异仅存在于
+配置和 Agent 可执行文件内，实验编排层只依赖统一 Runner Adapter。
+
+配置冻结 Runner 与 Agent 的名称、版本、路径和 SHA-256，以及 Provider、model、temperature、
+seed、max turns、timeout、工具能力、Skill/DatasetVersion 哈希、价格表和环境指纹。Runner 不提供
+的 request id、区域或镜像 digest 会明确记为 `capability unavailable`。
+
+## 安装、Secret 与真实 Benchmark
+
+```bash
+python -m pip install -e ".[dev]"
+export OPENAI_API_KEY='从安全凭据系统取得的值'
+sha256sum /absolute/path/to/skill-up /absolute/path/to/agent
+/absolute/path/to/skill-up --version
+/absolute/path/to/agent --version
+```
+
+Secret 名称写入配置，值只能来自环境变量。平台只将白名单 Secret 和 Runner 管理的最小环境传给
+子进程；Manifest、Trace、日志和报告只保存变量名。输出在持久化前进行精确 Secret 扫描。
+
+真实数据集必须由 Automatic Benchmark Generation 发布：fixture 来自修复前 commit，oracle 在
+修复前失败、修复后通过，包含许可证和 provenance，离线可复现且版本不可变。当前 smoke 使用两个
+`more-itertools` Git 历史候选。`python-bug-fix-v1` 是不含 Case ID、补丁或答案的通用 Skill，
+preflight 会验证 metadata 哈希并执行 leakage lint。
+
+## 配置与 Preflight
+
+复制 `examples/real-agent-evidence/observed-agent.example.yaml`，替换绝对路径、哈希、版本、
+Provider、model 和价格。真实配置必须为 `evidence_class: observed_agent`、`simulated: false`。
+
+```bash
+agentskill-eval real preflight /absolute/path/to/observed-agent.yaml
+```
+
+Preflight 不调用 Agent，但会验证 Case、Skill、Secret、可执行文件哈希和版本，并输出 smoke/evidence
+Run 数和单 Run 估算 Token/费用。
+
+## 预算安全门与运行
+
+```bash
+agentskill-eval real smoke CONFIG \
+  --workspace .agentskill-eval/real \
+  --confirm-real-run --max-cost-microusd 100000 --max-agent-runs 4
+
+agentskill-eval real run CONFIG \
+  --workspace .agentskill-eval/real \
+  --confirm-real-run --max-cost-microusd 300000 --max-agent-runs 12
+```
+
+命令在第一次调用前打印 Provider、model、Run 数、最大预算和估算 Token/费用。缺少参数、估算超出
+授权、哈希/版本漂移或 Secret 缺失都会失败。达到预算后不再创建新 Run；一次已在飞行中的请求可能
+使实测费用最多超出一个 Run，所以还须在 Agent 侧设置单次 Token 上限。真实失败不回退 Mock 或
+simulation。已完成实验幂等读取，不再次收费；未完成的付费实验禁止自动恢复。
+
+`smoke` 使用 2 Case × 2 臂 × 1 次，共 4 Run，只验证真实链路。`run` 使用 2 Case × 2 臂 ×
+3 次，共 12 Run，PairBlock 顺序按冻结 seed 随机化。唯一实验变量是是否加载 Skill。由于只有两个
+Case 且来自同一仓库，报告只能作为 descriptive evidence，不能声称普遍提升。
+
+## 证据边界、报告与审计
+
+逐 Attempt 保存 FrozenInputManifest、baseline cleanliness/SkillActivationEvidence、脱敏 Runner
+输出、最终消息哈希、Trace、工具/命令/测试/文件事件、ArtifactManifest、环境指纹、Token、时延、
+费用、pass/fail/invalid 和 FailureDiagnosis；不保存模型隐藏思维过程。
+
+真实结构强制包含 `simulated=false`、`evidence_class=observed_agent`、Provider、model、
+`real_run_confirmed=true` 和 `claim_limit`。CI Fake Process 强制标为 `simulated=true` 和
+`process_integration`，真实 CLI 拒绝执行。报告拒绝混合 real/simulated、Provider 或 model；缺失
+事件记为 unavailable，不能推断为“没有发生”。
+
+成功实验生成 `real-experiment-report.json`、离线 `real-experiment-report.html` 和 replay/audit
+tar。报告展示 DatasetVersion、Agent/model/Runner、Skill hash、双臂通过率、增益、W/T/L、invalid、
+Token、时延、费用、cost per success、Case 配对结果、Trace/诊断链接、unavailable 和 claim limit。
+HTML 采用严格 CSP、转义动态内容且不执行外部脚本。
+
+```bash
+agentskill-eval real status WORKSPACE EXPERIMENT_ID
+agentskill-eval real report WORKSPACE EXPERIMENT_ID
+agentskill-eval experiment verify-bundle WORKSPACE/real-evidence-bundles/EXPERIMENT_ID.tar
+```
+
+## 故障排查
+
+- `hash/version mismatch`：确认安装来源，不要仅为通过检查而修改期望值。
+- `Secret ... missing`：只在当前 shell 导出变量，不写入 YAML。
+- `estimated cost ... exceeds authorization`：缩小协议或人工确认后提高上限。
+- `BUDGET_EXHAUSTED`：保留已完成证据但不生成成功聚合报告。
+- `capability unavailable`：Runner 没有直接事件，不等于 Agent 没有执行。
+- `invalid`：基础设施、超时、取消或 Runner 结果错误，不计为成功。
+
+Fake Process 测试只验证接口、预算、Trace、Secret、报告和幂等语义，不产生费用，也不构成性能证据。

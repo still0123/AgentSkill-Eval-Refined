@@ -60,6 +60,7 @@ class ExecutionRecord:
 class LocalExecutionSummary:
     experiment_id: UUID
     records: Tuple[ExecutionRecord, ...]
+    budget_exhausted: bool = False
 
     @property
     def completed_runs(self) -> int:
@@ -86,11 +87,13 @@ class LocalExperimentExecutor:
         *,
         worker_id: str = "local-worker",
         progress_sink: Optional[Callable[[ExecutionRecord, int, int], None]] = None,
+        run_start_gate: Optional[Callable[[], bool]] = None,
     ) -> None:
         self.store = store
         self.adapter = adapter
         self.worker_id = worker_id
         self.progress_sink = progress_sink
+        self.run_start_gate = run_start_gate
         self.secret_scanner = ExactSecretScanner()
         self.failure_diagnoser = RuleFailureDiagnoser()
 
@@ -100,6 +103,16 @@ class LocalExperimentExecutor:
         for planned_block in plan.blocks:
             runs = {run.variant_id: run for run in planned_block.runs}
             for variant_id in planned_block.block.execution_order:
+                persisted = self.store.load_run(plan.experiment.id, runs[variant_id].id)
+                terminal = persisted.execution_status in {
+                    ExecutionStatus.COMPLETED,
+                    ExecutionStatus.INFRA_FAILED,
+                    ExecutionStatus.CANCELLED,
+                }
+                if not terminal and self.run_start_gate is not None and not self.run_start_gate():
+                    return LocalExecutionSummary(
+                        plan.experiment.id, tuple(records), budget_exhausted=True
+                    )
                 record = await self._execute_run(
                     plan.experiment.id,
                     runs[variant_id].id,
@@ -648,6 +661,9 @@ class LocalExperimentExecutor:
             turns=result.turns,
             input_tokens=result.input_tokens,
             output_tokens=result.output_tokens,
+            cached_input_tokens=result.cached_input_tokens,
+            tool_calls=result.tool_calls,
+            cost_microusd=result.cost_microusd,
         )
 
     @staticmethod

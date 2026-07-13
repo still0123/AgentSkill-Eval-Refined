@@ -18,7 +18,12 @@ from agentskill_eval_benchmark_gen import (
     DemoRunConfig,
 )
 from agentskill_eval_cli import __version__
-from agentskill_eval_contracts import ReviewDecision, export_schema_bundle
+from agentskill_eval_contracts import (
+    RealEvidenceClass,
+    RealRunMode,
+    ReviewDecision,
+    export_schema_bundle,
+)
 from agentskill_eval_experiment import (
     AnalysisConfig,
     ExecutionRecord,
@@ -26,6 +31,11 @@ from agentskill_eval_experiment import (
     LocalExperimentStore,
     ReplayBundleWriter,
     StaticReportWriter,
+)
+from agentskill_eval_real_evidence import (
+    RealAgentEvidenceRunner,
+    RealAgentEvidenceSpec,
+    RealEvidenceStore,
 )
 from agentskill_eval_skill_optimizer import (
     BenchmarkGuidedSkillSearch,
@@ -63,6 +73,8 @@ optimize_app = typer.Typer(help="Search validation data for a frozen Skill candi
 app.add_typer(optimize_app, name="optimize")
 final_app = typer.Typer(help="Evaluate a frozen base/winner pair on an independent split.")
 app.add_typer(final_app, name="final")
+real_app = typer.Typer(help="Preflight and run budgeted observed-Agent evidence experiments.")
+app.add_typer(real_app, name="real")
 
 
 def _version_callback(value: bool) -> None:
@@ -88,6 +100,168 @@ def main(
 def version() -> None:
     """Show the installed AgentSkill-Eval version."""
     typer.echo(__version__)
+
+
+def _load_observed_real_spec(spec_path: Path) -> RealAgentEvidenceSpec:
+    spec = RealAgentEvidenceSpec.load(spec_path)
+    if spec.evidence_class != RealEvidenceClass.OBSERVED_AGENT or spec.simulated:
+        raise typer.BadParameter(
+            "real execution commands require observed_agent with simulated=false",
+            param_hint="CONFIG",
+        )
+    return spec
+
+
+def _authorization_summary(
+    spec: RealAgentEvidenceSpec,
+    mode: RealRunMode,
+    max_cost_microusd: int,
+    max_agent_runs: int,
+) -> dict[str, object]:
+    preflight = RealAgentEvidenceRunner(Path(".")).preflight(spec)
+    runs = preflight.smoke_runs if mode == RealRunMode.SMOKE else preflight.evidence_runs
+    return {
+        "event": "real_run_authorization",
+        "mode": mode.value,
+        "provider": spec.agent.provider,
+        "model": spec.agent.model,
+        "planned_runs": runs,
+        "maximum_agent_runs": max_agent_runs,
+        "maximum_cost_microusd": max_cost_microusd,
+        "estimated_input_tokens": runs * preflight.estimated_input_tokens_per_run,
+        "estimated_output_tokens": runs * preflight.estimated_output_tokens_per_run,
+        "estimated_cost_microusd": runs * preflight.estimated_cost_per_run_microusd,
+    }
+
+
+def _run_observed_evidence(
+    spec_path: Path,
+    workspace: Path,
+    mode: RealRunMode,
+    confirm_real_run: bool,
+    max_cost_microusd: int,
+    max_agent_runs: int,
+) -> None:
+    spec = _load_observed_real_spec(spec_path)
+    if not confirm_real_run:
+        raise typer.BadParameter(
+            "observed Agent execution requires --confirm-real-run",
+            param_hint="--confirm-real-run",
+        )
+    summary = _authorization_summary(spec, mode, max_cost_microusd, max_agent_runs)
+    typer.echo(json.dumps(summary, sort_keys=True))
+    result = asyncio.run(
+        RealAgentEvidenceRunner(workspace).run(
+            spec,
+            mode,
+            confirm_real_run=True,
+            max_cost_microusd=max_cost_microusd,
+            max_agent_runs=max_agent_runs,
+        )
+    )
+    typer.echo(
+        json.dumps(
+            {
+                "experiment_id": str(result.manifest.experiment_id),
+                "status": result.manifest.status.value,
+                "completed_runs": result.manifest.completed_runs,
+                "invalid_runs": result.manifest.invalid_runs,
+                "observed_or_reserved_cost_microusd": (
+                    result.manifest.observed_or_reserved_cost_microusd
+                ),
+                "report_json": str(result.report_json) if result.report_json else None,
+                "report_html": str(result.report_html) if result.report_html else None,
+                "replay_bundle": str(result.replay_bundle) if result.replay_bundle else None,
+            },
+            sort_keys=True,
+        )
+    )
+
+
+@real_app.command("preflight")
+def real_preflight(
+    spec_path: Path = typer.Argument(..., exists=True, dir_okay=False),  # noqa: B008
+) -> None:
+    """Validate immutable inputs and print cost estimates without invoking an Agent."""
+    spec = RealAgentEvidenceSpec.load(spec_path)
+    report = RealAgentEvidenceRunner(Path(".")).preflight(spec)
+    typer.echo(json.dumps(report.model_dump(mode="json"), ensure_ascii=False, sort_keys=True))
+
+
+@real_app.command("smoke")
+def real_smoke(
+    spec_path: Path = typer.Argument(..., exists=True, dir_okay=False),  # noqa: B008
+    workspace: Path = typer.Option(  # noqa: B008
+        Path(".agentskill-eval-workspace"), "--workspace", file_okay=False
+    ),
+    confirm_real_run: bool = typer.Option(False, "--confirm-real-run"),  # noqa: B008
+    max_cost_microusd: int = typer.Option(..., "--max-cost-microusd", min=1),  # noqa: B008
+    max_agent_runs: int = typer.Option(..., "--max-agent-runs", min=1),  # noqa: B008
+) -> None:
+    """Run two cases once per arm after explicit budget authorization."""
+    _run_observed_evidence(
+        spec_path,
+        workspace,
+        RealRunMode.SMOKE,
+        confirm_real_run,
+        max_cost_microusd,
+        max_agent_runs,
+    )
+
+
+@real_app.command("run")
+def real_run(
+    spec_path: Path = typer.Argument(..., exists=True, dir_okay=False),  # noqa: B008
+    workspace: Path = typer.Option(  # noqa: B008
+        Path(".agentskill-eval-workspace"), "--workspace", file_okay=False
+    ),
+    confirm_real_run: bool = typer.Option(False, "--confirm-real-run"),  # noqa: B008
+    max_cost_microusd: int = typer.Option(..., "--max-cost-microusd", min=1),  # noqa: B008
+    max_agent_runs: int = typer.Option(..., "--max-agent-runs", min=1),  # noqa: B008
+) -> None:
+    """Run the repeated paired evidence protocol after explicit authorization."""
+    _run_observed_evidence(
+        spec_path,
+        workspace,
+        RealRunMode.EVIDENCE,
+        confirm_real_run,
+        max_cost_microusd,
+        max_agent_runs,
+    )
+
+
+@real_app.command("status")
+def real_status(
+    workspace: Path = typer.Argument(..., exists=True, file_okay=False),  # noqa: B008
+    experiment_id: UUID = typer.Argument(...),  # noqa: B008
+) -> None:
+    """Show the immutable real-evidence run manifest."""
+    run = RealEvidenceStore(workspace).load_run(experiment_id)
+    typer.echo(json.dumps(run.model_dump(mode="json"), ensure_ascii=False, sort_keys=True))
+
+
+@real_app.command("report")
+def real_report(
+    workspace: Path = typer.Argument(..., exists=True, file_okay=False),  # noqa: B008
+    experiment_id: UUID = typer.Argument(...),  # noqa: B008
+) -> None:
+    """Locate and validate a completed offline real-evidence report."""
+    store = RealEvidenceStore(workspace)
+    report = store.load_report(experiment_id)
+    typer.echo(
+        json.dumps(
+            {
+                "experiment_id": str(experiment_id),
+                "report_json": str(store.report_json(experiment_id)),
+                "report_html": str(store.report_html(experiment_id)),
+                "simulated": report.simulated,
+                "evidence_class": report.evidence_class.value,
+                "claim_limit": report.claim_limit,
+            },
+            ensure_ascii=False,
+            sort_keys=True,
+        )
+    )
 
 
 @final_app.command("evaluate")
@@ -202,9 +376,7 @@ def optimize_status(
         json.dumps(
             {
                 "job": job.model_dump(mode="json"),
-                "candidates": [
-                    item.model_dump(mode="json") for item in store.list_candidates(job)
-                ],
+                "candidates": [item.model_dump(mode="json") for item in store.list_candidates(job)],
             },
             ensure_ascii=False,
             sort_keys=True,

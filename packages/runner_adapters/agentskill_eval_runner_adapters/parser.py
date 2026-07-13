@@ -39,9 +39,7 @@ def _artifacts(root: Path) -> Tuple[ArtifactObservation, ...]:
         except ValueError as exc:
             raise ResultParseError(f"artifact escaped runner output: {path}") from exc
         digest = hashlib.sha256(path.read_bytes()).hexdigest()
-        observations.append(
-            ArtifactObservation(relative.as_posix(), digest, path.stat().st_size)
-        )
+        observations.append(ArtifactObservation(relative.as_posix(), digest, path.stat().st_size))
     return tuple(observations)
 
 
@@ -89,6 +87,9 @@ def parse_skill_up_result(
         turns=_optional_int(case.get("turns")),
         input_tokens=_optional_int(case.get("input_tokens")),
         output_tokens=_optional_int(case.get("output_tokens")),
+        cached_input_tokens=_optional_int(case.get("cached_input_tokens")),
+        tool_calls=_optional_int(case.get("tool_calls")),
+        cost_microusd=_optional_int(case.get("cost_microusd")),
         final_message=final_message,
         grading=grading if isinstance(grading, dict) else {},
         artifacts=_artifacts(result_path.parent),

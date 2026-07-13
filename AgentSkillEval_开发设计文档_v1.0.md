@@ -1665,3 +1665,26 @@ Mock Agent 场景：
 - [GEPA](https://arxiv.org/abs/2507.19457)：反思式 Prompt/策略搜索参考；
 - [RAGAS](https://aclanthology.org/2024.eacl-demo.16/) 与 [ARES](https://aclanthology.org/2024.naacl-long.20/)：RAG 分层评测与少量人工校准；
 - [LongMemEval](https://arxiv.org/abs/2410.10813)：长期 Memory 的信息提取、推理、更新与拒答任务。
+
+---
+
+## 22. 实际完成状态：Real Agent Evaluation Evidence MVP
+
+本阶段已在不改写既有配对实验、Trace、Benchmark、Skill Search 和 Final Evaluation 的前提下，
+增加真实 Agent 证据纵切：
+
+1. 复用固定版本 `SkillUpRunnerAdapter`，通过统一 Agent 可执行文件边界接入单一真实 Engine；
+2. preflight 冻结 Runner/Agent 版本与 SHA-256、Provider/model、生成参数、工具能力、Skill、
+   DatasetVersion、价格和环境，并验证两个真实 Git 历史 Case；
+3. 真实 CLI 强制 `--confirm-real-run`、`--max-cost-microusd` 和 `--max-agent-runs`，禁止
+   simulation 回退、失败自动恢复和已完成 Run 重复计费；
+4. 提供 4 Run smoke 与 12 Run evidence 协议，继续使用冻结 PairBlock 和唯一变量原则；
+5. 逐 Attempt 补充 real/process evidence class、环境指纹、最终消息哈希、capability unavailable、
+   claim limit，并复用 Trace、FailureDiagnosis、激活证据、Secret 扫描和审计包；
+6. 输出离线 JSON/HTML real experiment report，拒绝混合 real/simulated、Provider 或 model；
+7. 使用本地 Fake Process Agent 完成无费用端到端测试，覆盖预算、哈希/版本漂移、Secret 不落盘、
+   invalid、报告转义和幂等重放；Fake 结果始终标为 simulated，不构成性能证据。
+
+真实付费实验必须在代码检查全部通过后，单独向用户报告 Provider、model、Run 数、最大预算、
+预计 Token 和完整命令，获得明确授权后才能运行。两个 Case 的结果只能解释为 descriptive evidence。
+详细运行协议见 `docs/real-agent-evidence.md`。

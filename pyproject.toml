@@ -36,6 +36,7 @@ packages = [
   "packages/trace_intelligence/agentskill_eval_trace_intelligence",
   "packages/benchmark_gen/agentskill_eval_benchmark_gen",
   "packages/skill_optimizer/agentskill_eval_skill_optimizer",
+  "packages/real_evidence/agentskill_eval_real_evidence",
   "packages/mcp_lab/agentskill_eval_mcp_lab",
   "packages/memory_rag_lab/agentskill_eval_memory_rag_lab",
 ]
@@ -54,6 +55,7 @@ source = [
   "agentskill_eval_trace_intelligence",
   "agentskill_eval_runner_adapters",
   "agentskill_eval_skill_optimizer",
+  "agentskill_eval_real_evidence",
 ]
 
 [tool.coverage.report]
@@ -83,6 +85,7 @@ known-first-party = [
   "agentskill_eval_trace_intelligence",
   "agentskill_eval_runner_adapters",
   "agentskill_eval_skill_optimizer",
+  "agentskill_eval_real_evidence",
 ]
 
 [tool.mypy]

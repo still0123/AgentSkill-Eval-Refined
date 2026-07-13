@@ -2,7 +2,7 @@
 
 AgentSkill-Eval 是一个面向 Agent Skill 的可复现评测与回归分析项目。平台以受控配对实验为核心，比较同一 Agent 在 without-Skill、with-Skill 或不同 Skill 版本下的任务质量、成本、时延与稳定性。
 
-当前仓库已完成 **P0 可信配对闭环、P1 Trace Intelligence 纵切、P2 Automatic Benchmark Generation、Benchmark-guided Skill Search 与 Independent Final Evaluation MVP**。平台冻结 Case 与 Skill 输入，保存执行和诊断证据，从真实 Git 历史发布可审计 Benchmark；随后在 `validation_search` 上筛选 Skill 候选，并在独立 `validation_confirm`／一次性 `locked_test` 上对 frozen base/winner 进行配对复评。完整设计见 [开发设计文档](./AgentSkillEval_%E5%BC%80%E5%8F%91%E8%AE%BE%E8%AE%A1%E6%96%87%E6%A1%A3_v1.0.md)。
+当前仓库已完成 **P0 可信配对闭环、P1 Trace Intelligence 纵切、P2 Automatic Benchmark Generation、Benchmark-guided Skill Search、Independent Final Evaluation 与 Real Agent Evaluation Evidence MVP**。平台冻结 Case 与 Skill 输入，保存执行和诊断证据，从真实 Git 历史发布可审计 Benchmark；随后可筛选 Skill 候选、执行独立终评，并通过显式确认与预算门运行真实 Agent 配对实验。完整设计见 [开发设计文档](./AgentSkillEval_%E5%BC%80%E5%8F%91%E8%AE%BE%E8%AE%A1%E6%96%87%E6%A1%A3_v1.0.md)。
 
 ## 环境要求
 
@@ -43,6 +43,11 @@ agentskill-eval optimize status .agentskill-eval/optimizer OPTIMIZATION_JOB_UUID
 agentskill-eval final evaluate examples/optimizer/python-review-search/final.example.yaml \
   --workspace .agentskill-eval/optimizer --allow-simulation
 agentskill-eval final status .agentskill-eval/optimizer FINAL_EVALUATION_JOB_UUID
+agentskill-eval real preflight /absolute/path/to/observed-agent.yaml
+# 以下命令会产生真实调用费用，必须先人工确认 Provider、model、Run 数和预算：
+agentskill-eval real smoke /absolute/path/to/observed-agent.yaml \
+  --workspace .agentskill-eval/real --confirm-real-run \
+  --max-cost-microusd 100000 --max-agent-runs 4
 ```
 
 ## 本地验证
@@ -69,6 +74,7 @@ packages/experiment/      配对实验、统计与报告
 packages/trace_intelligence/
 packages/benchmark_gen/
 packages/skill_optimizer/
+packages/real_evidence/
 packages/mcp_lab/
 packages/memory_rag_lab/  P1/P2 研究模块占位
 runner_compatibility/     固定 Runner 版本与 Golden Contract
@@ -197,6 +203,18 @@ successive halving、original/manual/random/search 完整对照、Pareto 排序�
 冻结。搜索进程的契约中不存在 locked-test 输入；仓库离线演示强制标记为 simulated，
 只证明控制器行为。真实 Agent 可通过严格 JSON Process Evaluator 接入。详见
 [Benchmark-guided Skill Search MVP](./docs/benchmark-guided-skill-search.md)。
+
+## Real Agent Evaluation Evidence
+
+- 真实 CLI 仅接受 `observed_agent + simulated=false`，并强制确认、费用上限和 Run 数上限；
+- preflight 冻结并复验 Runner/Agent 可执行文件哈希与版本、Skill、真实 DatasetVersion 和 Secret 名称；
+- smoke 为 4 Run 链路验证，evidence 为 12 Run 冻结 PairBlock 配对实验；
+- 逐 Attempt 保存 Trace、失败诊断、激活/洁净证据、环境指纹、Token、时延、费用和离线审计包；
+- CI 使用明确标记为 simulated 的 Fake Process Agent，绝不产生模型费用或冒充性能证据；
+- 只有两个同源真实 Case，因此报告强制声明 descriptive evidence 的结论边界。
+
+完整配置、预算门、命令、报告字段和故障排查见
+[Real Agent Evaluation Evidence MVP](./docs/real-agent-evidence.md)。
 
 ## 开发原则
 
