@@ -8,6 +8,7 @@ from uuid import uuid4
 
 import pytest
 
+from agentskill_eval_benchmark_gen import DatasetLoader
 from agentskill_eval_contracts import (
     AgentSnapshot,
     ExperimentManifest,
@@ -84,6 +85,52 @@ def test_pinned_skill_up_custom_engine_contract(tmp_path: Path) -> None:
         assert result.input_tokens == 7
         assert result.output_tokens == 3
         assert any(item.path == "result.json" for item in result.artifacts)
+
+    asyncio.run(scenario())
+
+
+@pytest.mark.skipif(BINARY is None, reason="pinned skill-up binary is not installed")
+def test_demo_dataset_all_cases_validate_with_pinned_skill_up(tmp_path: Path) -> None:
+    assert BINARY is not None
+    dataset = DatasetLoader().load(ROOT / "examples/datasets/python-review-demo")
+    skill = ROOT / "examples/skills/python-review-v1"
+    code = "import json,sys; json.load(open(sys.argv[1])); print('{}')"
+    engine = {
+        "name": "demo-contract-local",
+        "custom": {
+            "transport": "local",
+            "response_format": "session_result",
+            "local": {
+                "command": sys.executable,
+                "args": ["-c", code, "${input_file}"],
+            },
+        },
+    }
+    adapter = SkillUpRunnerAdapter(BINARY)
+
+    async def scenario() -> None:
+        for index, case in enumerate(dataset.execution_specs()):
+            request = RunnerRequest(
+                execution_id=f"demo-validate-{index}",
+                case_id=case.runner_case_id,
+                variant="with-skill",
+                source_eval_dir=case.source_eval_dir,
+                case_file=case.case_file,
+                run_dir=tmp_path / case.runner_case_id,
+                engine=engine,
+                environment={"type": "none"},
+                skill_path=skill,
+                timeout_seconds=30,
+                max_turns=4,
+            )
+            request.run_dir.mkdir()
+            validation = await adapter.validate(request)
+            assert validation.valid, (
+                case.runner_case_id,
+                validation.errors,
+                validation.stdout,
+                validation.stderr,
+            )
 
     asyncio.run(scenario())
 

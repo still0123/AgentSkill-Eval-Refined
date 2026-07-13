@@ -1,3 +1,3 @@
 # Example Skills
 
-后续目标将在此加入 Python 代码审查/缺陷修复演示 Skill 及不可变版本元数据。
+- [`python-review-v1`](./python-review-v1/)：证据优先、控制误报的 Python 代码审查 Skill。

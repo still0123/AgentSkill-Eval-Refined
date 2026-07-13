@@ -1,0 +1,14 @@
+id: python-swallowed-exception
+title: Import failure reported as success
+description: Review exception handling that converts failure into success.
+input:
+  prompt: |
+    Review the production code in the current repository for one concrete defect. Trace reachable values
+    and report `DEFECT_FOUND: <CATEGORY>` with file, symbol, evidence, consequence, and a minimal fix.
+    If no supported defect exists, report `NO_ACTIONABLE_DEFECT`. Do not modify files.
+context:
+  repo_fixture: evals/fixtures/repos/python-swallowed-exception
+expect:
+  must_contain: ["DEFECT_FOUND", "SWALLOWED_EXCEPTION"]
+  must_not_contain: ["NO_ACTIONABLE_DEFECT"]
+  exit_code: 0

@@ -7,6 +7,7 @@ from uuid import UUID
 
 import typer
 
+from agentskill_eval_benchmark_gen import DatasetLoader
 from agentskill_eval_cli import __version__
 from agentskill_eval_contracts import export_schema_bundle
 from agentskill_eval_experiment import (
@@ -28,6 +29,8 @@ storage_app = typer.Typer(help="Inspect and recover the service-free P0 manifest
 app.add_typer(storage_app, name="storage")
 report_app = typer.Typer(help="Analyze a completed paired experiment and write static reports.")
 app.add_typer(report_app, name="report")
+dataset_app = typer.Typer(help="Validate and inspect curated evaluation datasets.")
+app.add_typer(dataset_app, name="dataset")
 
 
 def _version_callback(value: bool) -> None:
@@ -53,6 +56,41 @@ def main(
 def version() -> None:
     """Show the installed AgentSkill-Eval version."""
     typer.echo(__version__)
+
+
+@dataset_app.command("validate")
+def validate_dataset(
+    dataset_root: Path = typer.Argument(  # noqa: B008
+        ...,
+        help="Directory containing dataset.yaml and evals/.",
+        exists=True,
+        file_okay=False,
+    ),
+) -> None:
+    """Validate sidecars, fixtures, graders, hashes, and category gates."""
+    dataset = DatasetLoader().load(dataset_root)
+    typer.echo(
+        json.dumps(
+            {
+                "case_count": len(dataset.cases),
+                "case_ids": [item.metadata.case_id for item in dataset.cases],
+                "category_counts": {
+                    category.value: count
+                    for category, count in sorted(
+                        dataset.category_counts.items(), key=lambda item: item[0].value
+                    )
+                },
+                "dataset_id": str(dataset.dataset_id),
+                "dataset_sha256": dataset.dataset_sha256,
+                "demo_only": dataset.manifest.demo_only,
+                "independence_groups": list(dataset.independence_groups),
+                "name": dataset.manifest.name,
+                "version": dataset.manifest.version,
+            },
+            ensure_ascii=False,
+            sort_keys=True,
+        )
+    )
 
 
 @schema_app.command("export")

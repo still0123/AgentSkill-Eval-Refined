@@ -1,0 +1,19 @@
+schema_version: ase-case-meta/v1alpha1
+case_id: python-off-by-one
+case_ref: evals/cases/python-off-by-one.yaml
+split: regression_dev
+category: positive
+skill_applicable: true
+group_keys:
+  independence_group: synthetic/input-validation
+  repository: synthetic/pagination-service
+  fork_lineage: synthetic/input-validation
+  patch_family: page-boundary
+provenance: &provenance
+  source_type: curated_synthetic
+  source_revision: demo-v1
+  license: Apache-2.0
+  contamination_risk: low
+  synthetic: true
+oracle: {kind: expect, expected_signal: OFF_BY_ONE}
+tags: [python, boundary, review]

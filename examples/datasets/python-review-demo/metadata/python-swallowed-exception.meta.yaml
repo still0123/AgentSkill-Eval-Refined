@@ -1,0 +1,19 @@
+schema_version: ase-case-meta/v1alpha1
+case_id: python-swallowed-exception
+case_ref: evals/cases/python-swallowed-exception.yaml
+split: regression_dev
+category: positive
+skill_applicable: true
+group_keys:
+  independence_group: synthetic/io-lifecycle
+  repository: synthetic/import-service
+  fork_lineage: synthetic/io-lifecycle
+  patch_family: error-propagation
+provenance: &provenance
+  source_type: curated_synthetic
+  source_revision: demo-v1
+  license: Apache-2.0
+  contamination_risk: low
+  synthetic: true
+oracle: {kind: expect, expected_signal: SWALLOWED_EXCEPTION}
+tags: [python, exceptions, review]

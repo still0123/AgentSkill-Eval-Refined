@@ -1,4 +1,4 @@
-.PHONY: install lint format test check cli
+.PHONY: install lint format test check cli demo-validate
 
 install:
 	python3 -m pip install -e ".[dev]"
@@ -18,3 +18,6 @@ check: lint test
 
 cli:
 	python3 -m agentskill_eval_cli --help
+
+demo-validate:
+	python3 -m agentskill_eval_cli dataset validate examples/datasets/python-review-demo

@@ -1,0 +1,14 @@
+id: python-cross-module-cache
+title: Producer and consumer disagree on cache key
+description: Cross-module defect requiring a contract trace.
+input:
+  prompt: |
+    Review the cooperating production modules in the current repository for one concrete defect. Trace
+    values across module boundaries and report `DEFECT_FOUND: <CATEGORY>` with both sides of the
+    contract, consequence, and minimal fix. Otherwise report `NO_ACTIONABLE_DEFECT`. Do not modify files.
+context:
+  repo_fixture: evals/fixtures/repos/python-cross-module-cache
+expect:
+  must_contain: ["DEFECT_FOUND", "CACHE_KEY_MISMATCH"]
+  must_not_contain: ["NO_ACTIONABLE_DEFECT"]
+  exit_code: 0

@@ -1,0 +1,14 @@
+id: python-retry-budget
+title: Retry loop performs one extra call
+description: Resilience defect where attempts exceed the declared budget.
+input:
+  prompt: |
+    Review the production retry code against its documented maximum-attempt contract. Report
+    `DEFECT_FOUND: <CATEGORY>` with a concrete call count, consequence, and minimal fix; otherwise report
+    `NO_ACTIONABLE_DEFECT`. Do not modify files.
+context:
+  repo_fixture: evals/fixtures/repos/python-retry-budget
+expect:
+  must_contain: ["DEFECT_FOUND", "RETRY_BUDGET_EXCEEDED"]
+  must_not_contain: ["NO_ACTIONABLE_DEFECT"]
+  exit_code: 0

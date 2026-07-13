@@ -1,0 +1,14 @@
+id: python-deprecated-dir-distractor
+title: Broken code in unimported deprecated directory
+description: Distractor where only dead legacy code is defective.
+input:
+  prompt: |
+    Review the active production entrypoint in the current repository. Verify imports and reachability;
+    deprecated unreferenced code is not an actionable production defect. Report `DEFECT_FOUND:
+    <CATEGORY>` only for a reachable defect; otherwise report `NO_ACTIONABLE_DEFECT`. Do not modify files.
+context:
+  repo_fixture: evals/fixtures/repos/python-deprecated-dir-distractor
+expect:
+  must_contain: ["NO_ACTIONABLE_DEFECT"]
+  must_not_contain: ["DEFECT_FOUND"]
+  exit_code: 0
