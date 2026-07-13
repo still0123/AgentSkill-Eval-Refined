@@ -109,8 +109,10 @@ trace JSON。相同数据、计划、seed 和 failure injection 的分数及调�
 
 ## 当前限制与后续真实 Agent 接入
 
-当前没有 FastAPI、Vue、飞书、Java、Redis/Celery、Memory/RAG、市场、多租户或生产凭据管理；
-也没有真实 MCP Server/Agent 实验。时延是 adapter 返回的测量值，Mock 时延是注入值，不是墙钟。
+本 MCP 纵切没有 FastAPI、飞书、Java、Redis/Celery、市场、多租户或生产凭据管理，也没有真实
+MCP Server/Agent 实验。集成仓库已经包含只读 Vue Dashboard 与独立的离线 Memory/RAG Lab，
+但两者没有把本 MCP Lab 升级为真实 MCP Runtime。时延是 adapter 返回的测量值，Mock 时延是
+注入值，不是墙钟。
 
 接入真实 Agent 时应实现 `McpAdapter`，声明 capability，固定 Agent/model/tool/server 版本和预算，
 将 Agent 原生 tool-call 事件转换为 `McpTraceEvent`，并保留未经推断的原始证据引用。真实 runner

@@ -4,6 +4,10 @@ AgentSkill-Eval 是一个面向 Agent Skill 的可复现评测与回归分析项
 
 当前仓库已完成 **P0 可信配对闭环、P1 Trace Intelligence 纵切、P2 Automatic Benchmark Generation、Benchmark-guided Skill Search、Independent Final Evaluation 与 Real Agent Evaluation Evidence MVP**。平台冻结 Case 与 Skill 输入，保存执行和诊断证据，从真实 Git 历史发布可审计 Benchmark；随后可筛选 Skill 候选、执行独立终评，并通过显式确认与预算门运行真实 Agent 配对实验。完整设计见 [开发设计文档](./AgentSkillEval_%E5%BC%80%E5%8F%91%E8%AE%BE%E8%AE%A1%E6%96%87%E6%A1%A3_v1.0.md)。
 
+当前版本为 `v0.1.0-rc1` 发布候选：核心研究闭环和本地只读 Dashboard 已集成；FastAPI 等
+服务化控制面不在本版本范围。模拟 Lab、Fake Process Agent 和真实 Agent 证据在契约、报告与
+结论边界上严格隔离。RC1 只有在远端 CI 通过后才能合入 `main`；完整真实付费证据另行发布。
+
 ## 环境要求
 
 - Python 3.9 或更高版本
@@ -75,8 +79,8 @@ packages/trace_intelligence/
 packages/benchmark_gen/
 packages/skill_optimizer/
 packages/real_evidence/
-packages/mcp_lab/
-packages/memory_rag_lab/  P1/P2 研究模块占位
+packages/mcp_lab/         离线 MCP Tool Evaluation Lab
+packages/memory_rag_lab/  离线 Memory/RAG Evaluation Lab
 runner_compatibility/     固定 Runner 版本与 Golden Contract
 examples/                 演示 Skill 与 Dataset
 tests/                    unit / integration / e2e
@@ -250,3 +254,12 @@ Diagnosis、Benchmark Generation 和 Skill Search fixture，展示指标、W/T/L
 - 不复制 `skill-up` 的内部实现，只依赖其公开 CLI、JSON 和产物契约。
 - 确定性验证优先于 LLM Judge。
 - 每个完成目标都必须通过自动化检查，并以独立 Git 提交推送。
+
+## 参与和安全
+
+- 开发与提交要求见 [CONTRIBUTING.md](./CONTRIBUTING.md)；
+- 漏洞和凭据事件处理见 [SECURITY.md](./SECURITY.md)；
+- 版本变化见 [CHANGELOG.md](./CHANGELOG.md)；
+- 第三方 Benchmark 输入说明见 [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md)。
+
+项目代码以 [Apache License 2.0](./LICENSE) 发布；生成数据集仍以各自冻结 provenance 中的许可为准。

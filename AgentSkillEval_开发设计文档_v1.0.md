@@ -1728,3 +1728,20 @@ Trace/Diagnosis、Benchmark Generation 与 Skill Search fixture，展示研究�
 和 evidence reference。输入使用运行时 Schema 校验，文本按 Vue 默认规则转义，不执行报告中的
 HTML 或外部脚本。本阶段不包含实验写入 API、FastAPI、真实模型调用或生产鉴权；完整边界见
 [`docs/dashboard-mvp.md`](./docs/dashboard-mvp.md)。
+
+---
+
+## 26. Integration RC1 发布状态
+
+`v0.1.0-rc1` 集成候选已经包含 P0 配对实验、Trace Intelligence、Automatic Benchmark
+Generation、Benchmark-guided Skill Search、Independent Final Evaluation、Real Agent Evidence
+安全门、MCP/Memory-RAG 离线 Lab 与只读 Dashboard。RC1 发布工程补充 GitHub Actions、Apache-2.0
+许可证、变更日志、安全策略、贡献规范与第三方输入声明。
+
+2026-07-13 的本地候选验证包括 Ruff、mypy 70 个源文件、pytest 144 项、25 个公共 Schema、
+Python wheel 的 10 个包导入，以及 Dashboard typecheck、ESLint、9 项 Vitest 和 production build。
+这些结果证明代码和发布产物在本地通过，不替代目标提交上的远端 CI。
+
+真实 Agent 能力仍遵循独立证据边界：无费用 preflight、Fake Process 集成和被取消/invalid 的付费
+尝试都不构成成功的真实 smoke。只有 4/4 有效 smoke、Secret 审计和后续 12 Run evidence 全部完成，
+才能发布脱敏真实报告；两个同源 Case 仍只支持 descriptive evidence，不支持泛化提升声明。
