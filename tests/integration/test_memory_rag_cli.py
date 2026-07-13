@@ -21,6 +21,7 @@ def test_memory_rag_cli_validate_run_report_trace_and_replay(tmp_path: Path) -> 
     denied = runner.invoke(
         app,
         ["memory-rag", "lab", "run", str(config), "--workspace", str(tmp_path)],
+        env={"COLUMNS": "240"},
         terminal_width=240,
     )
     assert denied.exit_code == 2

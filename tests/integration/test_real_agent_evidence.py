@@ -204,6 +204,7 @@ def test_real_cli_preflight_and_authorization_boundary(
             "--max-agent-runs",
             "4",
         ],
+        env={"COLUMNS": "240"},
         terminal_width=240,
     )
     assert refused.exit_code == 2
@@ -227,6 +228,7 @@ def test_real_cli_preflight_and_authorization_boundary(
             "--max-agent-runs",
             "4",
         ],
+        env={"COLUMNS": "240"},
         terminal_width=240,
     )
     assert missing_confirmation.exit_code == 2
