@@ -1688,6 +1688,9 @@ Mock Agent 场景：
    Secret，生成文件权限为 `0600`，内容哈希进入冻结输入。该能力已用于验证
    `Qwen Code 0.19.9 + DeepSeek V4 Pro`，其中证据 Provider 为 DeepSeek、线协议 Provider 为
    OpenAI-compatible，且通过 `generationConfig.reasoning: false` 显式禁用 V4 thinking。
+9. 真实 DeepSeek smoke 暴露出主会话统计遗漏子 Agent usage 的风险，因此预算模型进一步拆分
+   cache miss/cache hit 价格，Qwen Adapter 汇总隔离 HOME 中主/子 Agent usage；同时增加墙钟、工具数、
+   会话 Token 和子 Agent 限制，并让 Ctrl-C 递归终止嵌套进程组、持久化 `CANCELLED`，禁止自动续跑。
 
 真实付费实验必须在代码检查全部通过后，单独向用户报告 Provider、model、Run 数、最大预算、
 预计 Token 和完整命令，获得明确授权后才能运行。两个 Case 的结果只能解释为 descriptive evidence。

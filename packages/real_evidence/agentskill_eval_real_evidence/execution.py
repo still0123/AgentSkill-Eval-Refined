@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import platform
@@ -152,8 +153,11 @@ class CostingRunnerAdapter:
         if result.input_tokens is None or result.output_tokens is None:
             return result
         price = self.spec.pricing
+        cached = min(result.cached_input_tokens or 0, result.input_tokens)
+        cache_miss = result.input_tokens - cached
         numerator = (
-            result.input_tokens * price.input_microusd_per_million_tokens
+            cache_miss * price.input_microusd_per_million_tokens
+            + cached * price.cache_hit_rate_microusd
             + result.output_tokens * price.output_microusd_per_million_tokens
         )
         return replace(result, cost_microusd=(numerator + 999_999) // 1_000_000)
@@ -251,10 +255,13 @@ class RealAgentEvidenceRunner:
                 repeats,
                 progress_sink,
             )
-        except Exception:
+        except BaseException as exc:
+            cancelled = isinstance(exc, (KeyboardInterrupt, asyncio.CancelledError))
             failed = manifest.model_copy(
                 update={
-                    "status": RealEvidenceStatus.FAILED,
+                    "status": (
+                        RealEvidenceStatus.CANCELLED if cancelled else RealEvidenceStatus.FAILED
+                    ),
                     "completed_at": datetime.now(timezone.utc),
                 }
             )
@@ -328,6 +335,18 @@ class RealAgentEvidenceRunner:
         ).execute(plan)
         cost = observed_or_reserved_cost()
         now = datetime.now(timezone.utc)
+        if execution.cancelled:
+            cancelled = manifest.model_copy(
+                update={
+                    "status": RealEvidenceStatus.CANCELLED,
+                    "completed_runs": execution.completed_runs,
+                    "invalid_runs": execution.invalid_runs,
+                    "observed_or_reserved_cost_microusd": cost,
+                    "completed_at": now,
+                }
+            )
+            self.store.save_run(cancelled)
+            return RealEvidenceResult(cancelled, None, None, None, None)
         if execution.budget_exhausted:
             exhausted = manifest.model_copy(
                 update={
@@ -447,6 +466,9 @@ class RealAgentEvidenceRunner:
         )
         rates: dict[str, JsonValue] = {
             "input_microusd_per_million_tokens": (spec.pricing.input_microusd_per_million_tokens),
+            "input_cache_hit_microusd_per_million_tokens": (
+                spec.pricing.cache_hit_rate_microusd
+            ),
             "output_microusd_per_million_tokens": (spec.pricing.output_microusd_per_million_tokens),
         }
         price = PriceSnapshot(

@@ -32,6 +32,7 @@ class RealEvidenceStatus(str, Enum):
     RUNNING = "RUNNING"
     COMPLETED = "COMPLETED"
     BUDGET_EXHAUSTED = "BUDGET_EXHAUSTED"
+    CANCELLED = "CANCELLED"
     FAILED = "FAILED"
 
 
@@ -125,6 +126,7 @@ class RealEvidenceRunManifest(FrozenModel):
         terminal = self.status in {
             RealEvidenceStatus.COMPLETED,
             RealEvidenceStatus.BUDGET_EXHAUSTED,
+            RealEvidenceStatus.CANCELLED,
             RealEvidenceStatus.FAILED,
         }
         if terminal != (self.completed_at is not None):

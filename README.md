@@ -214,6 +214,8 @@ successive halving、original/manual/random/search 完整对照、Pareto 排序�
 - 只有两个同源真实 Case，因此报告强制声明 descriptive evidence 的结论边界。
 - 已通过无费用 preflight 验证 Qwen Code 0.19.9 + DeepSeek V4 Pro 接入；DeepSeek 使用
   OpenAI-compatible 线协议和隔离 HOME 配置，显式关闭 thinking，配置中不保存 API Key。
+- 真实预算按 cache miss/cache hit 分开计价，并聚合 Qwen 主/子 Agent usage；Qwen 使用墙钟、工具数、
+  会话 Token 与子 Agent 限制，Ctrl-C 会递归终止进程并持久化 `CANCELLED`。
 
 完整配置、预算门、命令、报告字段和故障排查见
 [Real Agent Evaluation Evidence MVP](./docs/real-agent-evidence.md)。

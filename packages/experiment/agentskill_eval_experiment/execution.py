@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import mimetypes
 import shutil
@@ -61,6 +62,7 @@ class LocalExecutionSummary:
     experiment_id: UUID
     records: Tuple[ExecutionRecord, ...]
     budget_exhausted: bool = False
+    cancelled: bool = False
 
     @property
     def completed_runs(self) -> int:
@@ -122,6 +124,10 @@ class LocalExperimentExecutor:
                 records.append(record)
                 if self.progress_sink is not None:
                     self.progress_sink(record, len(records), total_runs)
+                if record.execution_status == ExecutionStatus.CANCELLED:
+                    return LocalExecutionSummary(
+                        plan.experiment.id, tuple(records), cancelled=True
+                    )
         return LocalExecutionSummary(plan.experiment.id, tuple(records))
 
     async def _execute_run(
@@ -182,6 +188,12 @@ class LocalExperimentExecutor:
             trace.record("platform.validation", status="started")
             try:
                 validation = await self.adapter.validate(request)
+            except asyncio.CancelledError:
+                attempt = self._terminal_attempt(attempt, AttemptStatus.CANCELLED)
+                self.store.save_attempt(experiment_id, attempt)
+                run = self._advance_run(run, ExecutionStatus.CANCEL_REQUESTED)
+                self._terminal_run(run, ExecutionStatus.CANCELLED)
+                raise
             except Exception as exc:  # adapter boundary
                 trace.record(
                     "platform.validation",
