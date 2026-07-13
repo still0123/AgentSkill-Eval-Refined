@@ -1,3 +1,4 @@
-# Web application (P1)
+# AgentSkill-Eval Dashboard
 
-Vue Dashboard 属于 P1。本目录在目标 1 中仅保留架构位置。
+Vue 3 + TypeScript 的只读本地报告 Dashboard。启动、支持格式与安全边界见
+[`docs/dashboard-mvp.md`](../../docs/dashboard-mvp.md)。

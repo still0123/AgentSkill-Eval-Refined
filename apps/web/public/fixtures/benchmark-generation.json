@@ -1,0 +1,85 @@
+{
+  "schema_version": "ase/benchmark-report/v1alpha1",
+  "synthetic": true,
+  "simulated": true,
+  "job": {
+    "id": "50000000-0000-4000-8000-000000000001",
+    "status": "COMPLETED",
+    "target_split": "validation_search"
+  },
+  "dataset_version": {
+    "id": "50000000-0000-4000-8000-000000000002",
+    "content_sha256": "70dc8ac99dd7e8db405d73ae7732bad34487cf62ab9feff9f04a48c03e1cbca3"
+  },
+  "candidates": [
+    {
+      "id": "51000000-0000-4000-8000-000000000001",
+      "key": "synthetic-off-by-one",
+      "task": "Repair a boundary error while preserving the public API (synthetic fixture)",
+      "status": "PUBLISHED",
+      "provenance": {
+        "source_type": "git_history",
+        "repository_url": "https://example.invalid/synthetic/repository",
+        "fork_lineage": "synthetic/demo",
+        "license_spdx": "MIT",
+        "before_commit": "1111111111111111111111111111111111111111",
+        "after_commit": "2222222222222222222222222222222222222222",
+        "contamination_risk": "unknown",
+        "synthetic": true
+      },
+      "transitions": [
+        { "sequence": 1, "to_status": "INGESTED" },
+        { "sequence": 2, "to_status": "RECONSTRUCTED" },
+        { "sequence": 3, "to_status": "VERIFIED" },
+        { "sequence": 4, "to_status": "DEDUPED" },
+        { "sequence": 5, "to_status": "REVIEWED" },
+        { "sequence": 6, "to_status": "PUBLISHED" }
+      ],
+      "quality_gates": [
+        { "name": "before_fail / after_pass", "passed": true, "detail": "3/3 stable repeats" },
+        { "name": "mutation_validation", "passed": true, "detail": "mutation fails 3/3" },
+        {
+          "name": "alternative_fix_validation",
+          "passed": true,
+          "detail": "independent fix passes 3/3"
+        },
+        { "name": "deduplication", "passed": true, "detail": "no normalized duplicate" }
+      ],
+      "duplicate_of": null,
+      "review_decision": "APPROVED",
+      "reviewer": "synthetic-reviewer",
+      "rejection_reasons": []
+    },
+    {
+      "id": "51000000-0000-4000-8000-000000000002",
+      "key": "synthetic-flaky-time",
+      "task": "Candidate rejected due to non-deterministic time dependency",
+      "status": "REJECTED",
+      "provenance": {
+        "source_type": "git_history",
+        "repository_url": "file:///not-opened",
+        "fork_lineage": "synthetic/demo",
+        "license_spdx": "Apache-2.0",
+        "before_commit": "3333333333333333333333333333333333333333",
+        "after_commit": "4444444444444444444444444444444444444444",
+        "contamination_risk": "unknown",
+        "synthetic": true
+      },
+      "transitions": [
+        { "sequence": 1, "to_status": "INGESTED" },
+        { "sequence": 2, "to_status": "RECONSTRUCTED" },
+        { "sequence": 3, "to_status": "REJECTED" }
+      ],
+      "quality_gates": [
+        {
+          "name": "before_fail / after_pass",
+          "passed": false,
+          "detail": "before result changed between repeats"
+        }
+      ],
+      "duplicate_of": null,
+      "review_decision": null,
+      "rejection_reasons": ["non-deterministic regression test", "current time access detected"]
+    }
+  ]
+}
