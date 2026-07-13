@@ -13,11 +13,15 @@ after the first stable release.
   provenance-family independence groups and published split-leakage guards.
 - A second audited offline source (`cachetools`) and a four-case, two-repository deterministic
   evidence bundle whose DatasetVersion hash covers case, fixture, grader, provenance and metadata.
+- A unified multi-scenario facade for software engineering, MCP and Memory/RAG evaluations with
+  frozen Skill hashes, explicit evidence classes, native metric preservation and immutable reports.
 
 ### Evidence boundary
 
 - The cross-repository evidence performs no model calls and proves only deterministic
   reconstruction and publication controls; it is not Agent-performance evidence.
+- Unified MCP and Memory/RAG examples use precompiled deterministic plans; they validate the
+  evaluation system but do not prove that a real Agent loaded or followed the example Skills.
 
 ## [0.1.0-rc1] - 2026-07-13
 

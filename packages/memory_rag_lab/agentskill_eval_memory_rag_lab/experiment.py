@@ -9,7 +9,7 @@ from typing import Dict, List, Literal, Tuple, cast
 from uuid import NAMESPACE_URL, UUID, uuid5
 
 import yaml
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from agentskill_eval_memory_rag_lab.adapters import (
     FailureInjection,
@@ -62,7 +62,14 @@ class LabConfig(StrictModel):
     cost_budget_usd: float = Field(default=0, ge=0)
     failure_injection: Tuple[FailureInjectionSpec, ...] = ()
     plans: Dict[str, PairPlans]
+    selected_case_ids: Tuple[str, ...] = ()
     simulated: Literal[True]
+
+    @model_validator(mode="after")
+    def selected_cases_must_be_unique(self) -> "LabConfig":
+        if len(self.selected_case_ids) != len(set(self.selected_case_ids)):
+            raise ValueError("selected_case_ids must be unique")
+        return self
 
     @classmethod
     def load(cls, path: Path) -> "LabConfig":
@@ -128,7 +135,12 @@ class MemoryRagLabRunner:
 
     def run(self, config: LabConfig) -> ExperimentArtifacts:
         dataset = MemoryRagDataset.load(config.dataset, allowed_root=config.dataset.parent)
-        case_ids = {case.case_id for case in dataset.cases}
+        selected = set(config.selected_case_ids)
+        cases = tuple(case for case in dataset.cases if not selected or case.case_id in selected)
+        case_ids = {case.case_id for case in cases}
+        unknown = selected - {case.case_id for case in dataset.cases}
+        if unknown:
+            raise ValueError(f"selected_case_ids do not exist: {sorted(unknown)}")
         if set(config.plans) != case_ids:
             raise ValueError(
                 f"plans must exactly match cases; missing={sorted(case_ids - set(config.plans))}, "
@@ -146,7 +158,7 @@ class MemoryRagLabRunner:
             for item in config.failure_injection
         )
         scored: List[ScoredRun] = []
-        for case in dataset.cases:
+        for case in cases:
             pair = config.plans[case.case_id]
             variants: Tuple[Tuple[Literal["control", "treatment"], AgentPlan], ...] = (
                 ("control", pair.control),

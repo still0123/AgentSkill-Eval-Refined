@@ -47,6 +47,7 @@ without-Skill        with-Skill
 | Real Agent Evidence | 通过显式授权和预算门运行真实 Agent 实验 | 已实现 |
 | MCP Evaluation Lab | 评测工具选择、参数、顺序、恢复和副作用 | 离线 simulated Lab |
 | Memory/RAG Lab | 评测检索、引用、污染、记忆更新和会话隔离 | 离线 simulated Lab |
+| Unified Scenario | 用同一协议运行软件工程、MCP、Memory/RAG 并保留专项指标 | 已实现，simulated MVP |
 | Dashboard | 查看已冻结的报告、Trace、W/T/L 和候选状态 | 本地只读版 |
 
 `simulated` 只证明评测管线可用，不能当作真实模型能力证据。
@@ -82,6 +83,14 @@ agentskill-eval demo run --workspace .agentskill-eval/demo
 - Trace、失败诊断和审计产物。
 
 > 演示使用确定性模拟执行，结果会强制标记 `simulated=true`。
+
+也可以通过统一场景入口运行三类评测：
+
+```bash
+agentskill-eval scenario validate examples/unified/mcp-tool.yaml
+agentskill-eval scenario run examples/unified/mcp-tool.yaml \
+  --workspace .agentskill-eval/unified --allow-simulation
+```
 
 ### 3. 运行质量检查
 
@@ -189,6 +198,7 @@ packages/skill_optimizer/
 packages/real_evidence/
 packages/mcp_lab/
 packages/memory_rag_lab/
+packages/scenarios/       跨场景计划、Adapter 和统一结果 envelope
 examples/                演示 Skill、Dataset 和配置
 experiments/             可公开的脱敏实验记录
 tests/                   单元与集成测试
@@ -210,6 +220,7 @@ docs/                    模块级设计和操作文档
 | Skill 搜索与独立终评 | [Skill Search](./docs/benchmark-guided-skill-search.md) / [Final Evaluation](./docs/independent-final-evaluation.md) |
 | 真实 Agent 评测 | [Real Agent Evidence](./docs/real-agent-evidence.md) |
 | MCP / Memory-RAG 专项 Lab | [MCP Lab](./docs/mcp-tool-evaluation.md) / [Memory-RAG Lab](./docs/memory-rag-evaluation.md) |
+| 跨场景统一入口和结果协议 | [Unified Multi-Scenario Evaluation](./docs/unified-multi-scenario-evaluation.md) |
 | Dashboard 启动和限制 | [Dashboard](./docs/dashboard-mvp.md) |
 
 完整文档索引见 [`docs/README.md`](./docs/README.md)。

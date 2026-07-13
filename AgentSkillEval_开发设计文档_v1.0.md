@@ -1772,3 +1772,24 @@ fixture、grader、provenance 和 metadata。生成器同时支持常见 `src/` 
 FAIL/PASS/FAIL/PASS，且必须通过补丁防泄漏、替代修复、许可证、Agent 分数选择独立性和去重门，
 再经逐候选人工审核后发布为一个不可变 DatasetVersion。公开 Git 历史污染风险仍标为 high；
 本阶段扩展的是可审计的数据基础，尚未产生新的付费 Agent 泛化结论。
+
+---
+
+## 28. Unified Multi-Scenario Evaluation MVP 实现状态
+
+截至 2026-07-14，软件工程、MCP 和 Memory/RAG 三条既有执行链路已通过薄
+`ScenarioAdapter` 接入统一协议。公共层冻结 `UnifiedScenarioSpec`、`EvaluationPlan`、
+control/treatment 变体、Skill 名称/版本/SHA-256、comparison、证据等级、Trace capability 和
+claim limit；执行后生成 `UnifiedEvaluationResult`，统一输出成功率、absolute gain、W/T/L、
+invalid 和带 SHA-256 的原生报告引用。各纵切专用指标仍由原 Grader 负责，禁止合成无语义的
+跨场景总分。
+
+CLI 新增 `scenario validate/run/report`。simulation 必须显式传入 `--allow-simulation`，
+`simulated_controller`、`process_integration` 和 `observed_agent` 的边界在契约层校验。软件工程
+示例复用 P0 配对实验引擎；MCP 与 Memory/RAG 示例复用各自确定性 Lab，并明确标记
+`precompiled_plan`，不得声称真实 Agent 已加载或遵循 Skill。Memory/RAG Lab 额外支持冻结
+Case 子集，使能力对照与污染压力测试能够分开运行。
+
+本阶段没有新增 FastAPI、MQ、Redis 或远程调度，也没有触发付费模型。真实 Bug Fix 证据继续
+由 `real` 命令的预算门保护。详细协议、命令与限制见
+[`docs/unified-multi-scenario-evaluation.md`](./docs/unified-multi-scenario-evaluation.md)。

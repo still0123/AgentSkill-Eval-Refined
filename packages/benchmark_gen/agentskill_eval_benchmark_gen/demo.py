@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import os
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
 from typing import Callable, Dict, Mapping, Optional, Tuple
@@ -69,6 +70,7 @@ class DemoRunConfig:
     inherited_secret_env: Tuple[str, ...] = ()
     timeout_seconds: int = 300
     max_turns: int = 10
+    created_at: Optional[datetime] = None
 
 
 @dataclass(frozen=True)
@@ -270,6 +272,7 @@ class DemoExperimentRunner:
                 else f"Python review demo ({config.engine}/{config.model_name or 'engine-default'})"
             ),
             code_revision="p0-demo-v1",
+            created_at=config.created_at or datetime.now(timezone.utc),
             dataset_version_id=dataset.dataset_id,
             dataset_sha256=dataset.dataset_sha256,
             protocol_snapshot={
