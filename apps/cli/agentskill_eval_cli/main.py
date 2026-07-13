@@ -550,14 +550,18 @@ def generate_benchmark(
     ),
 ) -> None:
     """Reconstruct, repeatedly verify, and deduplicate benchmark candidates."""
-    result = AutomaticBenchmarkGenerator(workspace).generate(
-        BenchmarkGenerationSpec.load(spec_path)
-    )
+    spec = BenchmarkGenerationSpec.load(spec_path)
+    result = AutomaticBenchmarkGenerator(workspace).generate(spec)
     typer.echo(
         json.dumps(
             {
                 "job_id": str(result.job.id),
                 "status": result.job.status.value,
+                "source_count": len(spec.repository_sources()),
+                "provenance_families": sorted(
+                    candidate.provenance_family or candidate.after_commit
+                    for candidate in spec.candidates
+                ),
                 "candidates": [
                     {"id": str(item.id), "key": item.key, "status": item.status.value}
                     for item in result.candidates

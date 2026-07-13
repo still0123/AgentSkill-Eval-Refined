@@ -1,6 +1,6 @@
 # Automatic Benchmark Generation MVP
 
-本模块从固定的本地 Git 历史重建可执行 Benchmark 候选。它不抓取 GitHub、不调用
+本模块从一个或多个固定的本地 Git 历史重建可执行 Benchmark 候选。它不抓取 GitHub、不调用
 LLM，也不根据被测 Agent 的成绩筛选题目。目标是先证明一条可审计、可离线复现的
 生成链路。
 
@@ -42,27 +42,36 @@ stdout/stderr 作为证据文件保存，manifest 只引用其 SHA-256。命令�
 - task 和选中测试不得包含参考补丁中的非平凡新增实现行；
 - SPDX、许可证哈希、仓库 URL、commit、生成器和验证器版本必须完整；
 - before/after/mutation/alternative 各至少三次结果一致；
-- 使用规范化任务、参考补丁和 fork lineage 的组合指纹确定性去重；
-- 同一 fork lineage 不得跨 split；
+- 使用规范化任务、参考补丁、fork lineage 和显式 provenance family 确定性去重；
+- 发布前扫描工作区内已有 DatasetVersion，同一 fork lineage 或 provenance family 不得跨 split；
+- DatasetVersion 内容哈希覆盖 case、fixture、grader、provenance 和承载 split/group 的 metadata；
 - 输入中不存在 Agent 分数，发布 manifest 记录 `selection_uses_agent_scores=false`；
 - 公开历史数据必须记录 contamination risk，不能宣称为无污染测试。
 
 当前 mutation 是“在修复后版本反向删除生产补丁”，因此 mutation score 为 1/1；替代
 修复必须以不同实现通过同一 oracle，避免 grader 只接受参考补丁的唯一写法。
 
-## 离线真实样本
+## 跨仓库离线真实样本
 
-仓库内保存 `examples/benchmark-sources/more-itertools.bundle`，来源为 MIT 许可的真实
-`more-itertools` 仓库，包含两个固定历史缺陷。无需网络即可重放：
+仓库内保存两个 MIT 许可真实项目的离线 Git bundle，每个仓库包含两个固定历史缺陷：
+
+- `more-itertools.bundle`：iterator 与 strict sampling 回归；
+- `cachetools.bundle`：cachedmethod introspection 与 cache-key pickle 回归。
+
+无需网络即可重放：
 
 ```bash
 git clone examples/benchmark-sources/more-itertools.bundle \
   .agentskill-eval/sources/more-itertools
 git -C .agentskill-eval/sources/more-itertools remote set-url origin \
   https://github.com/more-itertools/more-itertools.git
+git clone examples/benchmark-sources/cachetools.bundle \
+  .agentskill-eval/sources/cachetools
+git -C .agentskill-eval/sources/cachetools remote set-url origin \
+  https://github.com/tkem/cachetools.git
 
-cp examples/benchmark-sources/more-itertools-generation.example.yaml /tmp/generation.yaml
-# 将 repository_path 改为上面 clone 的绝对路径。
+cp examples/benchmark-sources/cross-repository-generation.example.yaml /tmp/generation.yaml
+# 将 sources 中两个 repository_path 改为上面 clone 的绝对路径。
 
 agentskill-eval benchmark generate /tmp/generation.yaml \
   --workspace .agentskill-eval/benchmark
@@ -73,12 +82,17 @@ agentskill-eval benchmark publish .agentskill-eval/benchmark JOB_UUID \
   --publisher YOUR_NAME
 ```
 
-两个候选都必须单独 review。发布后可继续用原有 loader 校验：
+四个候选都必须单独 review。发布后可继续用原有 loader 校验：
 
 ```bash
 agentskill-eval dataset validate \
   .agentskill-eval/benchmark/dataset-versions/DATASET_VERSION_UUID
 ```
+
+仓库内的已验证离线重放结果位于
+`experiments/cross-repository-benchmark-2026-07-14/`。其中记录 bundle、source spec、
+四个候选和发布 DatasetVersion 的哈希，以及本阶段严格的 claim limit；不包含凭据、原始临时
+workspace 或模型调用结果。
 
 ## Manifest 布局
 
@@ -105,4 +119,5 @@ workspace/
 
 MVP 不包含 GitHub 大规模抓取、难度模型、embedding 近似去重、Skill Optimizer、MCP、
 Memory/RAG、FastAPI、Redis、Vue 或 Kubernetes。`locked_test` 虽被契约识别，但公开
-Git 历史默认污染风险高；当前两个真实示例只发布到 `validation_search`。
+Git 历史默认污染风险高；当前四个真实示例只发布到 `validation_search`。v1alpha1 单仓库
+配置保持兼容；新跨仓库配置使用 v1alpha2。

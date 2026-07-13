@@ -1752,3 +1752,23 @@ Python wheel 的 10 个包导入，以及 Dashboard typecheck、ESLint、9 项 V
 66.7%/83.3%，Case 级 W/T/L 为 1/1/0，总记录费用 231,195 microusd；12 次 Secret 扫描和
 12,341 文件 Key 精确扫描均为 0 命中，389 文件审计包校验通过。由于仅有两个同源 Case
 且存在 3 个 invalid，+16.7 个百分点只是描述性观察，不支持 Skill 普遍增益声称。
+
+---
+
+## 23. 实际完成状态：Cross-Repository Benchmark Generation MVP
+
+截至 2026-07-14，Automatic Benchmark Generation 从单仓库协议扩展为兼容旧 v1alpha1 的
+v1alpha2 multi-source 协议：一个冻结 Job 可以引用多个本地 Git source，机器本地 clone 路径
+不进入语义哈希，每个候选显式绑定 source key 和 provenance family。发布时以 family 作为独立性
+分组，并扫描工作区内已有 DatasetVersion，阻止同一 fork lineage 或同源缺陷家族跨 split。
+
+DatasetVersion 完整性范围补充 metadata SHA-256，使 split、repository、fork lineage、
+patch family 和 independence group 不再游离于内容哈希之外；发布前及后续扫描均重新验证 case、
+fixture、grader、provenance 和 metadata。生成器同时支持常见 `src/` Python package layout，
+其受控 verifier 和发布 grader 会显式加入冻结 fixture 的 `src` 路径。
+
+离线验收数据扩展为两个 MIT 项目、四个真实历史缺陷：`more-itertools` 两例与 `cachetools`
+两例。四个候选均要求 before/after/mutation/alternative 各重复三次稳定得到
+FAIL/PASS/FAIL/PASS，且必须通过补丁防泄漏、替代修复、许可证、Agent 分数选择独立性和去重门，
+再经逐候选人工审核后发布为一个不可变 DatasetVersion。公开 Git 历史污染风险仍标为 high；
+本阶段扩展的是可审计的数据基础，尚未产生新的付费 Agent 泛化结论。

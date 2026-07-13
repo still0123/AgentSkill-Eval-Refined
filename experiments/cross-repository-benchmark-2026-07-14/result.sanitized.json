@@ -1,0 +1,71 @@
+{
+  "schema_version": "ase/cross-repository-benchmark-evidence/v1alpha1",
+  "generated_on": "2026-07-14",
+  "job_id": "dfde990f-04af-5b0c-9529-7e198bf6badf",
+  "source_spec_sha256": "04d6f961470b4476efb14ed35a1b4a39be78daed5491e0facc136403348bcce8",
+  "dataset_version_id": "f503bd3e-f24b-553e-b69d-dd2319c80d86",
+  "dataset_content_sha256": "a8f2e034933a66cb7f34715576f689e63805dd64ff4428e358cbb939fd9cc50e",
+  "dataset_loader_sha256": "6129d04d1a5cd0f39c4953243ff3779f72ace2c224cc121f3f3035cf7a0e1947",
+  "target_split": "validation_search",
+  "simulated": false,
+  "uses_model": false,
+  "selection_uses_agent_scores": false,
+  "published_case_count": 4,
+  "source_lineages": [
+    "github.com/more-itertools/more-itertools",
+    "github.com/tkem/cachetools"
+  ],
+  "independence_groups": [
+    "github.com/more-itertools/more-itertools#last-reversed-protocol",
+    "github.com/more-itertools/more-itertools#sample-strict-counts",
+    "github.com/tkem/cachetools#cachedmethod-descriptor-introspection",
+    "github.com/tkem/cachetools#hashkey-pickle"
+  ],
+  "bundle_sha256": {
+    "more-itertools.bundle": "9e19644b0027cc11502b5ccc959abce2847b8cf94a3446b09d45a1cd716651bb",
+    "cachetools.bundle": "9933f9067dbc4da476cdc2612625422251916d53d8945153b0795dca1371258c"
+  },
+  "candidates": [
+    {
+      "key": "more-itertools-last-reversed-none",
+      "candidate_id": "9a9e83b7-95da-5315-8448-a45948bec022",
+      "repository_url": "https://github.com/more-itertools/more-itertools.git",
+      "provenance_family": "last-reversed-protocol",
+      "fixture_sha256": "b83823d3179719341c26fe554036344c7a4a06be5b0c77a005afb839456dee01",
+      "reference_patch_sha256": "597bd9890818b1c5abc44ce26cf54ad92be988568b2d7ae0b82ccea177873575",
+      "evidence_commands": 12,
+      "passed_quality_gate_count": 10
+    },
+    {
+      "key": "more-itertools-sample-strict-counts",
+      "candidate_id": "1e9ab139-a160-52e9-ba32-23783b55fd7d",
+      "repository_url": "https://github.com/more-itertools/more-itertools.git",
+      "provenance_family": "sample-strict-counts",
+      "fixture_sha256": "191428ceebc7b26ac0d5cbad80612cc323e93b7101e0d90c9bdb2f8cbdc97b63",
+      "reference_patch_sha256": "c206ad833c5fcdf59c0fb62a4a4167a2e7bd62a9b3fef6ad8a58b205b2536ee2",
+      "evidence_commands": 12,
+      "passed_quality_gate_count": 10
+    },
+    {
+      "key": "cachetools-cachedmethod-autospec",
+      "candidate_id": "cc4e06e2-bbc4-5e7f-8033-a6b98add7fe6",
+      "repository_url": "https://github.com/tkem/cachetools.git",
+      "provenance_family": "cachedmethod-descriptor-introspection",
+      "fixture_sha256": "e6031f710cf792a14c3e8d5ecde3665b97261992f57f195983d725d450defa84",
+      "reference_patch_sha256": "678e814a17b2f23e9ac0c7a255463692e97c9c4e40f45467e628a8359b1b42bc",
+      "evidence_commands": 12,
+      "passed_quality_gate_count": 10
+    },
+    {
+      "key": "cachetools-hashkey-pickle",
+      "candidate_id": "9d38aaee-980e-5092-9a59-ecf4c6e519ac",
+      "repository_url": "https://github.com/tkem/cachetools.git",
+      "provenance_family": "hashkey-pickle",
+      "fixture_sha256": "daad32f33a54c2b05b909f0305a7eef3923b62943095b187527c815f51f59979",
+      "reference_patch_sha256": "2c20d5fa0035f108eeff293d9ce097eff31f6bbed89d20f6a092bf2a291d58f4",
+      "evidence_commands": 12,
+      "passed_quality_gate_count": 10
+    }
+  ],
+  "claim_limit": "Deterministic offline evidence for four public Python defect histories; not Agent-performance or population-level Benchmark evidence."
+}

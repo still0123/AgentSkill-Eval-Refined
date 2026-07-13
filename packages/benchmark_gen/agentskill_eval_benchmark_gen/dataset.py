@@ -13,8 +13,10 @@ from uuid import NAMESPACE_URL, UUID, uuid5
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from agentskill_eval_contracts import stable_sha256
+from agentskill_eval_contracts import BenchmarkDatasetVersion, stable_sha256
 from agentskill_eval_experiment import CaseExecutionSpec
+from agentskill_eval_experiment.storage.errors import IntegrityError
+from agentskill_eval_experiment.storage.manifests import load_model
 
 
 class DatasetError(ValueError):
@@ -162,6 +164,7 @@ class DatasetLoader:
                     f"category {category.value} requires {minimum} cases, "
                     f"found {actual_counts[category]}"
                 )
+        self._validate_published_version(root, cases)
         digest = stable_sha256(
             {
                 "manifest": manifest.model_dump(mode="json"),
@@ -179,6 +182,57 @@ class DatasetLoader:
         identity = f"agentskill-eval:{manifest.name}:{manifest.version}:{digest}"
         dataset_id = uuid5(NAMESPACE_URL, identity)
         return LoadedDataset(root, manifest, cases, digest, dataset_id)
+
+    def _validate_published_version(
+        self, root: Path, cases: Tuple[LoadedCase, ...]
+    ) -> None:
+        version_path = root / "dataset-version.json"
+        if not version_path.exists():
+            return
+        try:
+            version = load_model(version_path.read_bytes(), BenchmarkDatasetVersion)
+        except (IntegrityError, ValueError) as exc:
+            raise DatasetError(f"invalid DatasetVersion manifest: {exc}") from exc
+        published = {item.case_id: item for item in version.cases}
+        loaded = {item.metadata.case_id: item for item in cases}
+        if set(published) != set(loaded):
+            raise DatasetError("DatasetVersion case set does not match dataset metadata")
+        splits = {item.metadata.split.value for item in cases}
+        if splits != {version.split}:
+            raise DatasetError("published DatasetVersion contains mixed or mismatched splits")
+        lineages = tuple(
+            sorted({item.metadata.group_keys.fork_lineage for item in cases})
+        )
+        if lineages != version.source_lineages:
+            raise DatasetError("DatasetVersion source lineages do not match case metadata")
+        for case_id, item in loaded.items():
+            expected = published[case_id]
+            grader_sha = self._script_hash(root, item.case_payload, case_id)
+            actual = {
+                "case": self._hash_file(item.case_file),
+                "fixture": (
+                    self._published_fixture_hash(item.fixture_path)
+                    if item.fixture_path
+                    else None
+                ),
+                "grader": grader_sha,
+                "provenance": self._hash_file(
+                    self._safe_path(root, f"provenance/{case_id}.json", file=True)
+                ),
+            }
+            wanted = {
+                "case": expected.case_sha256,
+                "fixture": expected.fixture_sha256,
+                "grader": expected.grader_sha256,
+                "provenance": expected.provenance_sha256,
+            }
+            if expected.metadata_sha256 is not None:
+                actual["metadata"] = self._hash_file(
+                    self._safe_path(root, f"metadata/{case_id}.yaml", file=True)
+                )
+                wanted["metadata"] = expected.metadata_sha256
+            if actual != wanted:
+                raise DatasetError(f"published case integrity mismatch: {case_id}")
 
     def _load_case(self, root: Path, metadata_ref: str) -> LoadedCase:
         metadata_path = self._safe_path(root, metadata_ref, file=True)
@@ -273,6 +327,24 @@ class DatasetLoader:
                 entries.append(
                     {"path": path.relative_to(root).as_posix(), "sha256": self._hash_file(path)}
                 )
+        if not entries:
+            raise DatasetError(f"fixture must contain at least one file: {root}")
+        return stable_sha256(entries)
+
+    def _published_fixture_hash(self, root: Path) -> str:
+        """Recompute the generator's immutable fixture digest.
+
+        Dataset ingestion predates published Benchmark manifests and deliberately
+        uses a different, mapping-based tree payload in ``_hash_tree``.  Keep that
+        identity stable while matching the generator's tuple-based publication
+        digest for tamper checks.
+        """
+        entries = []
+        for path in sorted(root.rglob("*")):
+            if path.is_symlink():
+                raise DatasetError(f"symlink is not allowed in fixture: {path}")
+            if path.is_file():
+                entries.append((path.relative_to(root).as_posix(), self._hash_file(path)))
         if not entries:
             raise DatasetError(f"fixture must contain at least one file: {root}")
         return stable_sha256(entries)

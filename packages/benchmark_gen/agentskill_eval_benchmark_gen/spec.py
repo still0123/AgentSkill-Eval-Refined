@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Literal, Optional, Tuple
+from typing import Any, Dict, Literal, Optional, Tuple
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -19,6 +19,10 @@ class StrictModel(BaseModel):
 
 class CandidateSpec(StrictModel):
     key: str = Field(pattern=r"^[a-z0-9][a-z0-9-]{2,79}$")
+    source_key: str = Field(default="primary", pattern=r"^[a-z0-9][a-z0-9-]{2,39}$")
+    provenance_family: Optional[str] = Field(
+        default=None, pattern=r"^[a-z0-9][a-z0-9-]{2,119}$"
+    )
     before_commit: str = Field(pattern=r"^[0-9a-f]{7,40}$")
     after_commit: str = Field(pattern=r"^[0-9a-f]{7,40}$")
     task: str = Field(min_length=20)
@@ -27,7 +31,9 @@ class CandidateSpec(StrictModel):
     regression_test_paths: Tuple[str, ...] = Field(min_length=1)
     test_command: Tuple[str, ...] = Field(min_length=1)
     alternative_patch: str = Field(min_length=1)
-    category: str = "positive"
+    category: Literal["positive", "negative", "distractor", "complex", "robustness"] = (
+        "positive"
+    )
     tags: Tuple[str, ...] = Field(min_length=1)
 
     @model_validator(mode="after")
@@ -70,21 +76,41 @@ class BudgetSpec(StrictModel):
     wall_seconds: int = Field(default=7200, ge=1)
 
 
-class BenchmarkGenerationSpec(StrictModel):
-    schema_version: Literal["ase/benchmark-generation/v1alpha1"]
-    name: str = Field(min_length=1, max_length=120)
-    version: str = Field(min_length=1, max_length=40)
+class RepositorySourceSpec(StrictModel):
+    key: str = Field(pattern=r"^[a-z0-9][a-z0-9-]{2,39}$")
     repository_path: Path
     repository_url: str = Field(min_length=1)
     fork_lineage: str = Field(min_length=1)
     license_spdx: str = Field(min_length=1)
     license_path: str = Field(min_length=1)
+    contamination_risk: Literal["low", "medium", "high", "unknown"]
+
+    @model_validator(mode="after")
+    def license_path_is_safe(self) -> "RepositorySourceSpec":
+        path = Path(self.license_path)
+        if path.is_absolute() or ".." in path.parts:
+            raise ValueError("license_path must be a safe repository-relative path")
+        return self
+
+
+class BenchmarkGenerationSpec(StrictModel):
+    schema_version: Literal[
+        "ase/benchmark-generation/v1alpha1", "ase/benchmark-generation/v1alpha2"
+    ]
+    name: str = Field(min_length=1, max_length=120)
+    version: str = Field(min_length=1, max_length=40)
+    repository_path: Optional[Path] = None
+    repository_url: Optional[str] = Field(default=None, min_length=1)
+    fork_lineage: Optional[str] = Field(default=None, min_length=1)
+    license_spdx: Optional[str] = Field(default=None, min_length=1)
+    license_path: Optional[str] = Field(default=None, min_length=1)
+    sources: Tuple[RepositorySourceSpec, ...] = ()
     target_split: Literal["validation_search", "validation_confirm", "locked_test"] = (
         "validation_search"
     )
     generator_profile: str = "local-git-history/v1"
     verifier_profile: str = "deterministic-subprocess/v1"
-    contamination_risk: Literal["low", "medium", "high", "unknown"]
+    contamination_risk: Optional[Literal["low", "medium", "high", "unknown"]] = None
     quality_gate: QualityGateSpec = QualityGateSpec()
     budget: BudgetSpec = BudgetSpec()
     candidates: Tuple[CandidateSpec, ...] = Field(min_length=1)
@@ -96,10 +122,79 @@ class BenchmarkGenerationSpec(StrictModel):
             raise ValueError("candidate keys must be unique")
         if len(keys) > self.budget.max_candidates:
             raise ValueError("candidate count exceeds max_candidates")
-        license_path = Path(self.license_path)
-        if license_path.is_absolute() or ".." in license_path.parts:
-            raise ValueError("license_path must be a safe repository-relative path")
+        if self.sources:
+            if self.schema_version != "ase/benchmark-generation/v1alpha2":
+                raise ValueError("multi-source specs require schema v1alpha2")
+            legacy = (
+                self.repository_path,
+                self.repository_url,
+                self.fork_lineage,
+                self.license_spdx,
+                self.license_path,
+                self.contamination_risk,
+            )
+            if any(value is not None for value in legacy):
+                raise ValueError("multi-source specs cannot mix legacy repository fields")
+            source_keys = [source.key for source in self.sources]
+            lineages = [source.fork_lineage for source in self.sources]
+            if len(source_keys) != len(set(source_keys)):
+                raise ValueError("repository source keys must be unique")
+            if len(lineages) != len(set(lineages)):
+                raise ValueError("repository fork lineages must be unique")
+            known = set(source_keys)
+            for candidate in self.candidates:
+                if candidate.source_key not in known:
+                    raise ValueError(f"unknown candidate source_key: {candidate.source_key}")
+                if candidate.provenance_family is None:
+                    raise ValueError("multi-source candidates require provenance_family")
+        else:
+            if self.schema_version != "ase/benchmark-generation/v1alpha1":
+                raise ValueError("schema v1alpha2 requires sources")
+            legacy = (
+                self.repository_path,
+                self.repository_url,
+                self.fork_lineage,
+                self.license_spdx,
+                self.license_path,
+                self.contamination_risk,
+            )
+            if any(value is None for value in legacy):
+                raise ValueError("legacy single-source repository fields are required")
+            assert self.license_path is not None
+            license_path = Path(self.license_path)
+            if license_path.is_absolute() or ".." in license_path.parts:
+                raise ValueError("license_path must be a safe repository-relative path")
+            if any(candidate.source_key != "primary" for candidate in self.candidates):
+                raise ValueError("legacy candidates must use source_key=primary")
         return self
+
+    def repository_sources(self) -> Tuple[RepositorySourceSpec, ...]:
+        if self.sources:
+            return self.sources
+        assert self.repository_path is not None
+        assert self.repository_url is not None
+        assert self.fork_lineage is not None
+        assert self.license_spdx is not None
+        assert self.license_path is not None
+        assert self.contamination_risk is not None
+        return (
+            RepositorySourceSpec(
+                key="primary",
+                repository_path=self.repository_path,
+                repository_url=self.repository_url,
+                fork_lineage=self.fork_lineage,
+                license_spdx=self.license_spdx,
+                license_path=self.license_path,
+                contamination_risk=self.contamination_risk,
+            ),
+        )
+
+    def semantic_payload(self) -> Dict[str, Any]:
+        payload: Dict[str, Any] = self.model_dump(mode="json")
+        payload.pop("repository_path", None)
+        for source in payload.get("sources", []):
+            source.pop("repository_path", None)
+        return payload
 
     @classmethod
     def load(cls, path: Path) -> "BenchmarkGenerationSpec":
