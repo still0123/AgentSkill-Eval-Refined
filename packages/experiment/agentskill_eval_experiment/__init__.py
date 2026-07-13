@@ -1,5 +1,10 @@
 """Paired experiment orchestration, persistence, statistics, and reporting."""
 
+from agentskill_eval_experiment.bundles import (
+    BundleError,
+    ReplayBundleResult,
+    ReplayBundleWriter,
+)
 from agentskill_eval_experiment.execution import (
     ExecutionRecord,
     LocalExecutionSummary,
@@ -13,6 +18,11 @@ from agentskill_eval_experiment.planning import (
     VariantRuntimeSpec,
 )
 from agentskill_eval_experiment.reporting import StaticReportPaths, StaticReportWriter
+from agentskill_eval_experiment.security import (
+    ExactSecretScanner,
+    SecretLeakError,
+    SecretScanResult,
+)
 from agentskill_eval_experiment.statistics import (
     AnalysisConfig,
     CaseComparison,
@@ -47,6 +57,7 @@ __all__ = [
     "AtomicFileWriter",
     "AnalysisConfig",
     "BlobReference",
+    "BundleError",
     "CaseExecutionSpec",
     "CaseComparison",
     "ConfidenceInterval",
@@ -54,6 +65,7 @@ __all__ = [
     "EfficiencyComparison",
     "EstimandSummary",
     "ExecutionRecord",
+    "ExactSecretScanner",
     "ExperimentAnalyzer",
     "ExperimentLayout",
     "ExperimentStatistics",
@@ -71,6 +83,10 @@ __all__ = [
     "PlannedBlock",
     "PlannedExperiment",
     "RecoveryReport",
+    "ReplayBundleResult",
+    "ReplayBundleWriter",
+    "SecretLeakError",
+    "SecretScanResult",
     "StagedWrite",
     "StorageError",
     "StatisticsError",

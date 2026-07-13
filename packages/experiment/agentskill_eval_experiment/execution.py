@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import hashlib
 import mimetypes
+import shutil
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from pathlib import PurePosixPath
-from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple
+from pathlib import Path, PurePosixPath
+from typing import Any, Callable, Dict, List, Literal, Mapping, Optional, Tuple
 from uuid import UUID, uuid4
 
 from agentskill_eval_contracts import (
@@ -19,11 +20,18 @@ from agentskill_eval_contracts import (
     Run,
     RunAttempt,
     RunMeasurement,
+    SecurityScanEvidence,
+    SkillActivationEvidence,
 )
 from agentskill_eval_experiment.planning import (
     CaseExecutionSpec,
     PlannedExperiment,
     VariantRuntimeSpec,
+)
+from agentskill_eval_experiment.security import (
+    ExactSecretScanner,
+    SecretLeakError,
+    SecretScanResult,
 )
 from agentskill_eval_experiment.storage import ExperimentLayout, LocalExperimentStore
 from agentskill_eval_runner_adapters import (
@@ -31,6 +39,7 @@ from agentskill_eval_runner_adapters import (
     RunnerAdapter,
     RunnerRequest,
     RunnerResult,
+    RunnerSkillEvidence,
     RunnerStatus,
 )
 
@@ -61,6 +70,12 @@ class LocalExecutionSummary:
         )
 
 
+@dataclass(frozen=True)
+class ArchivedResult:
+    artifacts: ArtifactManifest
+    security_scan: SecurityScanEvidence
+
+
 class LocalExperimentExecutor:
     def __init__(
         self,
@@ -74,6 +89,7 @@ class LocalExperimentExecutor:
         self.adapter = adapter
         self.worker_id = worker_id
         self.progress_sink = progress_sink
+        self.secret_scanner = ExactSecretScanner()
 
     async def execute(self, plan: PlannedExperiment) -> LocalExecutionSummary:
         records: List[ExecutionRecord] = []
@@ -145,13 +161,17 @@ class LocalExperimentExecutor:
             try:
                 validation = await self.adapter.validate(request)
             except Exception as exc:  # adapter boundary
+                activation = self._activation_evidence(run, attempt, None, runtime)
                 return self._finalize_infra_failure(
                     run,
                     attempt,
                     RunnerStatus.ERROR,
                     "runner_validation_exception",
                     f"{type(exc).__name__}: {exc}",
+                    activation_evidence=activation,
+                    secret_env=runtime.secret_env,
                 )
+            activation = self._activation_evidence(run, attempt, validation.skill_evidence, runtime)
             if not validation.valid:
                 detail = "\n".join(validation.errors) or validation.stderr
                 return self._finalize_infra_failure(
@@ -160,6 +180,8 @@ class LocalExperimentExecutor:
                     RunnerStatus.ERROR,
                     "runner_validation_failed",
                     detail,
+                    activation_evidence=activation,
+                    secret_env=runtime.secret_env,
                 )
 
             attempt = self._advance_attempt(experiment_id, attempt, AttemptStatus.RUNNING)
@@ -178,7 +200,20 @@ class LocalExperimentExecutor:
 
             run = self._advance_run(run, ExecutionStatus.GRADING)
             try:
-                artifacts = self._archive_runner_output(run, attempt, request, result)
+                archived = self._archive_runner_output(run, attempt, request, result)
+            except SecretLeakError as exc:
+                self._purge_contaminated_runtime(request.run_dir)
+                scan = self._security_evidence(run, attempt, exc.result, status="blocked")
+                return self._finalize_infra_failure(
+                    run,
+                    attempt,
+                    RunnerStatus.ERROR,
+                    "secret_leak_detected",
+                    str(exc),
+                    activation_evidence=activation,
+                    security_scan=scan,
+                    secret_env=runtime.secret_env,
+                )
             except (OSError, ValueError) as exc:
                 return self._finalize_infra_failure(
                     run,
@@ -186,9 +221,18 @@ class LocalExperimentExecutor:
                     RunnerStatus.ERROR,
                     "artifact_archival_failed",
                     f"{type(exc).__name__}: {exc}",
+                    activation_evidence=activation,
+                    secret_env=runtime.secret_env,
                 )
             run = self._advance_run(run, ExecutionStatus.PERSISTING)
-            return self._finalize_result(run, attempt, result, artifacts)
+            return self._finalize_result(
+                run,
+                attempt,
+                result,
+                archived.artifacts,
+                activation,
+                archived.security_scan,
+            )
 
     def _request(
         self,
@@ -205,18 +249,25 @@ class LocalExperimentExecutor:
             / str(attempt.attempt_no)
         )
         run_dir.mkdir(parents=True, exist_ok=True)
+        layout = ExperimentLayout(self.store.workspace, run.experiment_id)
+        frozen_source = layout.frozen_input_files("case_source", case.id)
+        source_relative = case.case_file.resolve(strict=True).relative_to(
+            case.source_eval_dir.resolve(strict=True)
+        )
+        frozen_case_file = frozen_source / source_relative
+        frozen_skill = layout.frozen_input_files("skill", run.variant_id)
         return RunnerRequest(
             execution_id=str(attempt.id),
             case_id=case.runner_case_id,
             variant=str(run.variant_id),
-            source_eval_dir=case.source_eval_dir,
-            case_file=case.case_file,
+            source_eval_dir=frozen_source,
+            case_file=frozen_case_file,
             run_dir=run_dir,
             engine=runtime.engine,
             environment=runtime.environment,
             timeout_seconds=runtime.timeout_seconds,
             max_turns=runtime.max_turns,
-            skill_path=runtime.skill_path,
+            skill_path=frozen_skill if frozen_skill.is_dir() else runtime.skill_path,
             mcp=runtime.mcp,
             collect_artifacts=runtime.collect_artifacts,
             secret_env=runtime.secret_env,
@@ -228,10 +279,10 @@ class LocalExperimentExecutor:
         attempt: RunAttempt,
         request: RunnerRequest,
         result: RunnerResult,
-    ) -> ArtifactManifest:
+    ) -> ArchivedResult:
         layout = ExperimentLayout(self.store.workspace, run.experiment_id)
         destination_root = layout.raw_runner(run.id, attempt.attempt_no)
-        entries: List[ArtifactEntry] = []
+        payloads: List[Tuple[str, bytes]] = []
         source_root = request.run_dir / "runner-output" / "iteration-1"
         for observed in result.artifacts:
             relative = PurePosixPath(observed.path)
@@ -244,10 +295,7 @@ class LocalExperimentExecutor:
             digest = hashlib.sha256(content).hexdigest()
             if digest != observed.sha256 or len(content) != observed.size_bytes:
                 raise ValueError(f"runner artifact changed after observation: {observed.path}")
-            self.store.blobs.put_bytes(content)
-            destination = destination_root / observed.path
-            self.store.writer.write(destination, content)
-            entries.append(self._artifact_entry(observed.path, content))
+            payloads.append((observed.path, content))
 
         for name, content in (
             ("platform-stdout.log", result.stdout.encode("utf-8")),
@@ -255,10 +303,19 @@ class LocalExperimentExecutor:
         ):
             if not content:
                 continue
+            payloads.append((name, content))
+        scan_result = self.secret_scanner.scan(payloads, request.secret_env)
+        if not scan_result.clean:
+            raise SecretLeakError(scan_result)
+        entries: List[ArtifactEntry] = []
+        for name, content in payloads:
             self.store.blobs.put_bytes(content)
             self.store.writer.write(destination_root / name, content)
             entries.append(self._artifact_entry(name, content))
-        return ArtifactManifest(artifacts=tuple(entries))
+        return ArchivedResult(
+            artifacts=ArtifactManifest(artifacts=tuple(entries)),
+            security_scan=self._security_evidence(run, attempt, scan_result, status="clean"),
+        )
 
     @staticmethod
     def _artifact_entry(relative_path: str, content: bytes) -> ArtifactEntry:
@@ -270,12 +327,19 @@ class LocalExperimentExecutor:
             media_type=media_type,
         )
 
+    @staticmethod
+    def _purge_contaminated_runtime(run_dir: Path) -> None:
+        """Remove Runner-owned material after a Secret match before publishing evidence."""
+        shutil.rmtree(run_dir)
+
     def _finalize_result(
         self,
         run: Run,
         attempt: RunAttempt,
         result: RunnerResult,
         artifacts: ArtifactManifest,
+        activation_evidence: SkillActivationEvidence,
+        security_scan: SecurityScanEvidence,
     ) -> ExecutionRecord:
         if result.status in {RunnerStatus.PASS, RunnerStatus.FAIL}:
             attempt = self._terminal_attempt(attempt, AttemptStatus.COMPLETED)
@@ -310,7 +374,14 @@ class LocalExperimentExecutor:
                 evaluation_outcome=EvaluationOutcome.INVALID,
             )
         measurement = self._measurement(run, attempt, result)
-        selected = self.store.commit_attempt(run, attempt, artifacts, measurement)
+        selected = self.store.commit_attempt(
+            run,
+            attempt,
+            artifacts,
+            measurement,
+            activation_evidence,
+            security_scan,
+        )
         return ExecutionRecord(
             selected.id,
             selected.variant_id,
@@ -327,7 +398,13 @@ class LocalExperimentExecutor:
         runner_status: RunnerStatus,
         error_code: str,
         detail: str,
+        *,
+        activation_evidence: Optional[SkillActivationEvidence] = None,
+        security_scan: Optional[SecurityScanEvidence] = None,
+        secret_env: Optional[Mapping[str, str]] = None,
     ) -> ExecutionRecord:
+        secret_env = secret_env or {}
+        detail = self.secret_scanner.redact(detail, secret_env)
         attempt = self._terminal_attempt(
             attempt,
             AttemptStatus.FAILED,
@@ -345,8 +422,25 @@ class LocalExperimentExecutor:
             runner_status=runner_status.value,
             runner_exit_reason=error_code,
         )
+        if activation_evidence is None:
+            activation_evidence = self._activation_evidence(run, attempt, None, None)
+        if security_scan is None:
+            security_scan = SecurityScanEvidence(
+                run_id=run.id,
+                attempt_id=attempt.id,
+                status="not_run",
+                configured_secret_count=len(secret_env),
+                scanned_files=0,
+                scanned_bytes=0,
+                note="Runner output was unavailable for pre-persistence scanning.",
+            )
         selected = self.store.commit_attempt(
-            run, attempt, ArtifactManifest(), measurement
+            run,
+            attempt,
+            ArtifactManifest(),
+            measurement,
+            activation_evidence,
+            security_scan,
         )
         return ExecutionRecord(
             selected.id,
@@ -355,6 +449,63 @@ class LocalExperimentExecutor:
             selected.execution_status,
             selected.evaluation_outcome,
             attempt.attempt_no,
+        )
+
+    @staticmethod
+    def _activation_evidence(
+        run: Run,
+        attempt: RunAttempt,
+        observed: Optional[RunnerSkillEvidence],
+        runtime: Optional[VariantRuntimeSpec],
+    ) -> SkillActivationEvidence:
+        skill_expected = runtime is not None and runtime.skill_path is not None
+        if observed is None:
+            return SkillActivationEvidence(
+                run_id=run.id,
+                attempt_id=attempt.id,
+                skill_expected=skill_expected,
+                installation_method="validation_unavailable",
+                unavailable_reasons={
+                    "installed": "Runner validation did not return installation evidence",
+                    "baseline_clean": "Runner validation did not return workspace evidence",
+                    "discovered": "unsupported",
+                    "read": "unsupported",
+                    "activated": "unsupported",
+                    "followed": "unsupported",
+                },
+            )
+        return SkillActivationEvidence(
+            run_id=run.id,
+            attempt_id=attempt.id,
+            skill_expected=observed.skill_expected,
+            installed=observed.installed,
+            baseline_clean=observed.baseline_clean,
+            installation_method=observed.installation_method,
+            compiled_eval_sha256=observed.compiled_eval_sha256,
+            installed_skill_sha256=observed.installed_skill_sha256,
+            discovered=observed.discovered,
+            read=observed.read,
+            activated=observed.activated,
+            followed=observed.followed,
+            unavailable_reasons=dict(observed.unavailable_reasons),
+        )
+
+    @staticmethod
+    def _security_evidence(
+        run: Run,
+        attempt: RunAttempt,
+        result: SecretScanResult,
+        *,
+        status: Literal["clean", "blocked"],
+    ) -> SecurityScanEvidence:
+        return SecurityScanEvidence(
+            run_id=run.id,
+            attempt_id=attempt.id,
+            status=status,
+            configured_secret_count=result.configured_secret_count,
+            scanned_files=result.scanned_files,
+            scanned_bytes=result.scanned_bytes,
+            matched_secret_names=result.matched_secret_names,
         )
 
     def _advance_run(self, run: Run, status: ExecutionStatus, **updates: Any) -> Run:
@@ -408,9 +559,7 @@ class LocalExperimentExecutor:
         return default
 
     @staticmethod
-    def _measurement(
-        run: Run, attempt: RunAttempt, result: RunnerResult
-    ) -> RunMeasurement:
+    def _measurement(run: Run, attempt: RunAttempt, result: RunnerResult) -> RunMeasurement:
         return RunMeasurement(
             run_id=run.id,
             attempt_id=attempt.id,

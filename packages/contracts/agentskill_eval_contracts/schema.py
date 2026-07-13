@@ -9,6 +9,12 @@ from typing import Dict, Type
 from pydantic import BaseModel, JsonValue
 
 from agentskill_eval_contracts.artifacts import ArtifactManifest
+from agentskill_eval_contracts.evidence import (
+    FrozenInputManifest,
+    ReplayBundleManifest,
+    SecurityScanEvidence,
+    SkillActivationEvidence,
+)
 from agentskill_eval_contracts.experiment import ExperimentManifest, ExperimentVariant, PairBlock
 from agentskill_eval_contracts.measurements import RunMeasurement
 from agentskill_eval_contracts.run import Run, RunAttempt
@@ -23,6 +29,10 @@ SCHEMA_MODELS: Dict[str, Type[BaseModel]] = {
         Run,
         RunAttempt,
         RunMeasurement,
+        FrozenInputManifest,
+        SkillActivationEvidence,
+        SecurityScanEvidence,
+        ReplayBundleManifest,
     )
 }
 

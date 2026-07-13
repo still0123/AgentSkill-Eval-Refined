@@ -273,6 +273,19 @@ def test_content_addressed_blob_store_deduplicates_and_verifies(tmp_path: Path) 
         store.blobs.verify(first)
 
 
+def test_frozen_input_rejects_symlink_root(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "input.txt").write_text("immutable", encoding="utf-8")
+    linked = tmp_path / "linked"
+    linked.symlink_to(source, target_is_directory=True)
+
+    with pytest.raises(ValueError, match="symlink.*root"):
+        LocalExperimentStore(tmp_path / "workspace").freeze_input_tree(
+            uuid4(), "case_source", uuid4(), linked
+        )
+
+
 def test_commit_attempt_persists_evidence_before_run_pointer_and_indexes_it(
     tmp_path: Path,
 ) -> None:

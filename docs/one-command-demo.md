@@ -54,3 +54,15 @@ Dataset 与 smoke grader 仍不支持泛化结论，HTML 会显示 `PUBLIC SYNTH
 
 缩小开发 smoke run 时可以指定 `--repeats 1 --bootstrap-resamples 100`。简历或报告中的演示
 应保留预注册默认规模，不应通过反复调整 seed、Case 或 grader 挑选有利结果。
+
+## 导出离线审计证据
+
+完成实验后可用输出中的 `experiment_id` 生成并验证确定性 tar：
+
+```bash
+agentskill-eval experiment bundle \
+  .agentskill-eval/demo EXPERIMENT_UUID /tmp/agentskill-eval-evidence.tar
+agentskill-eval experiment verify-bundle /tmp/agentskill-eval-evidence.tar
+```
+
+该包用于审计和重新分析，不承诺重放外部模型服务端的一次具体生成。

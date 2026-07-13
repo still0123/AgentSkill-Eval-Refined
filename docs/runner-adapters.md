@@ -50,6 +50,10 @@ run-dir/
 6. 固定 `--iteration 1`，避免同一路径重跑后读取错误的 iteration；
 7. 显式下发 `timeout_seconds`、`max_turns` 与产物规则。
 
+`validate` 同时返回可审计的安装证据。baseline 必须同时满足编译配置为 `skills: []` 且 `skills/selected` 不存在；treatment 必须满足配置精确指向 `skills/selected`、目录和 `SKILL.md` 存在，并记录编译配置与 Skill 树哈希。Mock Runner 不具备安装能力，因此相关字段为 unsupported，而不会伪造成功。
+
+“Skill 已安装”不等于“Agent 已发现、读取、激活或遵循 Skill”。适配器只有在上游提供直接事件时才能填充这些阶段；`skill-up v0.5.0` 当前不暴露相应事件，所以证据记录明确的 unavailable reason。
+
 编译后的 `eval.yaml` 使用 JSON 文本。JSON 是合法 YAML 1.2，因此无需在平台引入另一套 YAML 序列化依赖。
 
 ## 进程与安全边界
@@ -58,7 +62,7 @@ Runner 使用独立进程组启动。超时或取消时先发送 `SIGTERM`，宽
 
 每次运行使用独立的 `HOME`、`XDG_CONFIG_HOME`、`XDG_CACHE_HOME` 和 `TMPDIR`。凭据只能通过 `RunnerRequest.secret_env` 传入，且该字段不会出现在对象 repr 中；调用者不能覆盖平台管理的 HOME、PATH 与临时目录变量。stdout、stderr 和配置中不得主动写入 Secret。
 
-产物采集只遍历 Runner 输出根目录，拒绝符号链接，并对每个普通文件计算 SHA-256 和大小。后续存储层再依据 Artifact Policy 做敏感信息分类与内容寻址持久化。
+产物采集只遍历 Runner 输出根目录，拒绝符号链接，并对每个普通文件计算 SHA-256 和大小。平台先把 stdout、stderr 和所有产物作为一个批次执行精确 Secret 字节扫描；只有整个批次洁净才写入 Blob/Manifest。命中时只保存 Secret 环境变量名称和计数，不保存值或污染内容。
 
 ## 兼容测试
 

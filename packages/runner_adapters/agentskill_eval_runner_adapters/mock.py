@@ -13,6 +13,7 @@ from agentskill_eval_runner_adapters.contracts import (
     RunnerEvent,
     RunnerRequest,
     RunnerResult,
+    RunnerSkillEvidence,
     RunnerStatus,
     TraceEventSink,
     ValidationReport,
@@ -48,7 +49,24 @@ class MockRunnerAdapter:
             errors.append("case_file does not exist")
         if request.skill_path is not None and not (request.skill_path / "SKILL.md").is_file():
             errors.append("skill_path does not contain SKILL.md")
-        return ValidationReport(valid=not errors, errors=tuple(errors))
+        return ValidationReport(
+            valid=not errors,
+            errors=tuple(errors),
+            skill_evidence=RunnerSkillEvidence(
+                skill_expected=request.skill_path is not None,
+                installed=None,
+                baseline_clean=None,
+                installation_method="unsupported_by_mock_runner",
+                unavailable_reasons={
+                    "installed": "MockRunnerAdapter does not install Skills",
+                    "baseline_clean": "MockRunnerAdapter does not compile an Agent workspace",
+                    "discovered": "unsupported by MockRunnerAdapter",
+                    "read": "unsupported by MockRunnerAdapter",
+                    "activated": "unsupported by MockRunnerAdapter",
+                    "followed": "unsupported by MockRunnerAdapter",
+                },
+            ),
+        )
 
     async def execute(
         self, request: RunnerRequest, event_sink: TraceEventSink = null_event_sink

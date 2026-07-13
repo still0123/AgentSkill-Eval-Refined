@@ -63,6 +63,22 @@ class ValidationReport:
     stdout: str = ""
     stderr: str = ""
     errors: Tuple[str, ...] = ()
+    skill_evidence: Optional["RunnerSkillEvidence"] = None
+
+
+@dataclass(frozen=True)
+class RunnerSkillEvidence:
+    skill_expected: bool
+    installed: Optional[bool]
+    baseline_clean: Optional[bool]
+    installation_method: str
+    compiled_eval_sha256: Optional[str] = None
+    installed_skill_sha256: Optional[str] = None
+    discovered: Optional[bool] = None
+    read: Optional[bool] = None
+    activated: Optional[bool] = None
+    followed: Optional[bool] = None
+    unavailable_reasons: Mapping[str, str] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)

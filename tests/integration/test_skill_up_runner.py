@@ -238,6 +238,18 @@ def test_paired_executor_runs_both_arms_with_real_skill_up(tmp_path: Path) -> No
         for run in block.runs:
             assert layout.artifact_manifest(run.id, 1).is_file()
             assert (layout.raw_runner(run.id, 1) / "result.json").is_file()
+            activation = store.load_activation_evidence(experiment_id, run.id, 1)
+            security = store.load_security_scan(experiment_id, run.id, 1)
+            if run.variant_id == baseline.id:
+                assert activation.skill_expected is False
+                assert activation.installed is False
+                assert activation.baseline_clean is True
+            else:
+                assert activation.skill_expected is True
+                assert activation.installed is True
+                assert activation.installed_skill_sha256 is not None
+            assert activation.compiled_eval_sha256 is not None
+            assert security.status == "clean"
 
     statistics = ExperimentAnalyzer(store).analyze(
         experiment_id,

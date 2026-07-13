@@ -2,7 +2,7 @@
 
 AgentSkill-Eval 是一个面向 Agent Skill 的可复现评测与回归分析项目。平台以受控配对实验为核心，比较同一 Agent 在 without-Skill、with-Skill 或不同 Skill 版本下的任务质量、成本、时延与稳定性。
 
-当前仓库已完成 **P0 目标 1～8：Python 项目初始化、核心数据契约、本地可靠存储、Runner 防腐层、本地配对实验编排、可信统计报告、12 Case Demo Dataset 及一键 72 Run 演示**。目前提供冻结领域模型、原子 Manifest、内容寻址 Blob、Mock/`skill-up v0.5.0` Adapter、确定性 PairBlock 执行、RunMeasurement、group/case 层级统计、W/T/L、invalid 双口径、效率指标、安全离线 HTML，以及严格可寻址的 Python 代码审查演示集。完整设计见 [开发设计文档](./AgentSkillEval_%E5%BC%80%E5%8F%91%E8%AE%BE%E8%AE%A1%E6%96%87%E6%A1%A3_v1.0.md)。
+当前仓库已完成 **P0 目标 1～9**：Python 项目初始化、核心数据契约、本地可靠存储、Runner 防腐层、本地配对实验编排、可信统计报告、12 Case Demo Dataset、一键 72 Run 演示，以及可信证据/审计包。平台在执行前冻结 Case 与 Skill 输入；逐 Attempt 保存 Skill 安装或 baseline 洁净证据；在任何 Runner 输出持久化前执行精确 Secret 扫描；并能生成确定性的离线审计与再分析包。完整设计见 [开发设计文档](./AgentSkillEval_%E5%BC%80%E5%8F%91%E8%AE%BE%E8%AE%A1%E6%96%87%E6%A1%A3_v1.0.md)。
 
 ## 环境要求
 
@@ -27,6 +27,8 @@ agentskill-eval storage recover /path/to/workspace
 agentskill-eval storage rebuild-index /path/to/workspace EXPERIMENT_UUID
 agentskill-eval report generate /path/to/workspace EXPERIMENT_UUID \
   --control CONTROL_VARIANT_UUID --treatment TREATMENT_VARIANT_UUID
+agentskill-eval experiment bundle /path/to/workspace EXPERIMENT_UUID /tmp/evidence.tar
+agentskill-eval experiment verify-bundle /tmp/evidence.tar
 ```
 
 ## 本地验证
@@ -68,6 +70,10 @@ tests/                    unit / integration / e2e
 - `RunAttempt`：记录物理尝试、lease generation、fencing token、错误和 observed environment fingerprint。
 - `ArtifactManifest`：保存内容哈希、大小、媒体类型和敏感级别，拒绝绝对路径、路径穿越及非规范路径。
 - `ExperimentManifest`：冻结数据集、协议、统计计划、预算和 Variant 引用。
+- `FrozenInputManifest`：冻结执行实际读取的 Case/Fixture/Skill 文件清单、逐文件哈希和树哈希。
+- `SkillActivationEvidence`：区分预期安装、已观测安装、baseline 洁净与上游不支持观测的行为阶段。
+- `SecurityScanEvidence`：只记录扫描器版本、计数、状态和命中的 Secret 变量名，不记录 Secret 值。
+- `ReplayBundleManifest`：冻结离线审计与再分析包的成员集合、大小和 SHA-256。
 
 ## P0 本地存储保证
 
@@ -97,6 +103,8 @@ tests/                    unit / integration / e2e
 - Experiment 引用、Variant 指纹、运行时配置和预算在执行前做一致性检查。
 - Run 与 Attempt 分别持久化生命周期，任务失败和基础设施 invalid 使用不同终态。
 - Runner 原始产物复制前复验路径、大小和 SHA-256，并同步写入内容寻址对象存储。
+- 每个 Case source 与 treatment Skill 在计划持久化时复制到不可变输入区；后续修改原目录不会改变执行输入。
+- Runner stdout、stderr 和产物先在内存中完成精确 Secret 扫描；发现命中即阻断整个输出批次，避免部分泄漏。
 - 已完成 Run 可幂等重放，不会再次调用 Agent；崩溃后的未终态 Run 只报告、不静默重复计费。
 - 真实集成测试使用 `skill-up` Custom Engine 跑完整 baseline/treatment 两臂，无需模型凭据。
 
@@ -136,6 +144,16 @@ agentskill-eval demo run --workspace .agentskill-eval/demo
 模拟结果在 Manifest、JSON 和 HTML 中强制标记，不能作为性能证据。真实模式需要显式选择
 `--mode skill-up`、指定 Engine/Secret，并传入 `--confirm-real-run`，防止误消耗额度。详见
 [一条命令运行 P0 配对实验](./docs/one-command-demo.md)。
+
+## 可信证据与审计包
+
+- 真实 `skill-up` Adapter 对 baseline 验证 `skills: []` 且无 selected Skill 目录；对 treatment 验证配置、`SKILL.md` 与安装树哈希。
+- `discovered/read/activated/followed` 只有在 Runner 提供直接事件时才记录；当前 `skill-up v0.5.0` 不暴露这些事件，报告明确标为 unsupported，绝不由“已安装”推断“已遵循”。
+- 审计包包含 Manifest 真值、冻结输入、逐 Attempt 原始证据与静态报告；排除 SQLite 查询缓存、锁文件和临时文件。
+- 同一实验生成的未压缩 tar 字节确定一致，校验器拒绝路径穿越、重复成员、非普通文件及大小/哈希不匹配。
+- 审计包支持离线审查、恢复 Manifest 和重新运行统计；它不包含外部 Provider 的服务端状态，因此不承诺逐 Token 重放一次外部模型请求。
+
+详细协议见 [执行证据、安全扫描与审计包](./docs/evidence-and-replay.md)。
 
 ## 开发原则
 

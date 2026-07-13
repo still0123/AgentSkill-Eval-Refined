@@ -4,8 +4,16 @@ import asyncio
 import json
 from pathlib import Path
 
+import pytest
+
 from agentskill_eval_benchmark_gen import DemoExperimentRunner, DemoRunConfig
-from agentskill_eval_experiment import AnalysisConfig, ExperimentAnalyzer, LocalExperimentStore
+from agentskill_eval_experiment import (
+    AnalysisConfig,
+    BundleError,
+    ExperimentAnalyzer,
+    LocalExperimentStore,
+    ReplayBundleWriter,
+)
 
 ROOT = Path(__file__).resolve().parents[2]
 DATASET = ROOT / "examples/datasets/python-review-demo"
@@ -60,3 +68,23 @@ def test_mock_demo_runs_72_logical_runs_and_writes_labeled_reports(tmp_path: Pat
     assert "not Agent or Skill performance evidence" in html
     bundle = json.loads(result.report_paths.json_path.read_text(encoding="utf-8"))
     assert bundle["experiment"]["protocol_snapshot"]["demo_only"] is True
+
+    first_bundle = ReplayBundleWriter(store).write(result.experiment_id, tmp_path / "first.tar")
+    second_bundle = ReplayBundleWriter(store).write(result.experiment_id, tmp_path / "second.tar")
+    assert first_bundle.path.read_bytes() == second_bundle.path.read_bytes()
+    verified = ReplayBundleWriter.verify(first_bundle.path)
+    assert verified == first_bundle.manifest
+    paths = {entry.path for entry in verified.files}
+    assert any("/inputs/case_source/" in path for path in paths)
+    assert any(path.endswith("/reports/report.json") for path in paths)
+    assert not any("index.sqlite" in path or path.endswith("run.lock") for path in paths)
+
+    corrupted = bytearray(first_bundle.path.read_bytes())
+    marker = b"SIMULATED DEMO"
+    offset = corrupted.find(marker)
+    assert offset >= 0
+    corrupted[offset] ^= 1
+    tampered = tmp_path / "tampered.tar"
+    tampered.write_bytes(corrupted)
+    with pytest.raises(BundleError, match="digest mismatch"):
+        ReplayBundleWriter.verify(tampered)

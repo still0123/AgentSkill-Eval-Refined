@@ -21,6 +21,7 @@ from agentskill_eval_experiment import (
     ExecutionRecord,
     ExperimentAnalyzer,
     LocalExperimentStore,
+    ReplayBundleWriter,
     StaticReportWriter,
 )
 
@@ -40,6 +41,8 @@ dataset_app = typer.Typer(help="Validate and inspect curated evaluation datasets
 app.add_typer(dataset_app, name="dataset")
 demo_app = typer.Typer(help="Run the service-free P0 demonstration experiment.")
 app.add_typer(demo_app, name="demo")
+experiment_app = typer.Typer(help="Package and inspect persisted experiments.")
+app.add_typer(experiment_app, name="experiment")
 
 
 def _version_callback(value: bool) -> None:
@@ -102,6 +105,54 @@ def validate_dataset(
     )
 
 
+@experiment_app.command("bundle")
+def bundle_experiment(
+    workspace: Path = typer.Argument(  # noqa: B008
+        ..., exists=True, file_okay=False, help="AgentSkill-Eval workspace root."
+    ),
+    experiment_id: UUID = typer.Argument(..., help="Experiment UUID."),  # noqa: B008
+    destination: Path = typer.Argument(  # noqa: B008
+        ..., dir_okay=False, help="Destination deterministic .tar file."
+    ),
+) -> None:
+    """Create an audit/reanalysis bundle without external runtime state."""
+    result = ReplayBundleWriter(LocalExperimentStore(workspace)).write(experiment_id, destination)
+    typer.echo(
+        json.dumps(
+            {
+                "bundle": str(result.path),
+                "bundle_sha256": result.manifest.bundle_sha256,
+                "experiment_id": str(result.manifest.experiment_id),
+                "file_count": len(result.manifest.files),
+                "scope": result.manifest.scope,
+            },
+            sort_keys=True,
+        )
+    )
+
+
+@experiment_app.command("verify-bundle")
+def verify_experiment_bundle(
+    bundle: Path = typer.Argument(  # noqa: B008
+        ..., exists=True, dir_okay=False, help="Replay bundle to verify."
+    ),
+) -> None:
+    """Verify member safety, file set, sizes, and SHA-256 digests."""
+    manifest = ReplayBundleWriter.verify(bundle)
+    typer.echo(
+        json.dumps(
+            {
+                "bundle_sha256": manifest.bundle_sha256,
+                "experiment_id": str(manifest.experiment_id),
+                "file_count": len(manifest.files),
+                "scope": manifest.scope,
+                "valid": True,
+            },
+            sort_keys=True,
+        )
+    )
+
+
 @demo_app.command("run")
 def run_demo(
     workspace: Path = typer.Option(  # noqa: B008
@@ -159,6 +210,7 @@ def run_demo(
             "skill-up mode may consume Agent quota; pass --confirm-real-run explicitly",
             param_hint="--confirm-real-run",
         )
+
     def progress(record: ExecutionRecord, completed: int, total: int) -> None:
         outcome = record.evaluation_outcome.value if record.evaluation_outcome else "none"
         typer.echo(

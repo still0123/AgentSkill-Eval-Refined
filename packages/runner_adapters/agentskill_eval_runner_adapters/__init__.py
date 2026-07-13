@@ -4,6 +4,7 @@ from agentskill_eval_runner_adapters.compiler import (
     CompilationError,
     CompiledEvaluation,
     compile_evaluation,
+    inspect_compiled_skill,
 )
 from agentskill_eval_runner_adapters.contracts import (
     ArtifactObservation,
@@ -14,6 +15,7 @@ from agentskill_eval_runner_adapters.contracts import (
     RunnerEvent,
     RunnerRequest,
     RunnerResult,
+    RunnerSkillEvidence,
     RunnerStatus,
     ValidationReport,
 )
@@ -43,10 +45,12 @@ __all__ = [
     "RunnerEvent",
     "RunnerRequest",
     "RunnerResult",
+    "RunnerSkillEvidence",
     "RunnerStatus",
     "SkillUpRunnerAdapter",
     "ValidationReport",
     "compile_evaluation",
+    "inspect_compiled_skill",
     "discover_skill_up_binary",
     "parse_skill_up_result",
 ]

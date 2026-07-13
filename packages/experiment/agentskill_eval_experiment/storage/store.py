@@ -2,24 +2,30 @@
 
 from __future__ import annotations
 
+import hashlib
+import mimetypes
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Tuple, Type, TypeVar
+from typing import Dict, Iterable, List, Literal, Optional, Tuple, Type, TypeVar
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel
 
 from agentskill_eval_contracts import (
+    ArtifactEntry,
     ArtifactManifest,
     AttemptStatus,
     ExecutionStatus,
     ExperimentManifest,
     ExperimentVariant,
+    FrozenInputManifest,
     PairBlock,
     Run,
     RunAttempt,
     RunMeasurement,
+    SecurityScanEvidence,
+    SkillActivationEvidence,
     validate_attempt_transition,
     validate_run_transition,
 )
@@ -61,10 +67,13 @@ KNOWN_MANIFEST_MODELS: Dict[str, Type[BaseModel]] = {
         ArtifactManifest,
         ExperimentManifest,
         ExperimentVariant,
+        FrozenInputManifest,
         PairBlock,
         Run,
         RunAttempt,
         RunMeasurement,
+        SecurityScanEvidence,
+        SkillActivationEvidence,
     )
 }
 
@@ -97,6 +106,17 @@ class ExperimentLayout:
     def reports(self) -> Path:
         return self.root / "reports"
 
+    def frozen_input_root(self, input_kind: str, owner_id: UUID) -> Path:
+        if input_kind not in {"case_source", "skill"}:
+            raise ValueError("unknown frozen input kind")
+        return self.root / "inputs" / input_kind / str(owner_id)
+
+    def frozen_input_files(self, input_kind: str, owner_id: UUID) -> Path:
+        return self.frozen_input_root(input_kind, owner_id) / "files"
+
+    def frozen_input_manifest(self, input_kind: str, owner_id: UUID) -> Path:
+        return self.frozen_input_root(input_kind, owner_id) / "manifest.json"
+
     def variant(self, variant_id: UUID) -> Path:
         return self.root / "variants" / f"{variant_id}.json"
 
@@ -125,6 +145,12 @@ class ExperimentLayout:
 
     def measurement(self, run_id: UUID, attempt_no: int) -> Path:
         return self.attempt_root(run_id, attempt_no) / "measurement.json"
+
+    def activation_evidence(self, run_id: UUID, attempt_no: int) -> Path:
+        return self.attempt_root(run_id, attempt_no) / "skill-activation.json"
+
+    def security_scan(self, run_id: UUID, attempt_no: int) -> Path:
+        return self.attempt_root(run_id, attempt_no) / "security-scan.json"
 
     def raw_runner(self, run_id: UUID, attempt_no: int) -> Path:
         path = self.attempt_root(run_id, attempt_no) / "raw-runner"
@@ -158,6 +184,76 @@ class LocalExperimentStore:
     def load_variant(self, experiment_id: UUID, variant_id: UUID) -> ExperimentVariant:
         layout = ExperimentLayout(self.workspace, experiment_id)
         return self._load_model(layout.variant(variant_id), ExperimentVariant)
+
+    def freeze_input_tree(
+        self,
+        experiment_id: UUID,
+        input_kind: Literal["case_source", "skill"],
+        owner_id: UUID,
+        source: Path,
+    ) -> FrozenInputManifest:
+        """Copy a symlink-free input tree before any external execution starts."""
+        layout = ExperimentLayout(self.workspace, experiment_id)
+        if source.is_symlink():
+            raise ValueError(f"symlink is not allowed as frozen input root: {source}")
+        source = source.resolve(strict=True)
+        if not source.is_dir():
+            raise ValueError("frozen input source must be a directory")
+        content_by_path: Dict[str, bytes] = {}
+        entries = []
+        for path in sorted(source.rglob("*")):
+            if path.is_symlink():
+                raise ValueError(f"symlink is not allowed in frozen input: {path}")
+            if not path.is_file():
+                continue
+            relative = path.relative_to(source).as_posix()
+            content = path.read_bytes()
+            content_by_path[relative] = content
+            entries.append(
+                ArtifactEntry(
+                    path=relative,
+                    sha256=hashlib.sha256(content).hexdigest(),
+                    size_bytes=len(content),
+                    media_type=mimetypes.guess_type(relative)[0] or "application/octet-stream",
+                )
+            )
+        if not entries:
+            raise ValueError("frozen input source must contain at least one file")
+        manifest = FrozenInputManifest(
+            experiment_id=experiment_id,
+            input_kind=input_kind,
+            owner_id=owner_id,
+            files=tuple(entries),
+        )
+        manifest_path = layout.frozen_input_manifest(input_kind, owner_id)
+        if manifest_path.exists():
+            current = self._load_model(manifest_path, FrozenInputManifest)
+            if current != manifest:
+                raise ImmutableManifestError("frozen input source changed after persistence")
+            return current
+        destination = layout.frozen_input_files(input_kind, owner_id)
+        for relative, content in content_by_path.items():
+            self.blobs.put_bytes(content)
+            self.writer.write(destination / relative, content)
+        self._write_model(
+            layout,
+            manifest_path,
+            manifest,
+            immutable=True,
+            entity_id=str(owner_id),
+        )
+        return manifest
+
+    def load_frozen_input(
+        self,
+        experiment_id: UUID,
+        input_kind: Literal["case_source", "skill"],
+        owner_id: UUID,
+    ) -> FrozenInputManifest:
+        layout = ExperimentLayout(self.workspace, experiment_id)
+        return self._load_model(
+            layout.frozen_input_manifest(input_kind, owner_id), FrozenInputManifest
+        )
 
     def list_variants(self, experiment_id: UUID) -> Tuple[ExperimentVariant, ...]:
         layout = ExperimentLayout(self.workspace, experiment_id)
@@ -201,13 +297,10 @@ class LocalExperimentStore:
     def list_runs(self, experiment_id: UUID) -> Tuple[Run, ...]:
         layout = ExperimentLayout(self.workspace, experiment_id)
         return tuple(
-            self._load_model(path, Run)
-            for path in sorted(layout.root.glob("runs/*/run.json"))
+            self._load_model(path, Run) for path in sorted(layout.root.glob("runs/*/run.json"))
         )
 
-    def load_selected_measurement(
-        self, experiment_id: UUID, run: Run
-    ) -> Optional[RunMeasurement]:
+    def load_selected_measurement(self, experiment_id: UUID, run: Run) -> Optional[RunMeasurement]:
         attempt = self.load_selected_attempt(experiment_id, run)
         if attempt is None:
             return None
@@ -217,9 +310,7 @@ class LocalExperimentStore:
             return None
         return self._load_model(measurement_path, RunMeasurement)
 
-    def load_selected_attempt(
-        self, experiment_id: UUID, run: Run
-    ) -> Optional[RunAttempt]:
+    def load_selected_attempt(self, experiment_id: UUID, run: Run) -> Optional[RunAttempt]:
         if run.active_attempt_id is None:
             return None
         layout = ExperimentLayout(self.workspace, experiment_id)
@@ -251,9 +342,7 @@ class LocalExperimentStore:
                 validate_attempt_transition(current.status, attempt.status)
         self._write_model(layout, path, attempt, immutable=False)
 
-    def load_attempt(
-        self, experiment_id: UUID, run_id: UUID, attempt_no: int
-    ) -> RunAttempt:
+    def load_attempt(self, experiment_id: UUID, run_id: UUID, attempt_no: int) -> RunAttempt:
         layout = ExperimentLayout(self.workspace, experiment_id)
         return self._load_model(layout.attempt(run_id, attempt_no), RunAttempt)
 
@@ -299,12 +388,64 @@ class LocalExperimentStore:
         layout = ExperimentLayout(self.workspace, experiment_id)
         return self._load_model(layout.measurement(run_id, attempt_no), RunMeasurement)
 
+    def save_activation_evidence(
+        self,
+        experiment_id: UUID,
+        run_id: UUID,
+        attempt_no: int,
+        evidence: SkillActivationEvidence,
+    ) -> None:
+        if evidence.run_id != run_id:
+            raise ValueError("activation evidence run_id must match run_id")
+        layout = ExperimentLayout(self.workspace, experiment_id)
+        self._write_model(
+            layout,
+            layout.activation_evidence(run_id, attempt_no),
+            evidence,
+            immutable=True,
+            entity_id=str(evidence.attempt_id),
+        )
+
+    def load_activation_evidence(
+        self, experiment_id: UUID, run_id: UUID, attempt_no: int
+    ) -> SkillActivationEvidence:
+        layout = ExperimentLayout(self.workspace, experiment_id)
+        return self._load_model(
+            layout.activation_evidence(run_id, attempt_no), SkillActivationEvidence
+        )
+
+    def save_security_scan(
+        self,
+        experiment_id: UUID,
+        run_id: UUID,
+        attempt_no: int,
+        evidence: SecurityScanEvidence,
+    ) -> None:
+        if evidence.run_id != run_id:
+            raise ValueError("security evidence run_id must match run_id")
+        layout = ExperimentLayout(self.workspace, experiment_id)
+        self._write_model(
+            layout,
+            layout.security_scan(run_id, attempt_no),
+            evidence,
+            immutable=True,
+            entity_id=str(evidence.attempt_id),
+        )
+
+    def load_security_scan(
+        self, experiment_id: UUID, run_id: UUID, attempt_no: int
+    ) -> SecurityScanEvidence:
+        layout = ExperimentLayout(self.workspace, experiment_id)
+        return self._load_model(layout.security_scan(run_id, attempt_no), SecurityScanEvidence)
+
     def commit_attempt(
         self,
         run: Run,
         attempt: RunAttempt,
         artifacts: Optional[ArtifactManifest] = None,
         measurement: Optional[RunMeasurement] = None,
+        activation_evidence: Optional[SkillActivationEvidence] = None,
+        security_scan: Optional[SecurityScanEvidence] = None,
     ) -> Run:
         """Persist a terminal Attempt before atomically advancing its Run pointer."""
         if attempt.run_id != run.id:
@@ -317,6 +458,10 @@ class LocalExperimentStore:
             raise ValueError("attempt lease_generation must match the Run generation")
         if measurement is not None and measurement.attempt_id != attempt.id:
             raise ValueError("measurement.attempt_id must match attempt.id")
+        if activation_evidence is not None and activation_evidence.attempt_id != attempt.id:
+            raise ValueError("activation evidence attempt_id must match attempt.id")
+        if security_scan is not None and security_scan.attempt_id != attempt.id:
+            raise ValueError("security scan attempt_id must match attempt.id")
 
         attempt_envelope = envelope_for_model(attempt)
         self.save_attempt(run.experiment_id, attempt)
@@ -327,6 +472,12 @@ class LocalExperimentStore:
                 attempt.attempt_no,
                 measurement,
             )
+        if activation_evidence is not None:
+            self.save_activation_evidence(
+                run.experiment_id, run.id, attempt.attempt_no, activation_evidence
+            )
+        if security_scan is not None:
+            self.save_security_scan(run.experiment_id, run.id, attempt.attempt_no, security_scan)
         if artifacts is not None:
             self.save_artifact_manifest(
                 run.experiment_id,
@@ -463,11 +614,14 @@ class LocalExperimentStore:
     def _manifest_paths(layout: ExperimentLayout) -> Iterable[Path]:
         patterns = (
             "experiment.json",
+            "inputs/*/*/manifest.json",
             "variants/*.json",
             "pair-blocks/*.json",
             "runs/*/run.json",
             "runs/*/attempts/*/attempt.json",
             "runs/*/attempts/*/measurement.json",
+            "runs/*/attempts/*/skill-activation.json",
+            "runs/*/attempts/*/security-scan.json",
             "runs/*/attempts/*/artifacts/manifest.json",
             "runs/*/grading/*.json",
         )

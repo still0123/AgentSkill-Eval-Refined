@@ -9,6 +9,9 @@ workspace/
 ├── experiments/{experiment_id}/
 │   ├── experiment.json
 │   ├── variants/{variant_id}.json
+│   ├── inputs/{case_source|skill}/{owner_id}/
+│   │   ├── manifest.json
+│   │   └── files/...
 │   ├── pair-blocks/{block_id}.json
 │   ├── runs/{run_id}/
 │   │   ├── run.json
@@ -16,6 +19,8 @@ workspace/
 │   │   └── attempts/{attempt_no}/
 │   │       ├── attempt.json
 │   │       ├── measurement.json
+│   │       ├── skill-activation.json
+│   │       ├── security-scan.json
 │   │       ├── raw-runner/
 │   │       └── artifacts/manifest.json
 │   ├── reports/report.json
@@ -55,10 +60,15 @@ Attempt 提交额外遵循：
 1. 验证 Run ID、终态和 lease generation；
 2. 将 `attempt.json` 推进到终态，终态后禁止修改；
 3. 写入与 Attempt ID 绑定的不可变 `measurement.json`；
-4. 写入不可变 Artifact Manifest；
-5. 最后更新 `run.json` 的 active Attempt 和 selected Attempt hash。
+4. 写入不可变 `skill-activation.json` 与 `security-scan.json`；
+5. 写入不可变 Artifact Manifest；
+6. 最后更新 `run.json` 的 active Attempt 和 selected Attempt hash。
 
-因此，第五步前崩溃只会留下可审计的物理 Attempt 和证据，不会让逻辑 Run 指向半写入结果。`reports/` 是可重建派生视图，不属于提交真值链。
+因此，第六步前崩溃只会留下可审计的物理 Attempt 和证据，不会让逻辑 Run 指向半写入结果。`reports/` 是可重建派生视图，不属于提交真值链。
+
+## 冻结执行输入
+
+计划持久化先复制每个 Case source 和 treatment Skill，再创建可执行 Run。输入树拒绝根目录或内部符号链接；每个普通文件写入内容寻址对象库，并由 `FrozenInputManifest` 保存规范相对路径、大小、媒体类型、SHA-256 和树哈希。Executor 只把冻结路径交给 Runner，因此实验创建后修改原始 Dataset 或 Skill 不会悄悄改变执行内容。
 
 ## 启动恢复
 

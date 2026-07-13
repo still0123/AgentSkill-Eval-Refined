@@ -93,9 +93,7 @@ class LocalExperimentPlanner:
             raise ValueError("an experiment requires at least one case")
         case_ids = [case.id for case in cases]
         runner_case_ids = [case.runner_case_id for case in cases]
-        if len(case_ids) != len(set(case_ids)) or len(runner_case_ids) != len(
-            set(runner_case_ids)
-        ):
+        if len(case_ids) != len(set(case_ids)) or len(runner_case_ids) != len(set(runner_case_ids)):
             raise ValueError("case IDs and runner_case_ids must be unique")
 
         variant_by_id = {variant.id: variant for variant in variants}
@@ -164,6 +162,20 @@ class LocalExperimentPlanner:
 
     def persist(self, plan: PlannedExperiment) -> None:
         self.store.save_experiment(plan.experiment)
+        frozen_cases = set()
+        for planned_block in plan.blocks:
+            case = planned_block.case
+            if case.id in frozen_cases:
+                continue
+            self.store.freeze_input_tree(
+                plan.experiment.id, "case_source", case.id, case.source_eval_dir
+            )
+            frozen_cases.add(case.id)
+        for runtime in plan.runtime_specs:
+            if runtime.skill_path is not None and runtime.skill_path.is_dir():
+                self.store.freeze_input_tree(
+                    plan.experiment.id, "skill", runtime.variant_id, runtime.skill_path
+                )
         for variant in plan.variants:
             self.store.save_variant(variant)
         for planned_block in plan.blocks:

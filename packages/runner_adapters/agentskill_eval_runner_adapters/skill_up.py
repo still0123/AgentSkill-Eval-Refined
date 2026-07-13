@@ -8,7 +8,11 @@ import shutil
 from pathlib import Path
 from typing import Mapping, Optional
 
-from agentskill_eval_runner_adapters.compiler import CompilationError, compile_evaluation
+from agentskill_eval_runner_adapters.compiler import (
+    CompilationError,
+    compile_evaluation,
+    inspect_compiled_skill,
+)
 from agentskill_eval_runner_adapters.contracts import (
     CapabilityLevel,
     ExitReason,
@@ -131,6 +135,7 @@ class SkillUpRunnerAdapter:
             stdout=outcome.stdout,
             stderr=outcome.stderr,
             errors=errors,
+            skill_evidence=inspect_compiled_skill(compiled, request),
         )
 
     async def execute(

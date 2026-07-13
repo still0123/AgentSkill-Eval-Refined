@@ -80,7 +80,7 @@ class StaticReportWriter:
             f"<td>{self._percent(case.control_pass_rate)}</td>"
             f"<td>{self._percent(case.treatment_pass_rate)}</td>"
             f"<td>{self._signed_percent(case.absolute_gain)}</td>"
-            f"<td><span class=\"tag {self._class_name(case.classification)}\">"
+            f'<td><span class="tag {self._class_name(case.classification)}">'
             f"{self._escape(case.classification)}</span></td>"
             "</tr>"
             for case in result.cases
@@ -172,7 +172,8 @@ th {{ font-size: .86rem; }} code {{ overflow-wrap: anywhere; }}
 </tr></thead><tbody>{case_rows}</tbody></table></section>
 <section><h2>Evidence</h2><p class="muted">Links are relative to this offline report.</p>
 <table><thead><tr><th>Run</th><th>Variant</th><th>Outcome</th>
-<th>Attempt</th><th>Artifacts</th><th>Raw result</th></tr></thead>
+<th>Attempt</th><th>Skill installed</th><th>Baseline clean</th><th>Secret scan</th>
+<th>Artifacts</th><th>Raw result</th></tr></thead>
 <tbody>{evidence_rows}</tbody></table></section>
 <footer class="muted"><p>No external resources or scripts.
 Machine-readable evidence: <code>report.json</code>.</p></footer>
@@ -218,32 +219,32 @@ Machine-readable evidence: <code>report.json</code>.</p></footer>
         ci = ""
         if interval is not None:
             ci = (
-                f"<div class=\"muted\">95% CI {self._percent(interval.low)}–"
+                f'<div class="muted">95% CI {self._percent(interval.low)}–'
                 f"{self._percent(interval.high)}</div>"
             )
         return (
-            f"<div class=\"card\"><div>{self._escape(label)}</div>"
-            f"<div class=\"value\">{formatted}</div>{ci}</div>"
+            f'<div class="card"><div>{self._escape(label)}</div>'
+            f'<div class="value">{formatted}</div>{ci}</div>'
         )
 
     def _efficiency_row(self, label: str, metric: EfficiencyComparison) -> str:
         overhead = self._signed_percent(metric.relative_overhead)
         if metric.relative_overhead_ci is not None:
             overhead += (
-                f"<div class=\"muted\">95% CI "
+                f'<div class="muted">95% CI '
                 f"{self._signed_percent(metric.relative_overhead_ci.low)}–"
                 f"{self._signed_percent(metric.relative_overhead_ci.high)}</div>"
             )
         paired_delta = self._signed_number(metric.paired_median_delta)
         if metric.paired_median_delta_ci is not None:
             paired_delta += (
-                f"<div class=\"muted\">95% CI "
+                f'<div class="muted">95% CI '
                 f"{self._signed_number(metric.paired_median_delta_ci.low)}–"
                 f"{self._signed_number(metric.paired_median_delta_ci.high)}</div>"
             )
         return (
             "<tr>"
-            f"<td>{self._escape(label)} <span class=\"muted\">"
+            f'<td>{self._escape(label)} <span class="muted">'
             f"({self._escape(metric.unit)})</span></td>"
             f"<td>{self._number(metric.control_mean)}</td>"
             f"<td>{self._number(metric.treatment_mean)}</td>"
@@ -261,6 +262,8 @@ Machine-readable evidence: <code>report.json</code>.</p></footer>
                 continue
             prefix = f"../runs/{run.id}/attempts/{attempt.attempt_no}"
             artifact_path = layout.artifact_manifest(run.id, attempt.attempt_no)
+            activation_path = layout.activation_evidence(run.id, attempt.attempt_no)
+            security_path = layout.security_scan(run.id, attempt.attempt_no)
             raw_result_path = (
                 layout.attempt_root(run.id, attempt.attempt_no) / "raw-runner" / "result.json"
             )
@@ -275,14 +278,41 @@ Machine-readable evidence: <code>report.json</code>.</p></footer>
                 else "N/A"
             )
             outcome = run.evaluation_outcome.value if run.evaluation_outcome else "cancelled"
+            installed = "N/A"
+            baseline_clean = "N/A"
+            if activation_path.is_file():
+                activation = self.store.load_activation_evidence(
+                    experiment_id, run.id, attempt.attempt_no
+                )
+                installed = (
+                    f'<a href="{prefix}/skill-activation.json">'
+                    f"{self._optional_bool(activation.installed)}</a>"
+                )
+                baseline_clean = (
+                    f'<a href="{prefix}/skill-activation.json">'
+                    f"{self._optional_bool(activation.baseline_clean)}</a>"
+                )
+            security = "N/A"
+            if security_path.is_file():
+                scan_status = self._escape(
+                    self.store.load_security_scan(experiment_id, run.id, attempt.attempt_no).status
+                )
+                security = f'<a href="{prefix}/security-scan.json">{scan_status}</a>'
             rows.append(
                 "<tr>"
                 f"<td><code>{self._escape(str(run.id))}</code></td>"
                 f"<td>{self._escape(names.get(run.variant_id, str(run.variant_id)))}</td>"
                 f"<td>{self._escape(outcome)}</td><td>{attempt.attempt_no}</td>"
+                f"<td>{installed}</td><td>{baseline_clean}</td><td>{security}</td>"
                 f"<td>{artifact_link}</td><td>{raw_link}</td></tr>"
             )
         return "".join(rows)
+
+    @staticmethod
+    def _optional_bool(value: Optional[bool]) -> str:
+        if value is None:
+            return "unsupported"
+        return "yes" if value else "no"
 
     @staticmethod
     def _escape(value: str) -> str:

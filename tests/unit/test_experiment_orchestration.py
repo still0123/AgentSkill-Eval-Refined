@@ -170,6 +170,15 @@ def test_planner_is_deterministic_budgeted_and_idempotent(tmp_path: Path) -> Non
     )
     planner.persist(first)
     planner.persist(first)
+    layout = ExperimentLayout(store.workspace, experiment_id)
+    case_manifest = store.load_frozen_input(experiment_id, "case_source", case.id)
+    skill_manifest = store.load_frozen_input(experiment_id, "skill", arms[1].id)
+    assert case_manifest.files
+    assert skill_manifest.files[0].path == "SKILL.md"
+    assert (layout.frozen_input_files("case_source", case.id) / "cases/golden-pass.yaml").is_file()
+    assert (layout.frozen_input_files("skill", arms[1].id) / "SKILL.md").read_text() == (
+        "# Selected\n"
+    )
     for block in first.blocks:
         for run in block.runs:
             persisted = store.load_run(experiment_id, run.id)
@@ -240,11 +249,16 @@ def test_executor_persists_paired_outcomes_attempts_and_order(tmp_path: Path) ->
         run = store.load_run(experiment_id, planned_run.id)
         attempt = store.load_attempt(experiment_id, run.id, 1)
         measurement = store.load_measurement(experiment_id, run.id, 1)
+        activation = store.load_activation_evidence(experiment_id, run.id, 1)
+        security = store.load_security_scan(experiment_id, run.id, 1)
         assert run.execution_status == ExecutionStatus.COMPLETED
         assert run.active_attempt_id == attempt.id
         assert run.selected_attempt_sha256 is not None
         assert attempt.status == AttemptStatus.COMPLETED
         assert measurement.attempt_id == attempt.id
+        assert activation.attempt_id == attempt.id
+        assert activation.installed is None
+        assert security.status == "clean"
         layout = ExperimentLayout(store.workspace, experiment_id)
         assert layout.artifact_manifest(run.id, 1).is_file()
 
@@ -280,3 +294,82 @@ def test_validation_failure_is_invalid_not_task_failure(tmp_path: Path) -> None:
     attempt = store.load_attempt(experiment_id, treatment_run.id, 1)
     assert attempt.status == AttemptStatus.FAILED
     assert attempt.error_code == "runner_validation_failed"
+
+
+def test_executor_uses_frozen_skill_after_original_changes(tmp_path: Path) -> None:
+    store = LocalExperimentStore(tmp_path / "workspace")
+    experiment_id = uuid4()
+    arms = variants(experiment_id)
+    skill = create_skill(tmp_path)
+    planner = LocalExperimentPlanner(store)
+    plan = planner.build(
+        manifest(experiment_id, arms),
+        arms,
+        runtime_specs(arms, skill),
+        [case_spec()],
+        repeats=1,
+        random_seed=11,
+    )
+    planner.persist(plan)
+    (skill / "SKILL.md").write_text("# Mutated after freeze\n", encoding="utf-8")
+
+    summary = asyncio.run(LocalExperimentExecutor(store, MockRunnerAdapter()).execute(plan))
+
+    assert summary.completed_runs == 2
+    frozen = ExperimentLayout(store.workspace, experiment_id).frozen_input_files(
+        "skill", arms[1].id
+    )
+    assert (frozen / "SKILL.md").read_text(encoding="utf-8") == "# Selected\n"
+
+
+def test_secret_in_runner_output_is_blocked_before_any_bytes_are_persisted(
+    tmp_path: Path,
+) -> None:
+    store = LocalExperimentStore(tmp_path / "workspace")
+    experiment_id = uuid4()
+    arms = variants(experiment_id)
+    skill = create_skill(tmp_path)
+    secret = "token-that-must-never-be-persisted"
+    runtimes = (
+        VariantRuntimeSpec(arms[0].id, {"name": "mock"}, {"type": "none"}),
+        VariantRuntimeSpec(
+            arms[1].id,
+            {"name": "mock"},
+            {"type": "none"},
+            skill_path=skill,
+            secret_env={"API_TOKEN": secret},
+        ),
+    )
+    planner = LocalExperimentPlanner(store)
+    plan = planner.build(
+        manifest(experiment_id, arms), arms, runtimes, [case_spec()], repeats=1, random_seed=5
+    )
+    planner.persist(plan)
+    leaking = RunnerResult(
+        execution_id="configured",
+        case_id="golden-pass",
+        status=RunnerStatus.PASS,
+        exit_reason=ExitReason.COMPLETED,
+        process_exit_code=0,
+        stdout=f"leaked={secret}",
+    )
+    results = {f"golden-pass:{arms[1].id}": leaking}
+
+    summary = asyncio.run(LocalExperimentExecutor(store, MockRunnerAdapter(results)).execute(plan))
+
+    treatment_record = next(item for item in summary.records if item.variant_id == arms[1].id)
+    assert treatment_record.execution_status == ExecutionStatus.INFRA_FAILED
+    treatment_run = next(item for item in plan.blocks[0].runs if item.variant_id == arms[1].id)
+    attempt = store.load_attempt(experiment_id, treatment_run.id, 1)
+    scan = store.load_security_scan(experiment_id, treatment_run.id, 1)
+    assert attempt.error_code == "secret_leak_detected"
+    assert scan.status == "blocked"
+    assert scan.matched_secret_names == ("API_TOKEN",)
+    runtime_attempt = (
+        store.workspace / ".runtime" / str(experiment_id) / str(treatment_run.id) / "1"
+    )
+    assert not runtime_attempt.exists()
+    secret_bytes = secret.encode()
+    for path in store.workspace.rglob("*"):
+        if path.is_file():
+            assert secret_bytes not in path.read_bytes(), path
