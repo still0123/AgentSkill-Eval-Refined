@@ -1,0 +1,38 @@
+{
+  "schema_version": "ase/sanitized-project-completion-demo/v1alpha1",
+  "executed_at": "2026-07-14",
+  "simulated": true,
+  "evidence_class": "simulated_fixture",
+  "model_calls": 0,
+  "paid_cost_microusd": 0,
+  "experiment": {
+    "id": "811b9670-254f-4a0a-b591-41355bb9b616",
+    "status": "FROZEN",
+    "code_revision": "p0-demo-v1",
+    "dataset_sha256": "a24a30aacf944a638b95234b4799584ef4388c1c675334e3e14b36663a7810b8",
+    "case_count": 12,
+    "variant_count": 2,
+    "repeats_per_variant": 3,
+    "logical_runs": 72,
+    "completed_runs": 72,
+    "invalid_runs": 0
+  },
+  "statistics": {
+    "baseline_pass_rate": 0.5,
+    "treatment_pass_rate": 0.8333333333333334,
+    "absolute_gain": 0.33333333333333337,
+    "wins": 5,
+    "ties_positive": 5,
+    "ties_negative": 1,
+    "losses": 1,
+    "inference_ready": false,
+    "inference_note": "descriptive only: too few independent groups"
+  },
+  "audit_bundle": {
+    "sha256": "f9a7292e02bb84d78bab7af8bc27f9bd22f748170b7b6e5116ba69a9ae66b448",
+    "file_count": 980,
+    "scope": "audit_and_reanalysis",
+    "valid": true
+  },
+  "claim_limit": "Deterministic simulated demo evidence only; no Agent or Skill performance claim."
+}

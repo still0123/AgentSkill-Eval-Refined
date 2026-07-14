@@ -272,6 +272,8 @@ docs/                    模块级设计和操作文档
 
 | 我想了解…… | 文档 |
 |---|---|
+| 当前完成状态与证据边界 | [Project Completion Status](./docs/project-completion-status.md) |
+| 五分钟答辩与面试问答 | [Portfolio Demo and Interview Guide](./docs/portfolio-demo-and-interview-guide.md) |
 | 整体架构、阶段和数据设计 | [开发设计文档](./AgentSkillEval_%E5%BC%80%E5%8F%91%E8%AE%BE%E8%AE%A1%E6%96%87%E6%A1%A3_v1.0.md) |
 | 一条命令运行演示 | [One-command Demo](./docs/one-command-demo.md) |
 | 本地存储、恢复和幂等 | [Local Storage](./docs/local-storage.md) |
@@ -285,6 +287,7 @@ docs/                    模块级设计和操作文档
 | 受审计的 Process 候选生成 | [Process Skill Proposal Generator](./docs/audited-process-skill-proposal-generator.md) |
 | 真实失败证据桥接 | [Observed Failure Evidence Bridge](./docs/observed-failure-evidence-bridge.md) |
 | 真实 Agent 评测 | [Real Agent Evidence](./docs/real-agent-evidence.md) |
+| Skill 演化证据发布 CLI | [Evolution Evidence Release](./docs/evolution-evidence-release-cli.md) |
 | MCP / Memory-RAG 专项 Lab | [MCP Lab](./docs/mcp-tool-evaluation.md) / [Memory-RAG Lab](./docs/memory-rag-evaluation.md) |
 | 跨场景统一入口和结果协议 | [Unified Multi-Scenario Evaluation](./docs/unified-multi-scenario-evaluation.md) |
 | 本地 Process Agent Skill 激活 | [Process Agent Scenario Evaluation](./docs/process-agent-scenario-evaluation.md) |

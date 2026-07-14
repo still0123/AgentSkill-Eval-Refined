@@ -4,6 +4,8 @@
 
 ## 后续执行路线
 
+- [项目收口状态与证据边界](./project-completion-status.md)
+- [答辩与面试讲解手册](./portfolio-demo-and-interview-guide.md)
 - [Skill v1→v2 分阶段执行工作文档](./skill-evolution-execution-roadmap.md)
 
 ## 可信实验基础
