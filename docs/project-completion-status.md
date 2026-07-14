@@ -2,7 +2,7 @@
 
 更新日期：2026-07-14
 
-基线：`main@ae5e842`
+基线：`main@6f2a458`
 
 状态：核心工程 MVP 已完成；真实 Skill v2 研究闭环保留为后续实验课题
 
@@ -35,7 +35,7 @@ Skill 缺陷，也没有消费已授权但不满足前提的 proposal 调用。
 | Promotion | 人工审核、父版本哈希、不可变 SkillVersion、回滚指针 | 当前真实 v2 未发布；Fake fixture 只证明流程 |
 | Evidence Release | `prepare`、`verify`、`inspect` CLI，离线 HTML、diff、索引和审计包 | Stage 5A.2 已用 Fake Promotion fixture 完成端到端验收 |
 | 多场景 | 软件工程、MCP、Memory/RAG 统一入口与专项指标 | MCP、Memory/RAG 仍是离线 simulated Lab |
-| 可视化 | 本地只读 Dashboard 展示实验、Trace、候选和版本谱系 | 不承担写操作或在线调度 |
+| 可视化 | 本地只读 Dashboard 展示实验、Trace、候选、版本谱系和 Skill Evolution Timeline | 不承担写操作、批准或在线调度 |
 
 ## 3. 已有真实证据
 
@@ -118,3 +118,11 @@ Stage 5A.2 Evidence Release CLI Integration 已通过 PR #15 合入 `main`。它
 Release Manifest 和既有发布准备层，提供 `evolution release prepare/verify/inspect`，并使用
 Fake Promotion fixture 验证从 handoff 到离线发布包的完整链路、幂等 prepare、哈希校验和篡改
 检测。该结果证明发布工具可用，但仍不表示真实 Skill v2 已产生或通过 locked test。
+
+## 9. Stage 4C 展示状态
+
+Stage 4C 在现有 Vue Dashboard 中增加只读 Skill Evolution 页面，直接消费 Evolution Evidence
+Release、Proposal、Search、Final Evaluation、Promotion 和 SkillVersion 证据。页面按
+`NOT_STARTED / RUNNING / PASSED / FAILED / REJECTED / UNAVAILABLE` 展示阶段状态；缺失 locked
+或人工审核证据时不会显示 Published，null 指标不会显示为 0。默认 Fake fixture 与 Stage 1
+脱敏 Proposal 仅用于展示协议和边界，不构成真实 Skill v2 改进结论。

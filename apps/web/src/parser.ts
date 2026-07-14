@@ -23,6 +23,14 @@ const versions: Record<ReportKind, Set<string>> = {
     'ase/promotion-workflow/v1alpha1',
     'ase/promotion-release/v1alpha1',
   ]),
+  evolution: new Set([
+    'ase/evolution-evidence-release/v1alpha1',
+    'ase/evolution-evidence-report/v1alpha1',
+    'ase/evolution-evidence-index/v1alpha1',
+    'ase/real-llm-proposal-manifest/v1alpha1',
+    'ase/real-llm-proposal-report/v1alpha1',
+    'ase/real-llm-proposal-smoke-result/v1alpha1',
+  ]),
 }
 
 function object(value: unknown, field = 'root'): Record<string, any> {
@@ -53,6 +61,8 @@ function detect(root: Record<string, any>): { kind: ReportKind; version: string 
     }
   }
   const version = requiredString(root.schema_version, 'schema_version')
+  if (version.startsWith('ase/evolution-evidence-') || version.startsWith('ase/real-llm-proposal-'))
+    return { kind: 'evolution', version }
   if (
     version === 'ase/skill-version-promotion/v1alpha1' ||
     version === 'ase/skill-version/v1alpha1' ||
@@ -84,6 +94,29 @@ function detect(root: Record<string, any>): { kind: ReportKind; version: string 
 }
 
 function validateByKind(kind: ReportKind, root: Record<string, any>): void {
+  if (kind === 'evolution') {
+    if (root.schema_version === 'ase/evolution-evidence-report/v1alpha1') {
+      object(root.skill_versions, 'skill_versions')
+      object(root.stages, 'stages')
+      requiredString(root.claim_limit, 'claim_limit')
+    } else if (root.schema_version === 'ase/evolution-evidence-release/v1alpha1') {
+      requiredString(root.evolution_id, 'evolution_id')
+      requiredString(root.parent_content_sha256, 'parent_content_sha256')
+      requiredString(root.content_sha256, 'content_sha256')
+      requiredArray(root.files, 'files')
+    } else if (root.schema_version === 'ase/evolution-evidence-index/v1alpha1') {
+      requiredArray(root.artifacts, 'artifacts')
+    } else {
+      requiredString(root.provider, 'provider')
+      requiredString(root.model, 'model')
+      if (
+        root.schema_version !== 'ase/real-llm-proposal-manifest/v1alpha1' &&
+        !Array.isArray(root.candidates) &&
+        !Array.isArray(root.proposals)
+      )
+        throw new ImportError('缺少必需数组：candidates/proposals', 'schema')
+    }
+  }
   if (kind === 'benchmark') {
     if (root.schema_version === 'ase/benchmark-report/v1alpha1') {
       object(root.job, 'job')
@@ -175,4 +208,24 @@ export async function parseReportFile(file: File): Promise<ImportedReport> {
   if (!file.name.toLowerCase().endsWith('.json'))
     throw new ImportError('仅支持 .json 文件', 'schema')
   return parseReportText(await file.text(), file.name)
+}
+
+export async function parsePatchFile(file: File): Promise<string> {
+  if (file.size > IMPORT_LIMITS.maxFileBytes)
+    throw new ImportError(`文件超过 ${IMPORT_LIMITS.maxFileBytes / 1024 / 1024} MB 限制`, 'size')
+  if (!/\.(?:patch|diff)$/i.test(file.name))
+    throw new ImportError('仅支持 .patch 或 .diff 文件', 'schema')
+  const text = await file.text()
+  if (text.length > IMPORT_LIMITS.maxStringLength)
+    throw new ImportError('Patch 文本超过安全展示限制', 'limits')
+  return text
+}
+
+export async function parseSha256File(file: File): Promise<string> {
+  if (file.size > 1024) throw new ImportError('SHA-256 sidecar 超过安全限制', 'size')
+  if (!file.name.toLowerCase().endsWith('.sha256'))
+    throw new ImportError('仅支持 .sha256 sidecar', 'schema')
+  const value = (await file.text()).trim()
+  if (!/^[0-9a-f]{64}$/.test(value)) throw new ImportError('SHA-256 sidecar 格式无效', 'schema')
+  return value
 }

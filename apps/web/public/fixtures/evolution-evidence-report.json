@@ -1,0 +1,33 @@
+{
+  "schema_version": "ase/evolution-evidence-report/v1alpha1",
+  "evolution_id": "fake-evolution-dashboard-001",
+  "dataset_version": "fake-software-benchmark@1.0.0",
+  "runner": "fake-process-runner/1",
+  "skill_versions": {
+    "v1": { "skill_name": "python-review", "version": "1.0.0", "content_sha256": "1111111111111111111111111111111111111111111111111111111111111111" },
+    "v2": { "skill_name": "python-review", "version": "2.0.0-fixture", "parent_content_sha256": "1111111111111111111111111111111111111111111111111111111111111111", "content_sha256": "2222222222222222222222222222222222222222222222222222222222222222", "diff_sha256": "3333333333333333333333333333333333333333333333333333333333333333" }
+  },
+  "proposal_lineage": [
+    { "id": "candidate-boundary", "failure_label": "missing_boundary_validation", "hypothesis": "Require explicit boundary analysis", "instruction": "Inspect empty, minimum, maximum and off-by-one inputs before changing code.", "evidence_refs": ["failure:case-boundary-01"], "risks": ["May increase token use"] },
+    { "id": "candidate-tests", "failure_label": "verification_omission", "hypothesis": "Require targeted regression checks", "instruction": "Run the smallest relevant test, then the full offline oracle.", "evidence_refs": ["failure:case-test-02"], "risks": ["May increase latency"] }
+  ],
+  "failure_lineage": [
+    { "failure_label": "missing_boundary_validation", "evidence_refs": ["diagnosis:case-boundary-01"] },
+    { "failure_label": "verification_omission", "evidence_refs": ["diagnosis:case-test-02"] }
+  ],
+  "search_winner": "candidate-boundary",
+  "stages": {
+    "validation_search": {
+      "v1": { "pass_rate": 0.5, "tokens": 1200, "latency_ms": 2100, "cost_microusd": 4200 },
+      "v2": { "pass_rate": 0.75, "tokens": 1450, "latency_ms": 2450, "cost_microusd": 5100 }
+    },
+    "regression_dev": { "passed": true, "loss_cases": [], "token_overhead_ratio": 0.21 },
+    "validation_confirm": { "decision": "CONFIRMED", "base_pass_rate": 0.5, "winner_pass_rate": 1.0, "absolute_gain": 0.5, "win": 1, "tie": 1, "loss": 0, "base": { "tokens": 600, "latency_ms": 1100, "cost_microusd": 2100 }, "winner": { "tokens": 720, "latency_ms": 1250, "cost_microusd": 2500 } },
+    "locked_test": { "decision": "CONFIRMED", "base_pass_rate": 0.5, "winner_pass_rate": 1.0, "absolute_gain": 0.5, "win": 1, "tie": 1, "loss": 0, "base": { "tokens": 610, "latency_ms": 1120, "cost_microusd": 2150 }, "winner": { "tokens": 730, "latency_ms": 1270, "cost_microusd": 2550 } }
+  },
+  "v1_v2_aggregate": { "win": 2, "tie": 2, "loss": 0, "base": { "tokens": 1210, "latency_ms": 2220, "cost_microusd": 4250 }, "winner": { "tokens": 1450, "latency_ms": 2520, "cost_microusd": 5050 } },
+  "human_review": { "decision": "APPROVED", "reviewer": "fixture-reviewer", "reason": "Fixture evidence reviewed; <script>alert('escaped')</script> remains inert." },
+  "evidence_class": "simulated",
+  "simulated": true,
+  "claim_limit": "Synthetic fixture demonstrates the read-only release chain only; no real Skill improvement claim."
+}

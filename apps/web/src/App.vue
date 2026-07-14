@@ -1,13 +1,15 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import Badge from './components/Badge.vue'
+import EvolutionTimeline from './components/EvolutionTimeline.vue'
 import MetricCard from './components/MetricCard.vue'
 import ResearchChart from './components/ResearchChart.vue'
-import { parseReportFile, parseReportText } from './parser'
+import { buildEvolutionTimeline } from './evolutionTimeline'
+import { parsePatchFile, parseReportFile, parseReportText, parseSha256File } from './parser'
 import type { CaseRow, DashboardState, ImportedReport } from './domain'
 import { safeExternalUrl } from './security'
 
-type Tab = 'overview' | 'cases' | 'trace' | 'benchmark' | 'search' | 'promotion'
+type Tab = 'overview' | 'cases' | 'trace' | 'benchmark' | 'search' | 'promotion' | 'evolution'
 const tabs: { id: Tab; label: string; eyebrow: string }[] = [
   { id: 'overview', label: 'Overview', eyebrow: '01' },
   { id: 'cases', label: 'Paired Cases', eyebrow: '02' },
@@ -15,8 +17,11 @@ const tabs: { id: Tab; label: string; eyebrow: string }[] = [
   { id: 'benchmark', label: 'Benchmark Generation', eyebrow: '04' },
   { id: 'search', label: 'Skill Search', eyebrow: '05' },
   { id: 'promotion', label: 'Promotion', eyebrow: '06' },
+  { id: 'evolution', label: 'Skill Evolution', eyebrow: '07' },
 ]
 const state = ref<DashboardState>({ reports: [], loading: false, error: null })
+const skillDiff = ref<string | null>(null)
+const releaseManifestHash = ref<string | null>(null)
 const active = ref<Tab>('overview')
 const filter = ref({ outcome: 'all', category: 'all', group: 'all', query: '' })
 
@@ -45,6 +50,9 @@ const traceIntel = computed<any>(
   () => experiment.value?.data.trace_intelligence ?? { traces: [], diagnoses: [], pair_diffs: [] },
 )
 const isDemo = computed(() => state.value.reports.some((r) => r.synthetic || r.simulated))
+const evolutionTimeline = computed(() =>
+  buildEvolutionTimeline(state.value.reports, releaseManifestHash.value),
+)
 
 const cases = computed<CaseRow[]>(() =>
   ((stats.value.cases ?? []) as any[]).map((item) => ({
@@ -242,8 +250,13 @@ async function importFiles(event: Event) {
   state.value.loading = true
   state.value.error = null
   try {
-    for (const file of Array.from(input.files))
-      state.value.reports.push(await parseReportFile(file))
+    for (const file of Array.from(input.files)) {
+      if (/\.(?:patch|diff)$/i.test(file.name)) skillDiff.value = await parsePatchFile(file)
+      else if (file.name === 'release-manifest.sha256')
+        releaseManifestHash.value = await parseSha256File(file)
+      else if (file.name.toLowerCase().endsWith('.json'))
+        state.value.reports.push(await parseReportFile(file))
+    }
   } catch (error) {
     state.value.error = error instanceof Error ? error.message : '导入失败'
   } finally {
@@ -264,6 +277,9 @@ async function loadDemo() {
       'skill-version.json',
       'promotion-workflow.json',
       'promotion-release.json',
+      'evolution-evidence-report.json',
+      'evolution-release-manifest.json',
+      'evolution-evidence-index.json',
     ]
     const loaded: ImportedReport[] = []
     for (const file of files) {
@@ -271,7 +287,31 @@ async function loadDemo() {
       if (!response.ok) throw new Error(`Fixture 加载失败：${file}`)
       loaded.push(parseReportText(await response.text(), `DEMO · ${file}`))
     }
+    const diffResponse = await fetch('/fixtures/skill-diff.patch')
+    if (!diffResponse.ok) throw new Error('Fixture 加载失败：skill-diff.patch')
+    skillDiff.value = await diffResponse.text()
+    const hashResponse = await fetch('/fixtures/release-manifest.sha256')
+    if (!hashResponse.ok) throw new Error('Fixture 加载失败：release-manifest.sha256')
+    releaseManifestHash.value = (await hashResponse.text()).trim()
     state.value.reports = loaded
+  } catch (error) {
+    state.value.error = error instanceof Error ? error.message : 'Fixture 加载失败'
+  } finally {
+    state.value.loading = false
+  }
+}
+async function loadProposalDemo() {
+  state.value.loading = true
+  state.value.error = null
+  try {
+    const response = await fetch('/fixtures/real-llm-proposal-smoke.json')
+    if (!response.ok) throw new Error('Fixture 加载失败：real-llm-proposal-smoke.json')
+    state.value.reports = [
+      parseReportText(await response.text(), 'SANITIZED · Stage 1 DeepSeek Proposal smoke'),
+    ]
+    skillDiff.value = null
+    releaseManifestHash.value = null
+    active.value = 'evolution'
   } catch (error) {
     state.value.error = error instanceof Error ? error.message : 'Fixture 加载失败'
   } finally {
@@ -280,6 +320,8 @@ async function loadDemo() {
 }
 function clearData() {
   state.value = { reports: [], loading: false, error: null }
+  skillDiff.value = null
+  releaseManifestHash.value = null
   active.value = 'overview'
 }
 </script>
@@ -316,13 +358,16 @@ function clearData() {
         <div class="actions">
           <button class="button ghost" :disabled="!state.reports.length" @click="clearData">
             清除本地数据</button
+          ><label class="button ghost"
+            ><input type="file" multiple webkitdirectory directory @change="importFiles" />导入
+            Release 目录</label
           ><label class="button primary"
             ><input
               type="file"
-              accept="application/json,.json"
+              accept="application/json,.json,.patch,.diff,.sha256"
               multiple
               @change="importFiles"
-            />导入 JSON</label
+            />导入证据</label
           >
         </div>
       </header>
@@ -351,11 +396,15 @@ function clearData() {
           <label class="button primary"
             ><input
               type="file"
-              accept="application/json,.json"
+              accept="application/json,.json,.patch,.diff,.sha256"
               multiple
               @change="importFiles"
-            />选择 JSON 报告</label
+            />选择证据文件</label
+          ><label class="button ghost"
+            ><input type="file" multiple webkitdirectory directory @change="importFiles" />选择
+            Release 目录</label
           ><button class="button ghost" @click="loadDemo">加载 Synthetic Demo</button>
+          <button class="button ghost" @click="loadProposalDemo">加载 Stage 1 脱敏 Proposal</button>
         </div>
         <small>单文件上限 5 MB · 深度/数组/字符串限制 · Secret 字段自动遮蔽</small>
       </section>
@@ -817,6 +866,12 @@ function clearData() {
             </div>
           </div>
         </section>
+
+        <EvolutionTimeline
+          v-else-if="active === 'evolution'"
+          :model="evolutionTimeline"
+          :skill-diff="skillDiff"
+        />
 
         <section v-else class="content-stack promotion-view">
           <div class="section-note">

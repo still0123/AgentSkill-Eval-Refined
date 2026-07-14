@@ -10,12 +10,12 @@ describe('dashboard page', () => {
     render(App)
     expect(screen.getByText('AgentSkill Eval')).toBeTruthy()
     expect(screen.getByText('把已有报告带到一个安全的本地视图')).toBeTruthy()
-    expect(screen.getAllByText('导入 JSON').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('导入证据').length).toBeGreaterThan(0)
     await fireEvent.click(screen.getByRole('button', { name: /Trace & Diagnosis/ }))
     expect(screen.getByRole('heading', { name: 'Trace & Diagnosis' })).toBeTruthy()
   })
 
-  it('contains all six required research sections', () => {
+  it('contains all seven required research sections', () => {
     render(App)
     for (const label of [
       'Overview',
@@ -24,9 +24,57 @@ describe('dashboard page', () => {
       'Benchmark Generation',
       'Skill Search',
       'Promotion',
+      'Skill Evolution',
     ]) {
       expect(screen.getByRole('button', { name: new RegExp(label) })).toBeTruthy()
     }
+  })
+
+  it('renders the complete evolution timeline, winner, artifact and escaped patch', async () => {
+    const { container } = render(App)
+    const names = [
+      'evolution-evidence-report.json',
+      'evolution-release-manifest.json',
+      'evolution-evidence-index.json',
+      'skill-diff.patch',
+    ]
+    const files = names.map((name) => {
+      const content = readFileSync(resolve(process.cwd(), 'public', 'fixtures', name), 'utf8')
+      const file = new File([content], name, { type: 'application/octet-stream' })
+      Object.defineProperty(file, 'text', { value: async () => content })
+      return file
+    })
+    const input = container.querySelector('input[accept*=".patch"]') as HTMLInputElement
+    Object.defineProperty(input, 'files', { value: files, configurable: true })
+    await fireEvent.update(input)
+    await fireEvent.click(screen.getByRole('button', { name: /Skill Evolution/ }))
+    expect(await screen.findByText('Evolution Timeline')).toBeTruthy()
+    expect(screen.getByText('candidate-boundary')).toBeTruthy()
+    expect(screen.getByText('evidence/locked-test-report.json')).toBeTruthy()
+    await fireEvent.click(screen.getByRole('button', { name: 'Expand' }))
+    expect(screen.getByTestId('skill-diff').textContent).toContain(
+      "<script>alert('escaped')</script>",
+    )
+    expect(container.querySelector('script')).toBeNull()
+  })
+
+  it('loads the sanitized Stage 1 proposal without inventing search or locked evidence', async () => {
+    const { container } = render(App)
+    const content = readFileSync(
+      resolve(process.cwd(), 'public', 'fixtures', 'real-llm-proposal-smoke.json'),
+      'utf8',
+    )
+    const file = new File([content], 'result.sanitized.json', { type: 'application/json' })
+    Object.defineProperty(file, 'text', { value: async () => content })
+    const input = container.querySelector('input[accept*=".patch"]') as HTMLInputElement
+    Object.defineProperty(input, 'files', { value: [file], configurable: true })
+    await fireEvent.update(input)
+    await fireEvent.click(screen.getByRole('button', { name: /Skill Evolution/ }))
+    expect(await screen.findByText(/Real Provider call \/ simulated fixture input/)).toBeTruthy()
+    expect(screen.getByText('deepseek / deepseek-v4-pro')).toBeTruthy()
+    expect(screen.getByTestId('stage-search').textContent).toContain('NOT_STARTED')
+    expect(screen.getByTestId('stage-locked').textContent).toContain('NOT_STARTED')
+    expect(screen.getByTestId('stage-published').textContent).toContain('NOT_STARTED')
   })
 
   it('keeps the promotion view available without inventing missing evidence', async () => {
