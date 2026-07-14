@@ -465,7 +465,7 @@ def test_real_candidate_evaluator_reuses_observed_runtime_and_case_cache(
         ["optimize", "search", str(search_config), "--workspace", str(tmp_path / "cli")],
     )
     assert refused_cli.exit_code == 2
-    assert "--confirm-real-run" in refused_cli.output
+    assert "real_agent evaluator requires" in refused_cli.output
     assert not counter.exists()
 
     refused = RealAgentCandidateEvaluator(
