@@ -14,7 +14,7 @@ AgentSkill-Eval 是一个面向 Agent Skill 的**评测、诊断与迭代优化�
 系统在冻结 Agent、模型、Case、环境和预算的前提下运行配对实验，保存结果、执行轨迹、
 失败诊断和审计证据，为后续 Skill 搜索、版本回归和自动优化提供可信依据。
 
-**当前版本：[`v0.1.0-rc1`](https://github.com/ranmaoxia0123/AgentSkill-Eval/tree/v0.1.0-rc1)**
+**当前版本：[`v0.2.0-rc1`](https://github.com/ranmaoxia0123/AgentSkill-Eval/tree/v0.2.0-rc1)**
 
 当前开发版在 RC1 基础上增加了跨仓库 Benchmark、真实 Agent 证据、多场景统一评测、
 Process Agent 接入、交互式 Action/Observation 循环、Failure-guided Skill Evolution 和受审计的
