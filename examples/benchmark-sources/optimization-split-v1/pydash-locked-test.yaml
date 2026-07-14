@@ -1,0 +1,165 @@
+schema_version: ase/benchmark-generation/v1alpha1
+name: optimization-split-v1-pydash
+version: "2026.07.14.1"
+repository_path: /absolute/path/to/offline/pydash
+repository_url: https://github.com/dgilland/pydash.git
+fork_lineage: github.com/dgilland/pydash
+license_spdx: MIT
+license_path: LICENSE.rst
+contamination_risk: high
+target_split: locked_test
+generator_profile: local-git-history/v2
+verifier_profile: deterministic-subprocess/v2
+quality_gate:
+  repeat_count: 3
+  timeout_seconds: 30
+  mutation_required: true
+  alternative_required: true
+  prohibit_network_time_random: true
+  prohibit_patch_leakage: true
+  max_repository_files: 5000
+  max_repository_bytes: 50000000
+budget:
+  max_candidates: 4
+  max_commands: 48
+  wall_seconds: 1200
+candidates:
+  - key: pydash-reversed-in-range
+    provenance_family: in-range-reversed-bounds
+    before_commit: 5af19c8defb4b99232857a414aa2a57512e3884c
+    after_commit: 338c90e0984d2d60fae66d762ffdc64a0e0e30ee
+    task: >-
+      Fix in_range so reversed start and end bounds are normalized while retaining an inclusive
+      lower bound and exclusive upper bound.
+    issue_url: https://github.com/dgilland/pydash/pull/243
+    production_paths: [src/pydash/predicates.py]
+    regression_test_paths: [tests/test_predicates.py]
+    test_command:
+      - "${PYTHON}"
+      - -m
+      - pytest
+      - -c
+      - /dev/null
+      - -q
+      - tests/test_predicates.py::test_in_range
+    alternative_patch: |
+      diff --git a/src/pydash/predicates.py b/src/pydash/predicates.py
+      --- a/src/pydash/predicates.py
+      +++ b/src/pydash/predicates.py
+      @@ -390,7 +390,9 @@ def in_range(value: t.Any, start: t.Any = 0, end: t.Any = None) -> bool:
+           elif not is_number(end):
+               end = 0
+      
+      -    return start <= value < end
+      +    lower = min(start, end)
+      +    upper = max(start, end)
+      +    return lower <= value < upper
+      
+      
+       def in_range_cmp(start: t.Any = 0, end: t.Any = None) -> t.Callable[[t.Any], bool]:
+    category: positive
+    tags: [python, regression, range, boundary]
+
+  - key: pydash-dict-to-list
+    provenance_family: to-list-dict-materialization
+    before_commit: 3d36c2d5355abf872679c8c304b102bef6416802
+    after_commit: 5af19c8defb4b99232857a414aa2a57512e3884c
+    task: >-
+      Fix to_list for dictionaries so it returns a concrete list of values instead of a live
+      dict_values view.
+    issue_url: https://github.com/dgilland/pydash/pull/250
+    production_paths: [src/pydash/objects.py]
+    regression_test_paths: [tests/test_objects.py]
+    test_command:
+      - "${PYTHON}"
+      - -m
+      - pytest
+      - -c
+      - /dev/null
+      - -q
+      - tests/test_objects.py::test_to_list
+    alternative_patch: |
+      diff --git a/src/pydash/objects.py b/src/pydash/objects.py
+      --- a/src/pydash/objects.py
+      +++ b/src/pydash/objects.py
+      @@ -2114,5 +2114,5 @@ def to_list(obj, split_strings=True):
+           if isinstance(obj, list):
+               return obj[:]
+           elif isinstance(obj, dict):
+      -        return obj.values()
+      +        return [*obj.values()]
+           elif not split_strings and isinstance(obj, (str, bytes)):
+    category: positive
+    tags: [python, regression, collection, materialization]
+
+  - key: pydash-empty-intersperse
+    provenance_family: iterintersperse-empty-input
+    before_commit: bdafc86cf179a50ae66dd868213ea94dfe432d04
+    after_commit: 3d36c2d5355abf872679c8c304b102bef6416802
+    task: >-
+      Fix iterintersperse so an empty iterable yields no values instead of converting the first
+      internal StopIteration into a RuntimeError.
+    issue_url: https://github.com/dgilland/pydash/pull/246
+    production_paths: [src/pydash/arrays.py]
+    regression_test_paths: [tests/test_arrays.py]
+    test_command:
+      - "${PYTHON}"
+      - -m
+      - pytest
+      - -c
+      - /dev/null
+      - -q
+      - tests/test_arrays.py::test_intersperse
+    alternative_patch: |
+      diff --git a/src/pydash/arrays.py b/src/pydash/arrays.py
+      --- a/src/pydash/arrays.py
+      +++ b/src/pydash/arrays.py
+      @@ -2848,6 +2848,10 @@ def iterinterleave(*arrays):
+      
+       def iterintersperse(iterable, separator):
+           """Iteratively intersperse iterable."""
+           iterable = iter(iterable)
+      -    yield next(iterable)
+      +    missing = object()
+      +    first = next(iterable, missing)
+      +    if first is missing:
+      +        return
+      +    yield first
+           for item in iterable:
+    category: robustness
+    tags: [python, regression, iterator, empty-input]
+
+  - key: pydash-false-math-operands
+    provenance_family: math-operator-false-operands
+    before_commit: 0dfc47d4de3b7101c0c663f79a260a5a3314c3ae
+    after_commit: 40f21a1874b70262587a2cdafa0dd2ca74bb4eb1
+    task: >-
+      Fix math operator helpers so numeric zero is preserved as an operand and only None triggers
+      the default value.
+    issue_url: https://github.com/dgilland/pydash/pull/218
+    production_paths: [src/pydash/numerical.py]
+    regression_test_paths: [tests/test_numerical.py]
+    test_command:
+      - "${PYTHON}"
+      - -m
+      - pytest
+      - -c
+      - /dev/null
+      - -q
+      - tests/test_numerical.py::test_multiply
+    alternative_patch: |
+      diff --git a/src/pydash/numerical.py b/src/pydash/numerical.py
+      --- a/src/pydash/numerical.py
+      +++ b/src/pydash/numerical.py
+      @@ -1210,7 +1210,7 @@ def zscore(collection, iteratee=None):
+       def call_math_operator(value1, value2, op, default):
+           """Return the result of the math operation on the given values."""
+      -    if not value1:
+      +    if isinstance(value1, type(None)):
+               value1 = default
+      
+      -    if not value2:
+      +    if isinstance(value2, type(None)):
+               value2 = default
+    category: positive
+    tags: [python, regression, numeric, falsy]
