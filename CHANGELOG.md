@@ -16,6 +16,9 @@ after the first stable release.
 
 ### Fixed
 
+- Disabled pytest's cache provider inside the offline verifier so test execution cannot mutate
+  frozen fixtures and invalidate their audit hashes.
+
 - Replaced the contradictory repository-per-split policy with one executable exposure-zone
   contract: repositories/forks cannot cross adaptive to holdout, while Case and defect-family
   identities remain unique across every split.
@@ -23,6 +26,14 @@ after the first stable release.
   `cachetools` is holdout-only, and `locked_test` contains four one-shot public Cases.
 - Added fail-closed split-plan audit and per-split generation CLI commands; historical Stage 3 runs
   that crossed the new boundary remain evidence but are ineligible for Promotion.
+
+### Added
+
+- Added Optimization Benchmark Split v1 with 20 real Git-history Cases from five independent
+  repositories, four Cases per immutable train/search/regression/confirmation/locked DatasetVersion.
+- Added strict repository/fork/patch-family isolation, a common frozen plan lineage, an
+  optimizer-only view that withholds confirmation/locked inputs, and offline publish/verify/inspect
+  CLI commands.
 
 ## [0.3.0-rc1] - 2026-07-14
 

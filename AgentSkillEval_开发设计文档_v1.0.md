@@ -1958,3 +1958,25 @@ sidecar 的 Release Manifest。`evolution release verify` 校验外层 Manifest�
 `evidence_class=simulated`，不会调用 DeepSeek、真实 Agent 或真实 final evaluation，也不会自动上传
 GitHub Release。协议与配置见
 [`docs/evolution-evidence-release-cli.md`](./docs/evolution-evidence-release-cli.md)。
+
+---
+
+## 35. Optimization Benchmark Split v1 实现状态
+
+阶段 2 已发布一套面向 Skill v1→v2 优化的五路不可变 Benchmark。它不是把历史 12 Case
+重新标记：数据扩展为 20 个真实 Git 历史缺陷，来自 more-itertools、cachetools、boltons、
+humanize 和 pydash 五个独立开源仓库，每个仓库固定属于一个 split，每个 split 固定 4 Case。
+该纵切在通用 exposure-zone 契约之上执行更严格的 repository/fork 隔离，并为 20 个 Case
+使用 20 个独立 patch family/independence group。
+
+每个候选均冻结 before/after commit、任务、回归测试、fixture、参考补丁、替代修复、grader、
+provenance、许可证和内容哈希；before-fail、after-pass、mutation-fail、alternative-pass 各连续
+执行 3 次，总计 240 条确定性命令证据。只有全部质量门通过并由 reviewer 批准的候选才能进入
+DatasetVersion。发布 Manifest 为五个 DatasetVersion 固定同一 split-plan SHA-256，重复发布只做
+完整性验证，禁止原地覆盖。
+
+Optimizer 只接收 `optimizer-view.json` 中的 train、validation_search 和 regression_dev 路径；
+validation_confirm 与 locked_test 只暴露数量和收据哈希。公开 Git 历史的污染风险仍为 high，
+因此 locked 表示流程隔离，不表示私有隐藏题。该阶段执行 0 次模型调用、费用为 0，只证明数据
+重建、隔离和发布可信，不构成 Agent 或 Skill 性能证据。完整协议见
+[`docs/optimization-benchmark-split-v1.md`](./docs/optimization-benchmark-split-v1.md)。

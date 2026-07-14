@@ -45,8 +45,8 @@ from agentskill_eval_contracts import (
 from agentskill_eval_experiment.storage.atomic import AtomicFileWriter
 from agentskill_eval_experiment.storage.manifests import load_model, model_bytes
 
-GENERATOR_VERSION = "0.1.0"
-VERIFIER_VERSION = "0.1.0"
+GENERATOR_VERSION = "0.2.0"
+VERIFIER_VERSION = "0.2.0"
 
 
 class BenchmarkGenerationError(RuntimeError):
@@ -218,6 +218,23 @@ class CommandVerifier:
         source_layout = fixture / "src"
         if source_layout.is_dir():
             python_paths.append(source_layout)
+            # Source archives are deliberately not installed into the host environment.  A
+            # small, deterministic metadata shim lets packages that only query their installed
+            # version import from the frozen ``src`` tree without adding a network or packaging
+            # step to verification.  The shim contains no production code and is recreated for
+            # every attempt inside the isolated runtime directory.
+            for package_dir in sorted(source_layout.iterdir()):
+                if not package_dir.is_dir() or not (package_dir / "__init__.py").is_file():
+                    continue
+                distribution = package_dir.name.replace("_", "-")
+                metadata_dir = guard_dir / f"{distribution}-0.dist-info"
+                metadata_dir.mkdir()
+                (metadata_dir / "METADATA").write_text(
+                    "Metadata-Version: 2.1\n"
+                    f"Name: {distribution}\n"
+                    "Version: 0+benchmark\n",
+                    encoding="utf-8",
+                )
         environment = {
             "HOME": str(runtime_dir / "home"),
             "LANG": "C.UTF-8",
@@ -227,6 +244,10 @@ class CommandVerifier:
             "PYTHONDONTWRITEBYTECODE": "1",
             "PYTHONHASHSEED": "0",
             "PYTHONPATH": os.pathsep.join(str(path) for path in python_paths),
+            # Pytest's cache provider mutates the supposedly frozen fixture even when bytecode
+            # writes are disabled.  Disable it for every verifier invocation so integrity hashes
+            # describe only source material and applied patches.
+            "PYTEST_ADDOPTS": "-p no:cacheprovider",
             "TZ": "UTC",
         }
         (runtime_dir / "home").mkdir()
@@ -711,11 +732,20 @@ class AutomaticBenchmarkGenerator:
 
     @staticmethod
     def _selected_test_source(item: CandidateSpec, after_fixture: Path) -> str:
-        selector = item.test_command[-1].split(".")
-        if len(selector) < 2:
-            raise BenchmarkGenerationError("test command must end with ClassName.method_name")
-        class_name, method_name = selector[-2:]
+        raw_selector = item.test_command[-1]
+        if "::" in raw_selector:
+            selector = tuple(part for part in raw_selector.split("::")[1:] if part)
+        else:
+            dotted = tuple(part for part in raw_selector.split(".") if part)
+            selector = dotted[-2:] if len(dotted) >= 2 else ()
+        if not selector or len(selector) > 2:
+            raise BenchmarkGenerationError(
+                "test command must select a top-level test or ClassName.method_name"
+            )
+        class_name = selector[0] if len(selector) == 2 else None
+        method_name = selector[-1]
         classes: Dict[str, ast.ClassDef] = {}
+        functions: Dict[str, tuple[ast.AST, str]] = {}
         sources: Dict[str, str] = {}
         for path in item.regression_test_paths:
             source = (after_fixture / path).read_text(encoding="utf-8", errors="replace")
@@ -729,6 +759,21 @@ class AutomaticBenchmarkGenerator:
                 if isinstance(node, ast.ClassDef):
                     classes[node.name] = node
                     sources[node.name] = source
+                elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    functions[node.name] = (node, source)
+        if class_name is None:
+            top_level = functions.get(method_name)
+            if top_level is None:
+                raise BenchmarkGenerationError(
+                    f"cannot locate selected top-level test {method_name} in frozen test paths"
+                )
+            segment = ast.get_source_segment(top_level[1], top_level[0])
+            if segment is None:
+                raise BenchmarkGenerationError(
+                    f"cannot extract selected top-level test {method_name}"
+                )
+            return segment
+
         target = classes.get(class_name)
         candidates: list[ast.ClassDef] = []
         if target is not None:
