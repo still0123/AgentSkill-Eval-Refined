@@ -1915,3 +1915,27 @@ request hash 并复用已有提案，不再次启动进程。非法 JSON、超�
 生成边界，不证明真实 LLM 能改善 Skill。真实 Provider 必须另行增加显式费用确认、调用数/预算门、
 Secret Gateway 和费用幂等。详细协议见
 [`docs/audited-process-skill-proposal-generator.md`](./docs/audited-process-skill-proposal-generator.md)。
+
+---
+
+## 33. DeepSeek Skill Proposal MVP 实现状态
+
+Failure-Guided Evolution 已支持 `generator.type=deepseek`。第一版只接入 DeepSeek 官方
+OpenAI-compatible Chat Completion API，每个 Evolution 最多执行一次显式授权的生成调用，并要求
+独立提供 `--confirm-generator-run`、最大调用数和最大费用。该授权与真实 Agent evaluator 的 Run/
+费用授权分离，生成失败不会回退 Fake、Process 或 deterministic Generator。
+
+Generator 沿用受审计的 train-only 请求协议，只读取 base Skill 与脱敏 eligible failure evidence，
+不接收 validation、regression、confirmation、locked test、grader 或参考补丁。系统提示词要求返回
+3～5 个结构化 proposal；每个 proposal 含 eligible failure label、可验证改进假设、可复用 instruction
+和风险，Controller 再根据 label 重建 diagnosis lineage。现有候选 lint、Search、`regression_dev`
+和最终 handoff 保持不变。
+
+报告冻结 provider/model、生成参数、prompt/schema/request/response/hypotheses SHA-256、token、cache
+hit、latency 和按配置单价计算的费用；API Key 只从 `OPENAI_API_KEY` 读取，原始请求、原始响应、
+Secret 与隐藏推理不落盘。相同 Evolution 幂等重放会校验 request hash 并复用不可变 artifact，不再次
+产生模型费用。Fake HTTP API 的单元、Service 端到端和 CLI 预算门测试不依赖真实付费调用。
+
+代码完成并不等于 Skill 已优化。Provider-backed proposal smoke 必须另行授权；生成的候选仍需真实
+Agent validation、regression 和阶段 4 的独立确认才能发布为不可变 Skill v2。详细协议见
+[`docs/deepseek-skill-proposal.md`](./docs/deepseek-skill-proposal.md)。

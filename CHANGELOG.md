@@ -29,6 +29,9 @@ after the first stable release.
   candidate/Case outcomes and Trace references, and caches completed candidate/Case combinations.
 - An expanded ten-case Python Bug Fix benchmark plan covering ten independent defect families and
   explicit train, validation_search, regression_dev and validation_confirm assignments.
+- A single-provider DeepSeek Skill Proposal Generator with explicit call/cost authorization,
+  train-only sanitized inputs, structured 3–5 candidate output, frozen prompt/schema hashes,
+  token/cost evidence and idempotent no-cost replay.
 
 ### Evidence boundary
 
@@ -46,6 +49,19 @@ after the first stable release.
   Secrets, paid calls or real-LLM optimization claims.
 - Real optimizer Fake Process tests validate the observed execution chain with `simulated=false`;
   Provider-backed candidate-selection evidence requires a separately authorized smoke run.
+- DeepSeek Fake API tests prove the proposal boundary and budget controls without paid calls; a
+  Provider-backed proposal smoke remains separate evidence and does not prove candidate quality.
+- The first Provider-backed Stage 3 train smoke produced no eligible treatment failure: one pair
+  passed and one pair was invalid in both arms. The bridge returned `INSUFFICIENT`, so the authorized
+  proposal call was deliberately not consumed; this negative result is retained rather than used as
+  a Skill task-failure signal.
+- Tool-call-limit exits are now parsed as `budget_exhausted` with the observed call count instead of
+  generic `execution_error`; real-evidence specs freeze a separate `max_tool_calls` value and require
+  Qwen's effective HOME setting to match it.
+- A second authorized train smoke with a 48-call limit still produced insufficient optimization
+  evidence: the hard Case hit action-stagnation/turn limits and the easy Case passed in both arms.
+  The proposal call remained unused; terminal reasons are now preserved as `loop_detected` and
+  `turn_limit` instead of generic infrastructure errors.
 
 ## [0.1.0-rc1] - 2026-07-13
 

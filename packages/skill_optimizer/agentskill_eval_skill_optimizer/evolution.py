@@ -6,7 +6,7 @@ import hashlib
 import html
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Literal, Optional, Protocol, Tuple
+from typing import Dict, Literal, Optional, Protocol, Tuple, Union
 from uuid import NAMESPACE_URL, UUID, uuid5
 
 import yaml
@@ -23,6 +23,12 @@ from agentskill_eval_contracts import (
     stable_sha256,
 )
 from agentskill_eval_experiment.storage.atomic import AtomicFileWriter
+from agentskill_eval_skill_optimizer.deepseek_generator import (
+    DeepSeekGeneratorAuthorization,
+    DeepSeekGeneratorError,
+    DeepSeekGeneratorInvocationEvidence,
+    DeepSeekHypothesisGenerator,
+)
 from agentskill_eval_skill_optimizer.evaluator import build_evaluator
 from agentskill_eval_skill_optimizer.process_generator import (
     GeneratorInvocationEvidence,
@@ -100,9 +106,7 @@ class FailureGuidedEvolutionSpec(FrozenModel):
         evaluator = spec.evaluator
         if evaluator.real_agent_config_path is not None:
             evaluator = evaluator.model_copy(
-                update={
-                    "real_agent_config_path": resolved(evaluator.real_agent_config_path)
-                }
+                update={"real_agent_config_path": resolved(evaluator.real_agent_config_path)}
             )
         return spec.model_copy(
             update={
@@ -161,13 +165,18 @@ class ImprovementHypothesis(FrozenModel):
     risks: Tuple[str, ...] = ()
 
 
+GeneratorEvidence = Union[  # noqa: UP007
+    GeneratorInvocationEvidence, DeepSeekGeneratorInvocationEvidence
+]
+
+
 class HypothesisArtifact(FrozenModel):
     schema_version: Literal["ase/improvement-hypotheses/v1alpha1"] = (
         "ase/improvement-hypotheses/v1alpha1"
     )
     generator: str = Field(min_length=1)
     hypotheses: Tuple[ImprovementHypothesis, ...] = Field(min_length=3)
-    invocation_evidence: Optional[GeneratorInvocationEvidence] = None
+    invocation_evidence: Optional[GeneratorEvidence] = None
 
     @model_validator(mode="after")
     def ids_and_evidence_must_match(self) -> "HypothesisArtifact":
@@ -177,9 +186,7 @@ class HypothesisArtifact(FrozenModel):
         if self.invocation_evidence is not None:
             if self.invocation_evidence.hypothesis_count != len(self.hypotheses):
                 raise ValueError("generator evidence hypothesis count mismatch")
-            expected = stable_sha256(
-                [item.model_dump(mode="json") for item in self.hypotheses]
-            )
+            expected = stable_sha256([item.model_dump(mode="json") for item in self.hypotheses])
             if self.invocation_evidence.hypotheses_sha256 != expected:
                 raise ValueError("generator evidence hypothesis hash mismatch")
         return self
@@ -270,7 +277,7 @@ class EvolutionReport(FrozenModel):
     winner_candidate_id: UUID
     winner_skill_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     regression_gate: RegressionGateResult
-    generator_evidence: Optional[GeneratorInvocationEvidence] = None
+    generator_evidence: Optional[GeneratorEvidence] = None
     simulated: bool
     locked_test_accessed: Literal[False] = False
     claim_limit: str = Field(min_length=1)
@@ -410,11 +417,10 @@ class FailureGuidedSkillEvolution:
         spec: FailureGuidedEvolutionSpec,
         *,
         real_authorization: Optional[RealEvaluationAuthorization] = None,
+        generator_authorization: Optional[DeepSeekGeneratorAuthorization] = None,
     ) -> FailureGuidedEvolutionResult:
         if not spec.evaluator.simulated and real_authorization is None:
-            raise EvolutionError(
-                "real model evolution requires a confirmation and budget protocol"
-            )
+            raise EvolutionError("real model evolution requires a confirmation and budget protocol")
         base = self._skill_file(spec.base_skill_path)
         manual = self._skill_file(spec.manual_skill_path)
         bundle = FailureEvidenceBundle.load(spec.failure_bundle_path)
@@ -433,12 +439,21 @@ class FailureGuidedSkillEvolution:
         )
         deterministic_generator: Optional[DeterministicHypothesisGenerator] = None
         process_generator: Optional[ProcessHypothesisGenerator] = None
+        deepseek_generator: Optional[DeepSeekHypothesisGenerator] = None
         if spec.generator.type == "process":
             try:
                 process_generator = ProcessHypothesisGenerator(spec.generator)
             except (OSError, ValueError) as exc:
                 raise EvolutionError(f"invalid Process Generator: {exc}") from exc
             generator_identity = process_generator.identity
+        elif spec.generator.type == "deepseek":
+            try:
+                deepseek_generator = DeepSeekHypothesisGenerator(
+                    spec.generator, generator_authorization
+                )
+            except ValueError as exc:
+                raise EvolutionError(f"invalid DeepSeek Generator: {exc}") from exc
+            generator_identity = deepseek_generator.identity
         else:
             deterministic_generator = DeterministicHypothesisGenerator(spec.generator.version)
             generator_identity = deterministic_generator.identity
@@ -477,13 +492,17 @@ class FailureGuidedSkillEvolution:
             artifact = HypothesisArtifact.model_validate_json(hypotheses_path.read_bytes())
             if artifact.generator != generator_identity:
                 raise EvolutionError("persisted hypothesis generator identity mismatch")
-            if process_generator is not None:
+            if process_generator is not None or deepseek_generator is not None:
                 request = self._process_request(base, context, spec.generator.max_hypotheses)
                 if artifact.invocation_evidence is None:
-                    raise EvolutionError("persisted Process Generator evidence is missing")
+                    raise EvolutionError("persisted proposal Generator evidence is missing")
                 expected_request_sha = self._sha(canonical_json(request))
                 if artifact.invocation_evidence.request_sha256 != expected_request_sha:
-                    raise EvolutionError("persisted Process Generator request hash mismatch")
+                    if deepseek_generator is None:
+                        raise EvolutionError("persisted Process Generator request hash mismatch")
+                    expected_api_request_sha = deepseek_generator.request_sha256(request)
+                    if artifact.invocation_evidence.request_sha256 != expected_api_request_sha:
+                        raise EvolutionError("persisted DeepSeek Generator request hash mismatch")
             hypotheses = artifact.hypotheses
         elif process_generator is not None:
             request = self._process_request(base, context, spec.generator.max_hypotheses)
@@ -518,6 +537,39 @@ class FailureGuidedSkillEvolution:
                 invocation_evidence=evidence,
             )
             self._write(hypotheses_path, artifact.model_dump(mode="json"))
+        elif deepseek_generator is not None:
+            request = self._process_request(base, context, spec.generator.max_hypotheses)
+            try:
+                deepseek_generated = deepseek_generator.generate(
+                    request,
+                    tuple(sorted({item.label for item in context.eligible}, key=lambda x: x.value)),
+                )
+            except DeepSeekGeneratorError as exc:
+                raise EvolutionError(str(exc)) from exc
+            hypotheses = tuple(
+                ImprovementHypothesis(
+                    id=item.id,
+                    failure_label=item.failure_label,
+                    hypothesis=item.hypothesis,
+                    instruction=item.instruction,
+                    evidence_refs=self._evidence_refs(context, item.failure_label),
+                    risks=item.risks,
+                )
+                for item in deepseek_generated.proposals
+            )
+            deepseek_evidence = deepseek_generated.evidence.model_copy(
+                update={
+                    "hypotheses_sha256": stable_sha256(
+                        [item.model_dump(mode="json") for item in hypotheses]
+                    )
+                }
+            )
+            artifact = HypothesisArtifact(
+                generator=generator_identity,
+                hypotheses=hypotheses,
+                invocation_evidence=deepseek_evidence,
+            )
+            self._write(hypotheses_path, artifact.model_dump(mode="json"))
         else:
             if deterministic_generator is None:
                 raise AssertionError("deterministic generator was not initialized")
@@ -535,7 +587,7 @@ class FailureGuidedSkillEvolution:
             (spec.regression_dev_path, regression_sha),
         )
         if any(self._sha(path.read_bytes()) != expected for path, expected in frozen_inputs):
-            raise EvolutionError("Process Generator mutated a frozen evolution input")
+            raise EvolutionError("proposal Generator mutated a frozen evolution input")
         search_spec = OptimizationSearchSpec(
             schema_version="ase/optimization-search/v1alpha1",
             name=f"{spec.name}-generated-search",
@@ -642,19 +694,13 @@ class FailureGuidedSkillEvolution:
                 "sha256": context.base_skill_sha256,
                 "content": base_skill.read_text(encoding="utf-8"),
             },
-            "eligible_failures": [
-                item.model_dump(mode="json") for item in context.eligible
-            ],
+            "eligible_failures": [item.model_dump(mode="json") for item in context.eligible],
             "max_hypotheses": max_hypotheses,
-            "output_contract": (
-                "structured_hypotheses_only_no_case_answers_no_hidden_reasoning"
-            ),
+            "output_contract": ("structured_hypotheses_only_no_case_answers_no_hidden_reasoning"),
         }
 
     @staticmethod
-    def _evidence_refs(
-        context: OptimizationContext, label: FailureLabel
-    ) -> Tuple[str, ...]:
+    def _evidence_refs(context: OptimizationContext, label: FailureLabel) -> Tuple[str, ...]:
         refs = tuple(
             sorted(
                 f"diagnosis://{item.run_id}/{item.rule_id}"
@@ -676,9 +722,7 @@ class FailureGuidedSkillEvolution:
     ) -> RegressionGateResult:
         if spec.evaluator.type == "real_agent":
             loaded = DatasetLoader().load(spec.regression_dev_path)
-            if any(
-                item.metadata.split != DatasetSplit.REGRESSION_DEV for item in loaded.cases
-            ):
+            if any(item.metadata.split != DatasetSplit.REGRESSION_DEV for item in loaded.cases):
                 raise EvolutionError("real regression DatasetVersion must be regression_dev")
             dataset_cases = tuple(SearchCase(id=item.metadata.case_id) for item in loaded.cases)
             surrogate = ValidationSearchDataset(
@@ -827,7 +871,7 @@ td,th{{border:1px solid #aaa;padding:6px}}table{{border-collapse:collapse}}</sty
 {esc(report.winner_candidate_id)}</code> · <code>{esc(report.winner_skill_sha256)}</code></p>
 <p>Regression gate: <strong>{esc(report.regression_gate.passed)}</strong> · losses:
 {esc(len(report.regression_gate.loss_cases))}/{esc(report.regression_gate.max_loss_cases)} ·
-token overhead: {esc(f'{report.regression_gate.token_overhead_ratio:.3f}')} / maximum
-{esc(f'{report.regression_gate.max_token_overhead_ratio:.3f}')}</p>
+token overhead: {esc(f"{report.regression_gate.token_overhead_ratio:.3f}")} / maximum
+{esc(f"{report.regression_gate.max_token_overhead_ratio:.3f}")}</p>
 <table><thead><tr><th>Hypothesis</th><th>Failure</th><th>Instruction</th></tr></thead>
 <tbody>{rows}</tbody></table><footer>No external scripts or resources.</footer></body></html>"""

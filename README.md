@@ -18,7 +18,8 @@ AgentSkill-Eval 是一个面向 Agent Skill 的**评测、诊断与迭代优化�
 
 当前开发版在 RC1 基础上增加了跨仓库 Benchmark、真实 Agent 证据、多场景统一评测、
 Process Agent 接入、交互式 Action/Observation 循环、Failure-guided Skill Evolution 和受审计的
-Process Skill Proposal Generator，以及 Fake-evidence SkillVersion Promotion Workflow；
+Process Skill Proposal Generator、预算受控的 DeepSeek Skill Proposal Generator，以及
+Fake-evidence SkillVersion Promotion Workflow；
 未完成能力会在下文明确标记。
 
 ## 项目的核心方向
@@ -87,6 +88,7 @@ without-Skill       Skill v1         Skill v2
 | Evidence Release Prep | 脱敏报告、审计包校验、v1/v2 对比和不可变发布目录 | Stage 5 前置开发已完成，不运行 Agent |
 | Failure-guided Optimization | 从 train 失败诊断生成假设，经搜索与 regression_dev 门冻结候选 | 已实现 simulated MVP，独立 locked 终评不自动触发 |
 | Process Skill Proposal | 哈希/版本固定的本地进程根据脱敏 train 失败生成候选变异 | 已实现 Fake Process MVP，不代表真实 LLM 优化 |
+| DeepSeek Skill Proposal | 单次授权调用从 train 失败生成 3～5 个结构化候选，并冻结 prompt/schema/token/费用证据 | 代码与 Fake API 已实现；首次真实 train smoke 证据不足，proposal 未调用 |
 | Real Optimizer Evaluator | 用真实 Agent 的 Case 结果、成本和 Trace 选择候选并执行 regression_dev | 已实现，真实 smoke 需单独授权 |
 | Observed Failure Bridge | 从真实 Skill treatment Run 导出可追溯的 train failure bundle | 已实现，不调用模型 |
 | Dashboard | 查看报告、Trace、候选、Promotion 谱系和 SkillVersion 状态 | 本地只读版 |
@@ -170,6 +172,8 @@ pnpm run build
 
 - [DeepSeek smoke 脱敏记录](./experiments/real-deepseek-v4-pro-smoke-2026-07-13/README.md)
 - [DeepSeek evidence 脱敏记录](./experiments/real-deepseek-v4-pro-evidence-2026-07-13/README.md)
+- [Stage 3 train smoke 负结果](./experiments/stage3-train-deepseek-v4-pro-smoke-2026-07-14/README.md)
+- [Stage 3 train smoke 工具预算修正后复跑](./experiments/stage3-train-deepseek-v4-pro-smoke-rerun-2026-07-14/README.md)
 
 ## 跨仓库 Benchmark 证据
 
@@ -198,6 +202,9 @@ agentskill-eval real preflight /absolute/path/to/observed-agent.yaml
 
 只有完成 Provider、model、Run 数和预算人工确认后，才应执行 smoke。完整命令与
 Secret 配置见 [Real Agent Evaluation Evidence](./docs/real-agent-evidence.md)。
+
+DeepSeek 候选生成使用独立的确认、调用数和费用预算门；配置、数据隔离和审计字段见
+[DeepSeek Skill Proposal MVP](./docs/deepseek-skill-proposal.md)。
 
 ## 系统组成
 

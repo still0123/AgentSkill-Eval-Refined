@@ -1,0 +1,63 @@
+{
+  "schema_version": "ase/sanitized-stage3-train-result/v1alpha1",
+  "experiment_id": "41ff1ca2-ab2e-5990-b05b-70b7aa1f274d",
+  "simulated": false,
+  "evidence_class": "observed_agent",
+  "provider": "deepseek",
+  "model": "deepseek-v4-pro",
+  "planned_agent_runs": 4,
+  "completed_agent_runs": 2,
+  "invalid_agent_runs": 2,
+  "agent_cost_microusd": 101266,
+  "agent_cost_limit_microusd": 300000,
+  "baseline_pass_rate": 0.5,
+  "treatment_pass_rate": 0.5,
+  "absolute_gain": 0.0,
+  "cases": [
+    {
+      "case_id": "more-itertools-islice-release",
+      "classification": "tie_negative",
+      "baseline_pass_rate": 0.0,
+      "treatment_pass_rate": 0.0,
+      "evidence_status": "both_arms_invalid",
+      "invalid_reason_class": "budget_exhausted",
+      "observed_tool_calls": 25,
+      "frozen_tool_call_limit": 24
+    },
+    {
+      "case_id": "cachetools-lru-missing-item",
+      "classification": "tie_positive",
+      "baseline_pass_rate": 1.0,
+      "treatment_pass_rate": 1.0,
+      "evidence_status": "both_arms_passed"
+    }
+  ],
+  "failure_bridge": {
+    "status": "INSUFFICIENT",
+    "treatment_runs": 2,
+    "task_failed_runs": 0,
+    "eligible_findings": 0,
+    "excluded_findings": 1,
+    "excluded_label": "BUDGET",
+    "reason": "no eligible task-failure findings were observed in the Skill treatment arm"
+  },
+  "proposal": {
+    "authorized_calls": 1,
+    "calls_consumed": 0,
+    "authorized_cost_microusd": 100000,
+    "cost_microusd": 0,
+    "status": "NOT_RUN_INSUFFICIENT_TRAIN_EVIDENCE"
+  },
+  "security": {
+    "secret_pattern_matching_files": 0,
+    "raw_secret_values_committed": false
+  },
+  "replay_bundle_sha256": "e158f1f9ba4edcb29c819dfcc4e158cbe578e623bbdecbeeebb753f8cb723579",
+  "diagnosis_correction": {
+    "original_parser_label": "ENVIRONMENT",
+    "corrected_label": "BUDGET",
+    "method": "offline replay of immutable Runner result with explicit tool-budget parser",
+    "raw_evidence_rewritten": false
+  },
+  "claim_limit": "Two-case train smoke with one fully invalid pair; validates evidence gating only."
+}

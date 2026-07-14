@@ -10,7 +10,7 @@ Codex/skill-up 当前支持的 Engine，或 OpenAI-compatible Process Agent；Pr
 配置和 Agent 可执行文件内，实验编排层只依赖统一 Runner Adapter。
 
 配置冻结 Runner 与 Agent 的名称、版本、路径和 SHA-256，以及 Provider、model、temperature、
-seed、max turns、timeout、工具能力、Skill/DatasetVersion 哈希、价格表和环境指纹。Runner 不提供
+seed、max turns、max tool calls、timeout、工具能力、Skill/DatasetVersion 哈希、价格表和环境指纹。Runner 不提供
 的 request id、区域或镜像 digest 会明确记为 `capability unavailable`。
 
 已验证的首个真实组合是 `skill-up v0.5.0 + Qwen Code 0.19.9 + DeepSeek V4 Pro`。Qwen Code
@@ -45,7 +45,11 @@ OPENAI_API_KEY="$(security find-generic-password \
 Qwen smoke 还应禁用不必要的 `agent` 子 Agent，并设置 `maxWallTimeSeconds`、`maxToolCalls`、
 `sessionTokenLimit` 和循环检测；这些限制属于冻结 Agent 配置，不能在双臂间变化。
 首轮真实 smoke 显示 12 turns 会让较难 Bug Fix Case 的双臂同时 invalid，因此当前示例冻结为
-24 turns、600k 会话 Token，同时继续保留 240 秒墙钟和 24 次工具调用硬门。
+24 turns、600k 会话 Token，同时继续保留 240 秒墙钟和 48 次工具调用硬门。顶层
+`agent.max_tool_calls` 必须与 Qwen HOME 配置中的 `model.maxToolCalls` 相等，避免审计 Manifest
+与实际 Agent 预算不一致。工具调用预算、session-turn 上限和 action-stagnation 循环终止分别记录为
+`budget_exhausted`、`turn_limit` 和 `loop_detected`；前两者归入 `BUDGET`，最后一类只在 Runner
+明确报告重复动作时归入 `PLANNING`，不再笼统记为环境故障。
 
 真实数据集必须由 Automatic Benchmark Generation 发布：fixture 来自修复前 commit，oracle 在
 修复前失败、修复后通过，包含许可证和 provenance，离线可复现且版本不可变。当前 smoke 使用两个

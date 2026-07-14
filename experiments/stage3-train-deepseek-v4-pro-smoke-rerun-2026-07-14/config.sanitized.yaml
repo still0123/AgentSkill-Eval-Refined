@@ -1,0 +1,34 @@
+schema_version: ase/sanitized-stage3-train-config/v1alpha1
+mode: smoke
+simulated: false
+evidence_class: observed_agent
+dataset:
+  name: generated-a7beeef7-7832-506f-be42-38909b17717f
+  version: 39832ce944db
+  sha256: 90e7fd89240c5f7be21aa09e8279de09e321efc1095946ba5476331efb6d3c9e
+  case_ids:
+    - more-itertools-islice-release
+    - cachetools-lru-missing-item
+skill:
+  name: python-bug-fix-v1
+  sha256: f996f19c10f285a51599f2f1e6958098adcbbbbf85d99be4b51c0aa9ff6afb4c
+agent:
+  engine: qwen_code
+  version: 0.19.9
+  provider: deepseek
+  model: deepseek-v4-pro
+  temperature: 0.0
+  max_turns: 24
+  max_tool_calls: 48
+  loop_detection_enabled: true
+runner:
+  name: skill-up
+  version: 0.5.0
+authorization:
+  maximum_agent_runs: 4
+  maximum_agent_cost_microusd: 220000
+  maximum_proposal_calls: 1
+  maximum_proposal_cost_microusd: 100000
+config_sha256: 06e55bdb156edbf334432845d832bf22b4e97dc12aa78706d779ac657b341d7f
+raw_secret_values_included: false
+absolute_local_paths_included: false
