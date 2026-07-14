@@ -9,10 +9,11 @@ from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
+import typer
 import yaml
 from typer.testing import CliRunner
 
-from agentskill_eval_cli.main import app
+from agentskill_eval_cli.main import _real_stage_authorization, app
 from agentskill_eval_contracts import (
     CandidateEvaluation,
     FailureLabel,
@@ -401,7 +402,15 @@ def test_execute_cli_requires_explicit_confirmation(tmp_path: Path) -> None:
         terminal_width=240,
     )
     assert result.exit_code == 2
-    assert "--confirm-real-run" in result.output
+    assert "invalid real evolution runtime spec" not in result.output
+
+    with pytest.raises(typer.BadParameter, match="--confirm-real-run"):
+        _real_stage_authorization(
+            confirm_real_run=False,
+            max_cost_microusd=None,
+            max_agent_runs=None,
+            stage="validation_search",
+        )
 
 
 def test_no_winner_is_persisted_as_a_valid_negative_result(
