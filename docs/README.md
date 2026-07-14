@@ -17,6 +17,7 @@
 - [一条命令运行 P0 配对实验](./one-command-demo.md)
 - [Automatic Benchmark Generation MVP](./automatic-benchmark-generation.md)
 - [Benchmark-guided Skill Search MVP](./benchmark-guided-skill-search.md)
+- [Failure-Guided Skill Evolution MVP](./failure-guided-skill-evolution.md)
 - [Independent Final Evaluation MVP](./independent-final-evaluation.md)
 - [Real Agent Evaluation Evidence MVP](./real-agent-evidence.md)
 

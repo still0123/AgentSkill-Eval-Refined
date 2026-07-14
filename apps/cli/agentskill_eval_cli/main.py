@@ -54,6 +54,8 @@ from agentskill_eval_real_evidence import (
 from agentskill_eval_scenarios import UnifiedScenarioRunner, UnifiedScenarioSpec
 from agentskill_eval_skill_optimizer import (
     BenchmarkGuidedSkillSearch,
+    FailureGuidedEvolutionSpec,
+    FailureGuidedSkillEvolution,
     FinalEvaluationStore,
     IndependentFinalEvaluationSpec,
     IndependentFinalEvaluator,
@@ -86,6 +88,8 @@ benchmark_app = typer.Typer(help="Generate, review, and publish audited benchmar
 app.add_typer(benchmark_app, name="benchmark")
 optimize_app = typer.Typer(help="Search validation data for a frozen Skill candidate.")
 app.add_typer(optimize_app, name="optimize")
+evolve_app = typer.Typer(help="Generate Skill candidates from train failure diagnoses.")
+optimize_app.add_typer(evolve_app, name="evolve")
 final_app = typer.Typer(help="Evaluate a frozen base/winner pair on an independent split.")
 app.add_typer(final_app, name="final")
 real_app = typer.Typer(help="Preflight and run budgeted observed-Agent evidence experiments.")
@@ -599,6 +603,53 @@ def optimize_status(
             sort_keys=True,
         )
     )
+
+
+@evolve_app.command("run")
+def evolve_run(
+    spec_path: Path = typer.Argument(  # noqa: B008
+        ..., exists=True, dir_okay=False, help="Frozen failure-guided evolution spec."
+    ),
+    workspace: Path = typer.Option(  # noqa: B008
+        Path(".agentskill-eval-workspace"), "--workspace", file_okay=False
+    ),
+    allow_simulation: bool = typer.Option(False, "--allow-simulation"),  # noqa: B008
+) -> None:
+    """Generate auditable hypotheses, run existing search, and freeze a final handoff."""
+    spec = FailureGuidedEvolutionSpec.load(spec_path)
+    if spec.evaluator.simulated and not allow_simulation:
+        raise typer.BadParameter(
+            "simulated evaluator requires --allow-simulation",
+            param_hint="--allow-simulation",
+        )
+    result = FailureGuidedSkillEvolution(workspace).run(spec)
+    typer.echo(
+        json.dumps(
+            {
+                "evolution_id": str(result.report.evolution_id),
+                "optimization_job_id": str(result.report.optimization_job_id),
+                "hypothesis_count": len(result.report.hypotheses),
+                "candidate_count": result.report.candidate_count,
+                "winner_candidate_id": str(result.report.winner_candidate_id),
+                "winner_skill_sha256": result.report.winner_skill_sha256,
+                "report_json": str(result.report_json),
+                "report_html": str(result.report_html),
+                "final_handoff": str(result.handoff_path),
+                "locked_test_accessed": result.report.locked_test_accessed,
+                "simulated": result.report.simulated,
+            },
+            sort_keys=True,
+        )
+    )
+
+
+@evolve_app.command("status")
+def evolve_status(
+    workspace: Path = typer.Argument(..., exists=True, file_okay=False),  # noqa: B008
+    evolution_id: UUID = typer.Argument(...),  # noqa: B008
+) -> None:
+    """Read one immutable failure-guided evolution report."""
+    typer.echo(FailureGuidedSkillEvolution(workspace).load(evolution_id).model_dump_json(indent=2))
 
 
 @benchmark_app.command("generate")

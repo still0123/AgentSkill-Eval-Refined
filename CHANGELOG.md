@@ -20,6 +20,9 @@ after the first stable release.
 - A backwards-compatible interactive Process Agent step loop for MCP and Memory/RAG with bounded
   Action/Observation history, deterministic budgets, observation-driven recovery and redacted
   per-step audit evidence.
+- A leakage-safe Failure-Guided Skill Evolution controller that converts eligible train diagnoses
+  into auditable hypotheses, reuses existing candidate search, applies an independent regression_dev
+  gate and freezes a no-auto-publish handoff for Independent Final Evaluation.
 
 ### Evidence boundary
 
@@ -31,6 +34,8 @@ after the first stable release.
   produced executable plans; deterministic tools and Fake Agents remain simulated evidence.
 - Interactive integration additionally proves that subsequent Process decisions can consume
   deterministic environment observations; it remains simulated tool/Memory/RAG evidence.
+- Failure-guided evolution currently uses deterministic hypotheses and simulated/Fake evaluators;
+  it proves the optimization control loop, not that a real model-generated Skill is better.
 
 ## [0.1.0-rc1] - 2026-07-13
 

@@ -1835,3 +1835,23 @@ SHA-256。已有统一结果幂等重放时不再次启动 Agent。
 该阶段仍为 `simulated=true, evidence_class=process_integration`。它证明本地 Agent 能基于确定性
 环境观察改变下一步行为，不证明真实 Provider 或生产 MCP/RAG 的普遍 Skill 增益。详细协议见
 [`docs/interactive-scenario-agent-loop.md`](./docs/interactive-scenario-agent-loop.md)。
+
+---
+
+## 31. Failure-Guided Skill Evolution MVP 实现状态
+
+截至 2026-07-14，Trace Intelligence 与 Benchmark-guided Skill Search 之间的缺失桥梁已经补齐。
+新控制器只接收 `train` FailureDiagnosis，将可由 Skill 指导改变的任务理解、规划、工具、检索、
+Memory、冲突和验证失败转成结构化 ImprovementHypothesis；环境、预算、Judge、未知及 abstained
+诊断明确排除。优化上下文只保留 label、rule ID、置信度和事件引用，不保存 rationale、Secret 或
+隐藏思维过程。
+
+假设以显式 MutationSpec 交给既有 successive-halving Search，继续复用 original/manual/random/search
+对照、预算、lint、候选谱系和 Pareto 门。validation winner 必须再与 base Skill 通过独立
+`regression_dev` loss/Token gate，才会生成状态为 `AWAITING_INDEPENDENT_FINAL_EVALUATION` 的冻结
+交接；该交接固定 `locked_test_accessed=false`、`auto_publish=false`，不会自动创建或发布 Skill v2。
+
+CLI 新增 `optimize evolve run/status`，确定性演示必须显式传入 `--allow-simulation`。当前 MVP 拒绝
+非 simulated evaluator，尚未加入真实模型候选生成或付费搜索；因此现有结果只证明诊断、假设、
+搜索、回归和独立终评交接的控制链路。完整协议见
+[`docs/failure-guided-skill-evolution.md`](./docs/failure-guided-skill-evolution.md)。
