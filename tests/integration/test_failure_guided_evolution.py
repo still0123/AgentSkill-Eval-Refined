@@ -228,7 +228,9 @@ def test_process_generator_fails_closed(
     generator = spec.generator.model_copy(
         update={
             "allowed_environment": ("PATH", "ASE_FAKE_GENERATOR_MODE"),
-            "timeout_seconds": 0.1,
+            # Python process startup can exceed 100 ms on macOS. Keep the timeout
+            # branch strict without turning the invalid-output branches into startup races.
+            "timeout_seconds": 0.1 if mode == "timeout" else 1.0,
         }
     )
     spec = spec.model_copy(update={"generator": generator})

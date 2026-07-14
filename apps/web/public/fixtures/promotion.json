@@ -1,0 +1,92 @@
+{
+  "schema_version": "ase/skill-version-promotion/v1alpha1",
+  "id": "10000000-0000-4000-8000-000000000001",
+  "skill_name": "python-review",
+  "target_version": "2.0.0-rc1",
+  "optimization_job_id": "20000000-0000-4000-8000-000000000002",
+  "winner_candidate_id": "30000000-0000-4000-8000-000000000003",
+  "base_skill_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "winner_skill_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "status": "PUBLISHED",
+  "evidence": [
+    {
+      "stage": "validation_confirm",
+      "final_evaluation_job_id": "40000000-0000-4000-8000-000000000004",
+      "report_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "decision": "CONFIRMED",
+      "base_skill_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "winner_skill_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "simulated": true,
+      "validator_version": "fixture-validator/1.0",
+      "recorded_at": "2026-07-14T08:10:00Z"
+    },
+    {
+      "stage": "locked_test",
+      "final_evaluation_job_id": "50000000-0000-4000-8000-000000000005",
+      "report_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "decision": "CONFIRMED",
+      "base_skill_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "winner_skill_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "simulated": true,
+      "validator_version": "fixture-validator/1.0",
+      "recorded_at": "2026-07-14T08:20:00Z"
+    }
+  ],
+  "transitions": [
+    {
+      "sequence": 1,
+      "from_status": null,
+      "to_status": "CREATED",
+      "occurred_at": "2026-07-14T08:00:00Z",
+      "actor": "fixture-handoff",
+      "input_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "output_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "reason": "Fake AWAITING_INDEPENDENT_FINAL_EVALUATION handoff accepted"
+    },
+    {
+      "sequence": 2,
+      "from_status": "CREATED",
+      "to_status": "VALIDATION_CONFIRMED",
+      "occurred_at": "2026-07-14T08:10:00Z",
+      "actor": "fixture-validator",
+      "input_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "output_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "reason": "Fixture validation confirmation accepted"
+    },
+    {
+      "sequence": 3,
+      "from_status": "VALIDATION_CONFIRMED",
+      "to_status": "LOCKED_TEST_COMPLETED",
+      "occurred_at": "2026-07-14T08:20:00Z",
+      "actor": "fixture-validator",
+      "input_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "output_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "reason": "Fixture locked test accepted"
+    },
+    {
+      "sequence": 4,
+      "from_status": "LOCKED_TEST_COMPLETED",
+      "to_status": "APPROVED",
+      "occurred_at": "2026-07-14T08:30:00Z",
+      "actor": "human-reviewer-fixture",
+      "input_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+      "output_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+      "reason": "Fixture evidence approved for controller testing only"
+    },
+    {
+      "sequence": 5,
+      "from_status": "APPROVED",
+      "to_status": "PUBLISHED",
+      "occurred_at": "2026-07-14T08:40:00Z",
+      "actor": "fixture-publisher",
+      "input_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+      "output_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "reason": "Immutable fixture SkillVersion published"
+    }
+  ],
+  "created_at": "2026-07-14T08:00:00Z",
+  "updated_at": "2026-07-14T08:40:00Z",
+  "rejection_reason": null,
+  "published_skill_version_id": "60000000-0000-4000-8000-000000000006",
+  "metadata": { "evidence_class": "fixture_only" }
+}

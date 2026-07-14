@@ -61,4 +61,80 @@ describe('report parser', () => {
       ),
     ).toThrowError(/locked_test_accessed=false/)
   })
+
+  it('recognizes promotion state and marks fake evidence as simulated', () => {
+    const report = parseReportText(
+      JSON.stringify({
+        schema_version: 'ase/skill-version-promotion/v1alpha1',
+        id: 'promotion-id',
+        skill_name: 'python-review',
+        target_version: '2.0.0',
+        status: 'REJECTED',
+        transitions: [{ to_status: 'REJECTED' }],
+        evidence: [{ simulated: true }],
+      }),
+    )
+    expect(report.kind).toBe('promotion')
+    expect(report.simulated).toBe(true)
+  })
+
+  it('requires immutable SkillVersion evidence fields', () => {
+    expect(() =>
+      parseReportText(
+        JSON.stringify({
+          schema_version: 'ase/skill-version/v1alpha1',
+          id: 'version-id',
+          skill_name: 'python-review',
+          version: '2.0.0',
+          promotion_id: 'promotion-id',
+          validation_confirm: {},
+        }),
+      ),
+    ).toThrowError(/locked_test/)
+  })
+
+  it('recognizes Stage 4b workflow and release schemas', () => {
+    const workflow = parseReportText(
+      JSON.stringify({
+        schema_version: 'ase/promotion-workflow/v1alpha1',
+        id: 'workflow-id',
+        promotion_id: 'promotion-id',
+        skill_name: 'python-review',
+        target_version: '2.0.0',
+        status: 'APPROVED',
+        lineage: [],
+        claim_limit: 'fixture only',
+        simulated: true,
+      }),
+    )
+    const release = parseReportText(
+      JSON.stringify({
+        schema_version: 'ase/promotion-release/v1alpha1',
+        workflow_id: 'workflow-id',
+        promotion_id: 'promotion-id',
+        decision: 'APPROVED',
+        lineage: [],
+        confirmation: {},
+        claim_limit: 'fixture only',
+        simulated: true,
+      }),
+    )
+    expect([workflow.kind, release.kind]).toEqual(['promotion', 'promotion'])
+    expect(workflow.simulated && release.simulated).toBe(true)
+  })
+
+  it('rejects incomplete Stage 4b release manifests', () => {
+    expect(() =>
+      parseReportText(
+        JSON.stringify({
+          schema_version: 'ase/promotion-release/v1alpha1',
+          workflow_id: 'workflow-id',
+          promotion_id: 'promotion-id',
+          decision: 'REJECTED',
+          lineage: [],
+          claim_limit: 'fixture only',
+        }),
+      ),
+    ).toThrowError(/confirmation/)
+  })
 })

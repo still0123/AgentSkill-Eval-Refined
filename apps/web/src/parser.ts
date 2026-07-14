@@ -17,6 +17,12 @@ const versions: Record<ReportKind, Set<string>> = {
     'ase/optimization-job/v1alpha1',
     'ase/skill-candidate/v1alpha1',
   ]),
+  promotion: new Set([
+    'ase/skill-version-promotion/v1alpha1',
+    'ase/skill-version/v1alpha1',
+    'ase/promotion-workflow/v1alpha1',
+    'ase/promotion-release/v1alpha1',
+  ]),
 }
 
 function object(value: unknown, field = 'root'): Record<string, any> {
@@ -47,6 +53,13 @@ function detect(root: Record<string, any>): { kind: ReportKind; version: string 
     }
   }
   const version = requiredString(root.schema_version, 'schema_version')
+  if (
+    version === 'ase/skill-version-promotion/v1alpha1' ||
+    version === 'ase/skill-version/v1alpha1' ||
+    version === 'ase/promotion-workflow/v1alpha1' ||
+    version === 'ase/promotion-release/v1alpha1'
+  )
+    return { kind: 'promotion', version }
   if (version.startsWith('ase/benchmark-')) return { kind: 'benchmark', version }
   if (version.startsWith('ase/optimization-') || version.startsWith('ase/skill-candidate'))
     return { kind: 'skill-search', version }
@@ -90,6 +103,39 @@ function validateByKind(kind: ReportKind, root: Record<string, any>): void {
         throw new ImportError('Skill Search 报告必须声明 locked_test_accessed=false', 'schema')
     } else requiredString(root.id, 'id')
   }
+  if (kind === 'promotion') {
+    if (root.schema_version === 'ase/skill-version-promotion/v1alpha1') {
+      requiredString(root.id, 'id')
+      requiredString(root.skill_name, 'skill_name')
+      requiredString(root.status, 'status')
+      requiredString(root.target_version, 'target_version')
+      requiredArray(root.transitions, 'transitions')
+      requiredArray(root.evidence, 'evidence')
+    } else if (root.schema_version === 'ase/skill-version/v1alpha1') {
+      requiredString(root.id, 'id')
+      requiredString(root.skill_name, 'skill_name')
+      requiredString(root.version, 'version')
+      requiredString(root.promotion_id, 'promotion_id')
+      object(root.validation_confirm, 'validation_confirm')
+      object(root.locked_test, 'locked_test')
+      requiredString(root.claim_limit, 'claim_limit')
+    } else if (root.schema_version === 'ase/promotion-workflow/v1alpha1') {
+      requiredString(root.id, 'id')
+      requiredString(root.promotion_id, 'promotion_id')
+      requiredString(root.skill_name, 'skill_name')
+      requiredString(root.target_version, 'target_version')
+      requiredString(root.status, 'status')
+      requiredArray(root.lineage, 'lineage')
+      requiredString(root.claim_limit, 'claim_limit')
+    } else {
+      requiredString(root.workflow_id, 'workflow_id')
+      requiredString(root.promotion_id, 'promotion_id')
+      requiredString(root.decision, 'decision')
+      requiredArray(root.lineage, 'lineage')
+      object(root.confirmation, 'confirmation')
+      requiredString(root.claim_limit, 'claim_limit')
+    }
+  }
 }
 
 export function parseReportText(text: string, name = 'report.json'): ImportedReport {
@@ -116,6 +162,9 @@ export function parseReportText(text: string, name = 'report.json'): ImportedRep
     synthetic: clean.synthetic === true || clean.experiment?.protocol_snapshot?.demo_only === true,
     simulated:
       clean.simulated === true ||
+      clean.simulated_evidence === true ||
+      (Array.isArray(clean.evidence) &&
+        clean.evidence.some((item: any) => item?.simulated === true)) ||
       clean.experiment?.protocol_snapshot?.evidence_mode === 'simulated_fixture',
   }
 }
