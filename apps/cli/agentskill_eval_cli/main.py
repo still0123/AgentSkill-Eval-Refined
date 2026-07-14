@@ -60,6 +60,8 @@ from agentskill_eval_scenarios import UnifiedScenarioRunner, UnifiedScenarioSpec
 from agentskill_eval_skill_optimizer import (
     BenchmarkGuidedSkillSearch,
     DeepSeekGeneratorAuthorization,
+    EvolutionDryRunOrchestrator,
+    EvolutionDryRunSpec,
     EvolutionEvidenceReleasePreparer,
     EvolutionExecutionPlanSpec,
     EvolutionReleaseConfig,
@@ -115,6 +117,10 @@ evolution_release_app = typer.Typer(help="Prepare and verify offline evolution r
 evolution_app.add_typer(evolution_release_app, name="release")
 evolution_plan_app = typer.Typer(help="Freeze a no-execution real evolution run and cost plan.")
 evolution_app.add_typer(evolution_plan_app, name="plan")
+evolution_dry_run_app = typer.Typer(
+    help="Bind Stage 2 datasets and rehearse Stage 3A through a local Process only."
+)
+evolution_app.add_typer(evolution_dry_run_app, name="dry-run")
 evolve_app = typer.Typer(help="Generate Skill candidates from train failure diagnoses.")
 optimize_app.add_typer(evolve_app, name="evolve")
 proposal_app = typer.Typer(help="Generate audited real-LLM proposals without running search.")
@@ -719,6 +725,87 @@ def evolution_plan_verify(
                 "plan_id": str(result.plan.plan_id),
                 "real_calls_executed": result.plan.real_calls_executed,
                 "locked_content_accessed": result.plan.locked_content_accessed,
+            },
+            sort_keys=True,
+        )
+    )
+
+
+@evolution_dry_run_app.command("preflight")
+def evolution_dry_run_preflight(
+    config_path: Path = typer.Argument(..., exists=True, dir_okay=False),  # noqa: B008
+) -> None:
+    """Validate bindings and rehearse adaptive metadata without a model or Agent."""
+    try:
+        spec = EvolutionDryRunSpec.load(config_path)
+        report = EvolutionDryRunOrchestrator(Path(".")).preflight(spec)
+    except (OSError, ValueError, RuntimeError) as exc:
+        raise typer.BadParameter(str(exc), param_hint="CONFIG") from exc
+    typer.echo(report.model_dump_json(indent=2))
+
+
+@evolution_dry_run_app.command("prepare")
+def evolution_dry_run_prepare(
+    config_path: Path = typer.Argument(..., exists=True, dir_okay=False),  # noqa: B008
+    workspace: Path = typer.Option(  # noqa: B008
+        Path(".agentskill-eval-workspace"), "--workspace", file_okay=False
+    ),
+) -> None:
+    """Write immutable Process-integration evidence; never invoke a model or Agent."""
+    try:
+        spec = EvolutionDryRunSpec.load(config_path)
+        result = EvolutionDryRunOrchestrator(workspace).prepare(spec)
+    except (OSError, ValueError, RuntimeError) as exc:
+        raise typer.BadParameter(str(exc), param_hint="CONFIG") from exc
+    typer.echo(
+        json.dumps(
+            {
+                "dry_run_id": str(result.report.dry_run_id),
+                "directory": str(result.directory),
+                "status": result.report.status,
+                "simulated": True,
+                "real_calls_executed": False,
+                "agent_runs_executed": False,
+                "locked_content_accessed": False,
+            },
+            sort_keys=True,
+        )
+    )
+
+
+@evolution_dry_run_app.command("inspect")
+def evolution_dry_run_inspect(
+    dry_run_directory: Path = typer.Argument(..., exists=True, file_okay=False),  # noqa: B008
+) -> None:
+    """Verify and print the complete Stage 3B dry-run report."""
+    try:
+        result = EvolutionDryRunOrchestrator(dry_run_directory.parent.parent).verify(
+            dry_run_directory
+        )
+    except (OSError, ValueError, RuntimeError) as exc:
+        raise typer.BadParameter(str(exc), param_hint="DRY_RUN_DIR") from exc
+    typer.echo(result.report.model_dump_json(indent=2))
+
+
+@evolution_dry_run_app.command("verify")
+def evolution_dry_run_verify(
+    dry_run_directory: Path = typer.Argument(..., exists=True, file_okay=False),  # noqa: B008
+) -> None:
+    """Detect modified Stage 3B artifacts and forbidden-stage evidence."""
+    try:
+        result = EvolutionDryRunOrchestrator(dry_run_directory.parent.parent).verify(
+            dry_run_directory
+        )
+    except (OSError, ValueError, RuntimeError) as exc:
+        raise typer.BadParameter(str(exc), param_hint="DRY_RUN_DIR") from exc
+    typer.echo(
+        json.dumps(
+            {
+                "valid": True,
+                "dry_run_id": str(result.report.dry_run_id),
+                "status": result.report.status,
+                "real_calls_executed": False,
+                "locked_content_accessed": False,
             },
             sort_keys=True,
         )

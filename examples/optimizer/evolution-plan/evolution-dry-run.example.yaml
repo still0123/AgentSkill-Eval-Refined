@@ -1,0 +1,23 @@
+# Replace the four absolute paths with locally reproduced Stage 2/3A artifacts.
+# This command invokes only the hash-pinned local fixture below; it never invokes a model or Agent.
+schema_version: ase/evolution-dry-run-spec/v1alpha1
+name: python-bug-fix-evolution-dry-run-v1
+execution_plan_directory: /absolute/path/to/evolution-execution-plans/PLAN_ID
+benchmark_workspace: /absolute/path/to/stage-2-benchmark-workspace
+release_manifest: /absolute/path/to/optimization-benchmark-releases/NAME/VERSION/release-manifest.json
+optimizer_view: /absolute/path/to/optimization-benchmark-releases/NAME/VERSION/optimizer-view.json
+
+process:
+  executable: ./fake-evolution-dry-run-process.py
+  expected_sha256: 1e39794d99ea6fa5f52be8873f545d59aae8abb261f75b698bc268033d517055
+  expected_version_output: agentskill-eval-fake-evolution-dry-run 1.0
+  timeout_seconds: 10
+  allowed_environment:
+    - PATH
+    - LANG
+    - LC_ALL
+
+claim_limit: >-
+  Process integration evidence only. This dry run binds and opens validation_search and
+  regression_dev, preserves validation_confirm and locked_test as withheld receipts, invokes no
+  model or Agent, and supports no Skill improvement or publishability claim.
