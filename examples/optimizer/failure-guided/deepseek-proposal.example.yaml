@@ -1,0 +1,23 @@
+schema_version: ase/real-llm-proposal-spec/v1alpha1
+name: python-review-real-llm-proposal-smoke
+base_skill_path: ../../skills/python-review-v1
+failure_bundle_path: train-failures.yaml
+input_evidence_class: simulated_fixture
+generator:
+  type: deepseek
+  name: deepseek-skill-proposal
+  version: proposal-only-prompt-v1
+  max_hypotheses: 4
+  base_url: https://api.deepseek.com
+  model: deepseek-v4-pro
+  temperature: 0.0
+  max_output_tokens: 2000
+  secret_env_name: OPENAI_API_KEY
+  timeout_seconds: 60
+  input_cache_miss_microusd_per_million: 435000
+  input_cache_hit_microusd_per_million: 3625
+  output_microusd_per_million: 870000
+claim_limit: >-
+  This smoke uses a real DeepSeek proposal call with a synthetic sanitized train-failure fixture.
+  It proves the proposal-only audit path, not that any candidate improves the Skill. No search,
+  regression, confirmation, or locked-test evaluation is executed.

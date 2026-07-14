@@ -45,6 +45,8 @@ Skill 缺陷，也没有消费已授权但不满足前提的 proposal 调用。
 - 12-Run evidence：9 次完成、3 次 invalid，Baseline 66.7%、Treatment 83.3%；
 - Real Optimizer smoke：20 个 Attempt，18 次完成、2 次 invalid，验证真实候选筛选链；
 - 两次 Stage 3 train smoke：均未产生 eligible treatment task failure，proposal 调用数为 0。
+- Proposal-only Stage 1 smoke：真实 DeepSeek 调用 1 次，生成 4 个结构化候选，费用
+  921 microusd；输入为 synthetic 脱敏 train fixture，未执行 search 或 locked test。
 
 这些结果都是描述性证据。Case 数量小、来源集中，不能声称 Skill 具有普遍增益。
 
