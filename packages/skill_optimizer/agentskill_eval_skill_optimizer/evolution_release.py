@@ -15,7 +15,7 @@ from typing import Dict, List, Literal, Mapping, Optional, Sequence
 from uuid import uuid4
 
 import yaml
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from agentskill_eval_contracts import (
     CandidateEvaluation,
@@ -51,9 +51,16 @@ class EvolutionReleaseConfig(FrozenModel):
     evolution_report: Path
     search_report: Path
     skill_diff: Path
-    evidence_class: Literal["simulated"] = "simulated"
-    simulated: Literal[True] = True
+    evidence_class: Literal["simulated", "observed_agent"] = "simulated"
+    simulated: bool = True
     claim_limit: Optional[str] = Field(default=None, min_length=1)
+
+    @model_validator(mode="after")
+    def evidence_boundary_is_consistent(self) -> "EvolutionReleaseConfig":
+        expected_simulated = self.evidence_class == "simulated"
+        if self.simulated != expected_simulated:
+            raise ValueError("evidence_class and simulated flag disagree")
+        return self
 
     @classmethod
     def load(cls, path: Path) -> "EvolutionReleaseConfig":
@@ -80,6 +87,8 @@ class EvolutionReleaseResult:
     evidence_index: Path
     audit_bundle: Path
     manifest_sha256: str
+    evidence_class: str
+    simulated: bool
     idempotent_replay: bool = False
 
 
@@ -183,8 +192,8 @@ class EvolutionEvidenceReleasePreparer(EvidenceReleasePreparer):
             "parent_content_sha256": v2.parent_content_sha256,
             "content_sha256": v2.content_sha256,
             "diff_sha256": v2.diff_sha256,
-            "evidence_class": "simulated",
-            "simulated": True,
+            "evidence_class": config.evidence_class,
+            "simulated": config.simulated,
             "claim_limit": report["claim_limit"],
             "files": file_entries,
         }
@@ -410,23 +419,25 @@ class EvolutionEvidenceReleasePreparer(EvidenceReleasePreparer):
             raise EvolutionReleaseError("claim_limit cannot differ from the promotion release")
         if review != promotion.human_review or review.decision != "APPROVED":
             raise EvolutionReleaseError("human review does not match promotion release")
-        if not all(
-            (
-                promotion.simulated,
-                v2.simulated_evidence,
-                confirmation.job.simulated,
-                locked.job.simulated,
-                evolution.simulated,
-                config.simulated,
-            )
-        ):
-            raise EvolutionReleaseError("Stage 5A.2 fixture release requires simulated evidence")
+        flags = (
+            promotion.simulated,
+            v2.simulated_evidence,
+            confirmation.job.simulated,
+            locked.job.simulated,
+            evolution.simulated,
+        )
+        if any(value != config.simulated for value in flags):
+            raise EvolutionReleaseError("real and simulated evolution evidence must not be mixed")
+        self._require_simulation_boundary(
+            evolution.model_dump(mode="json"), config.simulated, "evolution report"
+        )
+        self._require_simulation_boundary(search, config.simulated, "search report")
         v1_name = self._field(v1, "skill_name")
         v1_version = self._field(v1, "version")
         del v1_version
         v1_hash = self._field(v1, "content_sha256")
-        if v1.get("simulated_evidence") is not True:
-            raise EvolutionReleaseError("Skill v1 manifest must declare simulated evidence")
+        if v1.get("simulated_evidence") is not config.simulated:
+            raise EvolutionReleaseError("Skill v1 evidence class does not match release config")
         if v1_name != v2.skill_name:
             raise EvolutionReleaseError("Skill v1/v2 names do not match")
         if v2.parent_content_sha256 != v1_hash:
@@ -494,8 +505,34 @@ class EvolutionEvidenceReleasePreparer(EvidenceReleasePreparer):
             report.job.base_skill_sha256 != evidence.base_skill_sha256
             or report.job.winner_skill_sha256 != evidence.winner_skill_sha256
             or report.decision != evidence.decision
+            or report.job.simulated != evidence.simulated
         ):
             raise EvolutionReleaseError("final report content does not match promotion evidence")
+
+    @staticmethod
+    def _require_simulation_boundary(
+        value: object, expected: bool, label: str
+    ) -> None:
+        flags: List[bool] = []
+
+        def visit(child: object) -> None:
+            if isinstance(child, dict):
+                for key, nested in child.items():
+                    if key in {"simulated", "simulated_evidence"}:
+                        if not isinstance(nested, bool):
+                            raise EvolutionReleaseError(f"invalid simulation flag in {label}")
+                        flags.append(nested)
+                    else:
+                        visit(nested)
+            elif isinstance(child, list):
+                for nested in child:
+                    visit(nested)
+
+        visit(value)
+        if not flags or any(flag != expected for flag in flags):
+            raise EvolutionReleaseError(
+                f"real and simulated evidence are mixed in {label}"
+            )
 
     def _build_report(
         self, config: EvolutionReleaseConfig, loaded: Mapping[str, object]
@@ -581,8 +618,8 @@ class EvolutionEvidenceReleasePreparer(EvidenceReleasePreparer):
             },
             "v1_v2_aggregate": aggregate,
             "human_review": review.model_dump(mode="json"),
-            "evidence_class": "simulated",
-            "simulated": True,
+            "evidence_class": config.evidence_class,
+            "simulated": config.simulated,
             "claim_limit": claim,
         }
 
@@ -799,9 +836,14 @@ class EvolutionEvidenceReleasePreparer(EvidenceReleasePreparer):
             or manifest.get("diff_sha256") != v2.get("diff_sha256")
         ):
             raise EvolutionReleaseError("release SkillVersion parent lineage mismatch")
-        if report.get("simulated") is not True or manifest.get("simulated") is not True:
-            raise EvolutionReleaseError("fixture release evidence class mismatch")
-        if report.get("evidence_class") != manifest.get("evidence_class"):
+        simulated = manifest.get("simulated")
+        if not isinstance(simulated, bool) or report.get("simulated") is not simulated:
+            raise EvolutionReleaseError("report and manifest simulation flags differ")
+        expected_class = "simulated" if simulated else "observed_agent"
+        if (
+            report.get("evidence_class") != expected_class
+            or manifest.get("evidence_class") != expected_class
+        ):
             raise EvolutionReleaseError("report and manifest evidence classes differ")
 
     @staticmethod
@@ -825,6 +867,8 @@ class EvolutionEvidenceReleasePreparer(EvidenceReleasePreparer):
             value = stages[name]
             rendered = esc(json.dumps(value, sort_keys=True))
             rows.append(f"<tr><th>{esc(name)}</th><td><pre>{rendered}</pre></td></tr>")
+        simulated = report.get("simulated") is True
+        badge = "SIMULATED / FIXTURE EVIDENCE" if simulated else "OBSERVED AGENT EVIDENCE"
         return (
             "<!doctype html><html><head><meta charset='utf-8'>"
             "<meta http-equiv='Content-Security-Policy' content=\"default-src 'none'; "
@@ -833,7 +877,7 @@ class EvolutionEvidenceReleasePreparer(EvidenceReleasePreparer):
             "table{border-collapse:collapse;width:100%}th,td{border:1px solid #bbb;padding:.5rem;"
             "text-align:left;vertical-align:top}pre{white-space:pre-wrap;word-break:break-word}"
             ".badge{padding:.2rem .5rem;background:#ffe9a8}</style></head><body>"
-            "<h1>Evolution Evidence Release</h1><p class='badge'>SIMULATED / FIXTURE EVIDENCE</p>"
+            f"<h1>Evolution Evidence Release</h1><p class='badge'>{esc(badge)}</p>"
             f"<p><strong>Skill:</strong> {esc(v2['skill_name'])} · {esc(v1['version'])} → "
             f"{esc(v2['version'])}</p><p><strong>v1:</strong> {esc(v1['content_sha256'])}<br>"
             f"<strong>v2:</strong> {esc(v2['content_sha256'])}<br><strong>Parent:</strong> "
@@ -854,13 +898,14 @@ class EvolutionEvidenceReleasePreparer(EvidenceReleasePreparer):
         v2 = versions["v2"]
         assert isinstance(v1, dict) and isinstance(v2, dict)
         claim = str(report["claim_limit"]).replace("\n", " ")
+        evidence_class = str(report["evidence_class"])
         return (
             "# Evolution Evidence Release\n\n"
             "This directory is a deterministic, offline-verifiable Stage 5A.2 evidence bundle.\n\n"
             f"- Skill: `{v2['skill_name']}`\n"
             f"- Versions: `{v1['version']}` → `{v2['version']}`\n"
-            "- Evidence class: `simulated`\n"
-            "- No real model or Agent was invoked by release preparation.\n\n"
+            f"- Evidence class: `{evidence_class}`\n"
+            "- Release preparation itself does not invoke a model or Agent.\n\n"
             f"Claim limit: {claim}\n\n"
             "Run `agentskill-eval evolution release verify evolution-release` before use.\n"
         )
@@ -868,7 +913,10 @@ class EvolutionEvidenceReleasePreparer(EvidenceReleasePreparer):
     def _result(
         self, manifest: Mapping[str, object], *, idempotent: bool
     ) -> EvolutionReleaseResult:
-        del manifest
+        evidence_class = manifest.get("evidence_class")
+        simulated = manifest.get("simulated")
+        if not isinstance(evidence_class, str) or not isinstance(simulated, bool):
+            raise EvolutionReleaseError("release manifest evidence boundary is invalid")
         return EvolutionReleaseResult(
             release_dir=self.release_dir,
             manifest_path=self.release_dir / "release-manifest.json",
@@ -877,5 +925,7 @@ class EvolutionEvidenceReleasePreparer(EvidenceReleasePreparer):
             evidence_index=self.release_dir / "evidence-index.json",
             audit_bundle=self.release_dir / "audit-bundle.tar",
             manifest_sha256=_sha256((self.release_dir / "release-manifest.json").read_bytes()),
+            evidence_class=evidence_class,
+            simulated=simulated,
             idempotent_replay=idempotent,
         )

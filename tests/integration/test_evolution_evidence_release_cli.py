@@ -15,7 +15,14 @@ import yaml
 from typer.testing import CliRunner
 
 from agentskill_eval_cli.main import app
+from agentskill_eval_contracts import (
+    FinalEvaluationReport,
+    PromotionReleaseManifest,
+    SkillVersionManifest,
+)
+from agentskill_eval_experiment.storage.manifests import load_model, model_bytes
 from agentskill_eval_skill_optimizer import (
+    EvolutionReport,
     FailureGuidedEvolutionResult,
     FailureGuidedEvolutionSpec,
     FailureGuidedSkillEvolution,
@@ -242,6 +249,126 @@ def _fixture(tmp_path: Path) -> Tuple[Path, Path, Path]:
     return config, publication_workspace, evidence_workspace
 
 
+def _observed_contract_fixture(tmp_path: Path) -> Tuple[Path, Path, Path]:
+    """Convert the Fake E2E fixture into a typed observed-evidence contract fixture."""
+    config, publication, evidence = _fixture(tmp_path)
+    value = yaml.safe_load(config.read_text(encoding="utf-8"))
+
+    def source(name: str) -> Path:
+        return evidence / value[name]
+
+    def observed(value: object) -> object:
+        if isinstance(value, dict):
+            return {
+                key: (False if key in {"simulated", "simulated_evidence"} else observed(child))
+                for key, child in value.items()
+            }
+        if isinstance(value, list):
+            return [observed(child) for child in value]
+        return value
+
+    final_reports = {}
+    for role in ("confirmation_report", "locked_test_report"):
+        path = source(role)
+        envelope = json.loads(path.read_text(encoding="utf-8"))
+        report = FinalEvaluationReport.model_validate(observed(envelope["payload"]))
+        content = model_bytes(report)
+        path.write_bytes(content)
+        final_reports[role] = (report, _sha256(content))
+
+    evolution_path = source("evolution_report")
+    evolution = EvolutionReport.model_validate(
+        observed(json.loads(evolution_path.read_text(encoding="utf-8")))
+    )
+    _write_json(evolution_path, evolution.model_dump(mode="json"))
+
+    search_path = source("search_report")
+    search = observed(json.loads(search_path.read_text(encoding="utf-8")))
+    _write_json(search_path, search)
+
+    v1_path = source("v1_manifest")
+    v1 = json.loads(v1_path.read_text(encoding="utf-8"))
+    v1["simulated_evidence"] = False
+    _write_json(v1_path, v1)
+
+    v2_path = source("v2_manifest")
+    v2 = load_model(v2_path.read_bytes(), SkillVersionManifest)
+    confirmation, confirmation_sha = final_reports["confirmation_report"]
+    locked, locked_sha = final_reports["locked_test_report"]
+    validation_ref = v2.validation_confirm.model_copy(
+        update={
+            "report_sha256": confirmation_sha,
+            "simulated": False,
+            "final_evaluation_job_id": confirmation.job.id,
+        }
+    )
+    locked_ref = v2.locked_test.model_copy(
+        update={
+            "report_sha256": locked_sha,
+            "simulated": False,
+            "final_evaluation_job_id": locked.job.id,
+        }
+    )
+    v2 = v2.model_copy(
+        update={
+            "validation_confirm": validation_ref,
+            "locked_test": locked_ref,
+            "simulated_evidence": False,
+            "claim_limit": "Observed evidence applies only to the frozen experiment inputs.",
+        }
+    )
+    v2_bytes = model_bytes(v2)
+    v2_path.write_bytes(v2_bytes)
+    v2_path.with_suffix(".sha256").write_text(
+        _sha256(v2_bytes) + "\n", encoding="utf-8"
+    )
+
+    promotion_path = source("promotion_release_manifest")
+    promotion = load_model(promotion_path.read_bytes(), PromotionReleaseManifest)
+    lineage = tuple(
+        item.model_copy(
+            update={
+                "sha256": (
+                    _sha256(evolution_path.read_bytes())
+                    if item.role == "evolution_report"
+                    else _sha256(search_path.read_bytes())
+                    if item.role == "search_report"
+                    else item.sha256
+                ),
+                "size_bytes": (
+                    len(evolution_path.read_bytes())
+                    if item.role == "evolution_report"
+                    else len(search_path.read_bytes())
+                    if item.role == "search_report"
+                    else item.size_bytes
+                ),
+            }
+        )
+        for item in promotion.lineage
+    )
+    promotion = promotion.model_copy(
+        update={
+            "confirmation": validation_ref,
+            "locked_test": locked_ref,
+            "lineage": lineage,
+            "skill_version_manifest_sha256": _sha256(v2_bytes),
+            "simulated": False,
+            "claim_limit": "Observed evidence applies only to the frozen experiment inputs.",
+        }
+    )
+    promotion_bytes = model_bytes(promotion)
+    promotion_path.write_bytes(promotion_bytes)
+    promotion_path.with_suffix(".sha256").write_text(
+        _sha256(promotion_bytes) + "\n", encoding="utf-8"
+    )
+
+    value["evidence_class"] = "observed_agent"
+    value["simulated"] = False
+    value["claim_limit"] = promotion.claim_limit
+    config.write_text(yaml.safe_dump(value, sort_keys=False), encoding="utf-8")
+    return config, publication, evidence
+
+
 def test_release_cli_fake_promotion_e2e_idempotency_and_tamper_detection(
     tmp_path: Path,
 ) -> None:
@@ -404,3 +531,66 @@ def test_prepare_rejects_promotion_integrity_sidecar_mismatch(tmp_path: Path) ->
     assert result.exit_code != 0
     assert "integrity sidecar mismatch" in result.output
     assert not (publication / "evolution-release").exists()
+
+
+def test_release_cli_accepts_consistent_observed_evidence_without_running_agent(
+    tmp_path: Path,
+) -> None:
+    config, publication, _ = _observed_contract_fixture(tmp_path)
+    prepared = runner.invoke(
+        app,
+        [
+            "evolution",
+            "release",
+            "prepare",
+            str(config),
+            "--workspace",
+            str(publication),
+        ],
+    )
+    assert prepared.exit_code == 0, prepared.output
+    summary = json.loads(prepared.output)
+    assert summary["simulated"] is False
+    assert summary["evidence_class"] == "observed_agent"
+
+    release = Path(summary["release_dir"])
+    verified = runner.invoke(app, ["evolution", "release", "verify", str(release)])
+    assert verified.exit_code == 0, verified.output
+    inspected = runner.invoke(app, ["evolution", "release", "inspect", str(release)])
+    assert inspected.exit_code == 0, inspected.output
+    inspection = json.loads(inspected.output)
+    assert inspection["simulated"] is False
+    assert inspection["evidence_class"] == "observed_agent"
+
+    report = json.loads((release / "evolution-report.json").read_text(encoding="utf-8"))
+    assert report["simulated"] is False
+    assert report["evidence_class"] == "observed_agent"
+    html = (release / "evolution-report.html").read_text(encoding="utf-8")
+    assert "OBSERVED AGENT EVIDENCE" in html
+    assert "SIMULATED / FIXTURE EVIDENCE" not in html
+    readme = (release / "README.md").read_text(encoding="utf-8")
+    assert "Evidence class: `observed_agent`" in readme
+    assert "does not invoke a model or Agent" in readme
+
+
+def test_release_cli_rejects_mixed_observed_and_simulated_evidence(tmp_path: Path) -> None:
+    config, publication, evidence = _observed_contract_fixture(tmp_path)
+    value = yaml.safe_load(config.read_text(encoding="utf-8"))
+    v1_path = evidence / value["v1_manifest"]
+    v1 = json.loads(v1_path.read_text(encoding="utf-8"))
+    v1["simulated_evidence"] = True
+    _write_json(v1_path, v1)
+
+    result = runner.invoke(
+        app,
+        [
+            "evolution",
+            "release",
+            "prepare",
+            str(config),
+            "--workspace",
+            str(publication),
+        ],
+    )
+    assert result.exit_code != 0
+    assert "evidence class" in result.output
