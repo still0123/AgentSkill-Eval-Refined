@@ -245,8 +245,8 @@ Case 数：
 
 ```text
 Branch：codex/real-optimizer-evaluator-mvp
-Commit：待本阶段提交后填写
-PR：待推送后填写
+Commit：c381596 Add real optimizer evaluator evidence
+PR：https://github.com/ranmaoxia0123/AgentSkill-Eval/pull/9
 Smoke Job：8cbac6bf-ac4b-5d54-90fd-34f6f2725e8f（FROZEN）
 Frozen Candidate：search-protocol-boundaries
 Run 数：20 Attempt（18 completed，2 invalid；授权上限 24）
