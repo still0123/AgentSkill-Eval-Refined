@@ -1,0 +1,65 @@
+# Planning template. Replace paths, hashes, counts, and ceilings with frozen Stage 1/2 artifacts.
+# This command never invokes a model or Agent:
+# agentskill-eval evolution plan preflight real-evolution-plan.example.yaml
+schema_version: ase/real-evolution-execution-plan-spec/v1alpha1
+name: python-bug-fix-real-evolution-v1
+proposal_directory: /absolute/path/to/proposal-jobs/PROPOSAL_JOB_ID
+real_agent_config_path: /absolute/path/to/observed-agent.yaml
+
+datasets:
+  validation_search:
+    split: validation_search
+    dataset_version_sha256: "1111111111111111111111111111111111111111111111111111111111111111"
+    split_plan_sha256: &split_plan "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    case_count: 6
+    independent_group_count: 3
+    content_access: metadata_only
+  regression_dev:
+    split: regression_dev
+    dataset_version_sha256: "2222222222222222222222222222222222222222222222222222222222222222"
+    split_plan_sha256: *split_plan
+    case_count: 4
+    independent_group_count: 2
+    content_access: metadata_only
+  validation_confirm:
+    split: validation_confirm
+    dataset_version_sha256: "3333333333333333333333333333333333333333333333333333333333333333"
+    split_plan_sha256: *split_plan
+    case_count: 4
+    independent_group_count: 2
+    content_access: metadata_only
+  locked_test:
+    split: locked_test
+    dataset_version_sha256: "4444444444444444444444444444444444444444444444444444444444444444"
+    split_plan_sha256: *split_plan
+    case_count: 4
+    independent_group_count: 2
+    content_access: metadata_only
+
+search:
+  subset_size: 2
+  promote_search_candidates: 2
+  random_seed: 2026
+
+final:
+  validation_confirm_repeats: 3
+  locked_test_repeats: 1
+
+# Ceilings must be at least the exact values printed by preflight.
+budgets:
+  validation_search:
+    max_agent_runs: 100
+    max_cost_microusd: 10000000
+  regression_dev:
+    max_agent_runs: 100
+    max_cost_microusd: 10000000
+  validation_confirm:
+    max_agent_runs: 100
+    max_cost_microusd: 10000000
+  locked_test:
+    max_agent_runs: 100
+    max_cost_microusd: 10000000
+
+claim_limit: >-
+  Planning evidence only. No Agent or model was run, locked content was not accessed,
+  and no Skill improvement or publishability claim is supported.

@@ -91,6 +91,7 @@ without-Skill       Skill v1         Skill v2
 | Failure-guided Optimization | 从 train 失败诊断生成假设，经搜索与 regression_dev 门冻结候选 | 已实现 simulated MVP，独立 locked 终评不自动触发 |
 | Process Skill Proposal | 哈希/版本固定的本地进程根据脱敏 train 失败生成候选变异 | 已实现 Fake Process MVP，不代表真实 LLM 优化 |
 | DeepSeek Skill Proposal | proposal-only 单次授权调用从脱敏 train 失败生成 3～5 个结构化候选，并冻结 prompt/schema/token/费用证据 | 已完成 1 次真实 smoke，生成 4 个候选；不触发 search 或 locked test |
+| Real Evolution Planner | 冻结 Proposal、四段 Dataset 元数据、真实 Agent 身份及逐阶段 Run/Token/费用上限 | Stage 3A 已实现；只生成计划，不调用模型、不读取 locked 内容 |
 | Real Optimizer Evaluator | 用真实 Agent 的 Case 结果、成本和 Trace 选择候选并执行 regression_dev | 已实现，真实 smoke 需单独授权 |
 | Observed Failure Bridge | 从真实 Skill treatment Run 导出可追溯的 train failure bundle | 已实现，不调用模型 |
 | Dashboard | 查看报告、Trace、候选、Promotion 谱系和 SkillVersion 状态 | 本地只读版 |
@@ -209,6 +210,8 @@ Secret 配置见 [Real Agent Evaluation Evidence](./docs/real-agent-evidence.md)
 
 DeepSeek 候选生成使用独立的确认、调用数和费用预算门；配置、数据隔离和审计字段见
 [DeepSeek Skill Proposal MVP](./docs/deepseek-skill-proposal.md)。
+[Real Evolution Execution Planner](./docs/real-evolution-execution-planner.md) 可在零费用下冻结
+search→regression→confirmation→locked 的精确 Run 与预算计划；它不会执行这些阶段。
 
 ## 系统组成
 
@@ -289,6 +292,7 @@ docs/                    模块级设计和操作文档
 | 受审计的 Process 候选生成 | [Process Skill Proposal Generator](./docs/audited-process-skill-proposal-generator.md) |
 | 真实失败证据桥接 | [Observed Failure Evidence Bridge](./docs/observed-failure-evidence-bridge.md) |
 | 真实 Agent 评测 | [Real Agent Evidence](./docs/real-agent-evidence.md) |
+| 真实演化执行计划 | [Real Evolution Execution Planner](./docs/real-evolution-execution-planner.md) |
 | Skill 演化证据发布 CLI | [Evolution Evidence Release](./docs/evolution-evidence-release-cli.md) |
 | MCP / Memory-RAG 专项 Lab | [MCP Lab](./docs/mcp-tool-evaluation.md) / [Memory-RAG Lab](./docs/memory-rag-evaluation.md) |
 | 跨场景统一入口和结果协议 | [Unified Multi-Scenario Evaluation](./docs/unified-multi-scenario-evaluation.md) |

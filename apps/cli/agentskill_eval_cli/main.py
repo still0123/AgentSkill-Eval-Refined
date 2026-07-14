@@ -59,6 +59,7 @@ from agentskill_eval_skill_optimizer import (
     BenchmarkGuidedSkillSearch,
     DeepSeekGeneratorAuthorization,
     EvolutionEvidenceReleasePreparer,
+    EvolutionExecutionPlanSpec,
     EvolutionReleaseConfig,
     FailureBridgeError,
     FailureGuidedEvolutionSpec,
@@ -72,6 +73,7 @@ from agentskill_eval_skill_optimizer import (
     PromotionWorkflow,
     PromotionWorkflowResult,
     RealEvaluationAuthorization,
+    RealEvolutionExecutionPlanner,
     RealLLMProposalService,
     RealLLMProposalSpec,
 )
@@ -105,6 +107,8 @@ evolution_app = typer.Typer(help="Package and inspect frozen Skill evolution evi
 app.add_typer(evolution_app, name="evolution")
 evolution_release_app = typer.Typer(help="Prepare and verify offline evolution releases.")
 evolution_app.add_typer(evolution_release_app, name="release")
+evolution_plan_app = typer.Typer(help="Freeze a no-execution real evolution run and cost plan.")
+evolution_app.add_typer(evolution_plan_app, name="plan")
 evolve_app = typer.Typer(help="Generate Skill candidates from train failure diagnoses.")
 optimize_app.add_typer(evolve_app, name="evolve")
 proposal_app = typer.Typer(help="Generate audited real-LLM proposals without running search.")
@@ -632,6 +636,87 @@ def evolution_release_inspect(
     except (OSError, ValueError, RuntimeError) as exc:
         raise typer.BadParameter(str(exc), param_hint="RELEASE_DIR") from exc
     typer.echo(json.dumps(summary, ensure_ascii=False, sort_keys=True))
+
+
+@evolution_plan_app.command("preflight")
+def evolution_plan_preflight(
+    config_path: Path = typer.Argument(..., exists=True, dir_okay=False),  # noqa: B008
+) -> None:
+    """Calculate exact stage run and cost envelopes without writing or executing."""
+    try:
+        spec = EvolutionExecutionPlanSpec.load(config_path)
+        plan = RealEvolutionExecutionPlanner(Path(".")).preflight(spec)
+    except (OSError, ValueError, RuntimeError) as exc:
+        raise typer.BadParameter(str(exc), param_hint="CONFIG") from exc
+    typer.echo(plan.model_dump_json(indent=2))
+
+
+@evolution_plan_app.command("prepare")
+def evolution_plan_prepare(
+    config_path: Path = typer.Argument(..., exists=True, dir_okay=False),  # noqa: B008
+    workspace: Path = typer.Option(  # noqa: B008
+        Path(".agentskill-eval-workspace"), "--workspace", file_okay=False
+    ),
+) -> None:
+    """Write an immutable execution plan; never invoke a model or Agent."""
+    try:
+        spec = EvolutionExecutionPlanSpec.load(config_path)
+        result = RealEvolutionExecutionPlanner(workspace).prepare(spec)
+    except (OSError, ValueError, RuntimeError) as exc:
+        raise typer.BadParameter(str(exc), param_hint="CONFIG") from exc
+    typer.echo(
+        json.dumps(
+            {
+                "plan_id": str(result.plan.plan_id),
+                "directory": str(result.directory),
+                "total_agent_runs": result.plan.total_agent_runs,
+                "total_estimated_cost_microusd": (
+                    result.plan.total_estimated_cost_microusd
+                ),
+                "real_calls_executed": False,
+                "locked_content_accessed": False,
+            },
+            sort_keys=True,
+        )
+    )
+
+
+@evolution_plan_app.command("inspect")
+def evolution_plan_inspect(
+    plan_directory: Path = typer.Argument(..., exists=True, file_okay=False),  # noqa: B008
+) -> None:
+    """Verify and print the complete immutable execution plan."""
+    try:
+        result = RealEvolutionExecutionPlanner(plan_directory.parent.parent).verify(
+            plan_directory
+        )
+    except (OSError, ValueError, RuntimeError) as exc:
+        raise typer.BadParameter(str(exc), param_hint="PLAN_DIR") from exc
+    typer.echo(result.plan.model_dump_json(indent=2))
+
+
+@evolution_plan_app.command("verify")
+def evolution_plan_verify(
+    plan_directory: Path = typer.Argument(..., exists=True, file_okay=False),  # noqa: B008
+) -> None:
+    """Detect any modification to a prepared execution plan."""
+    try:
+        result = RealEvolutionExecutionPlanner(plan_directory.parent.parent).verify(
+            plan_directory
+        )
+    except (OSError, ValueError, RuntimeError) as exc:
+        raise typer.BadParameter(str(exc), param_hint="PLAN_DIR") from exc
+    typer.echo(
+        json.dumps(
+            {
+                "valid": True,
+                "plan_id": str(result.plan.plan_id),
+                "real_calls_executed": result.plan.real_calls_executed,
+                "locked_content_accessed": result.plan.locked_content_accessed,
+            },
+            sort_keys=True,
+        )
+    )
 
 
 def _promotion_summary(result: PromotionWorkflowResult) -> dict[str, object]:
