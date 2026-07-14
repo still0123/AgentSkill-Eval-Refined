@@ -1,0 +1,41 @@
+{
+  "schema_version": "ase/real-llm-proposal-smoke-result/v1alpha1",
+  "proposal_job_id": "bea91c41-dc9a-53ba-8a95-be18783c5e13",
+  "provider": "deepseek",
+  "model": "deepseek-v4-pro",
+  "proposal_count": 4,
+  "input_tokens": 998,
+  "output_tokens": 559,
+  "cost_microusd": 921,
+  "authorized_cost_microusd": 10000,
+  "duration_ms": 10025.932832999999,
+  "response_sha256": "bdd01aad9e5ae9d2b6c5c68376245b9de2e1a6bf2894b3423699f408dc4f5d8d",
+  "proposals_sha256": "b9d9750c7a3831e8bc111956f810ff6656ff9fdfe903fac92ec5abb4571f093f",
+  "artifact_verification_passed": true,
+  "secret_scan_passed": true,
+  "search_executed": false,
+  "locked_test_accessed": false,
+  "candidates": [
+    {
+      "id": "normalization-boundary-check",
+      "failure_label": "TASK_UNDERSTANDING",
+      "reason": "Add explicit normalization-boundary identification before acting."
+    },
+    {
+      "id": "exception-cleanup-plan",
+      "failure_label": "PLANNING",
+      "reason": "Plan cleanup and rollback behavior for exceptional paths."
+    },
+    {
+      "id": "retry-accounting-guidance",
+      "failure_label": "TOOL_RECOVERY",
+      "reason": "Account for retry budgets before and during tool recovery."
+    },
+    {
+      "id": "runtime-evidence-requirement",
+      "failure_label": "VERIFICATION",
+      "reason": "Require executable runtime evidence before finalizing a defect fix."
+    }
+  ],
+  "claim_limit": "Real LLM proposal-path evidence only; no candidate quality or Skill improvement claim."
+}

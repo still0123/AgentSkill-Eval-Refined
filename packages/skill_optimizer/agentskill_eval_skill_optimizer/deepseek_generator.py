@@ -201,12 +201,12 @@ class DeepSeekHypothesisGenerator:
             raise DeepSeekGeneratorError(
                 "DeepSeek proposal generation requires confirmation and budget limits"
             )
-        self.authorization.reserve(estimated_cost)
         secret = os.environ.get(self.spec.secret_env_name)
         if not secret:
             raise DeepSeekGeneratorError(
                 f"DeepSeek proposal Secret {self.spec.secret_env_name} is not set"
             )
+        self.authorization.reserve(estimated_cost)
         started = time.monotonic()
         response_bytes = self.transport.post(
             f"{str(self.spec.base_url).rstrip('/')}/chat/completions",

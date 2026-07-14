@@ -71,6 +71,14 @@ class FailureEvidenceBundle(FrozenModel):
             raise EvolutionError(f"invalid train failure bundle {path}: {exc}") from exc
 
 
+EXCLUDED_PROPOSAL_FAILURES = {
+    FailureLabel.ENVIRONMENT,
+    FailureLabel.BUDGET,
+    FailureLabel.JUDGE,
+    FailureLabel.UNKNOWN,
+}
+
+
 class FailureGuidedEvolutionSpec(FrozenModel):
     schema_version: Literal["ase/failure-guided-evolution/v1alpha1"]
     name: str = Field(min_length=1)
@@ -156,6 +164,36 @@ class EligibilityDecision(FrozenModel):
     reason: str = Field(min_length=1)
 
 
+def classify_failure_bundle(bundle: FailureEvidenceBundle) -> Tuple[EligibilityDecision, ...]:
+    """Reduce train diagnoses to the sanitized evidence visible to proposal generators."""
+
+    decisions = []
+    for diagnosis in bundle.diagnoses:
+        for finding in diagnosis.findings:
+            eligible = (
+                diagnosis.status == "diagnosed"
+                and finding.label not in EXCLUDED_PROPOSAL_FAILURES
+            )
+            decisions.append(
+                EligibilityDecision(
+                    run_id=diagnosis.run_id,
+                    label=finding.label,
+                    rule_id=finding.rule_id,
+                    confidence=finding.confidence,
+                    evidence_sequence_nos=finding.evidence_sequence_nos,
+                    eligible=eligible,
+                    reason=(
+                        "observable Agent/Skill behavior can be changed by guidance"
+                        if eligible
+                        else "infrastructure, budget, Judge, unknown, or abstained failure"
+                    ),
+                )
+            )
+    return tuple(
+        sorted(decisions, key=lambda item: (str(item.run_id), item.label.value, item.rule_id))
+    )
+
+
 class ImprovementHypothesis(FrozenModel):
     id: str = Field(pattern=r"^[a-z0-9][a-z0-9-]{2,79}$")
     failure_label: FailureLabel
@@ -204,6 +242,41 @@ class OptimizationContext(FrozenModel):
     locked_test_accessed: Literal[False] = False
     raw_rationale_stored: Literal[False] = False
     hidden_reasoning_stored: Literal[False] = False
+
+
+def build_hypothesis_request(
+    base_skill: Path, context: OptimizationContext, max_hypotheses: int
+) -> Dict[str, object]:
+    """Build the sole payload allowed to cross a proposal-generator trust boundary."""
+
+    return {
+        "schema_version": "ase/process-hypothesis-request/v1alpha1",
+        "source_split": "train",
+        "base_skill": {
+            "sha256": context.base_skill_sha256,
+            "content": base_skill.read_text(encoding="utf-8"),
+        },
+        "eligible_failures": [item.model_dump(mode="json") for item in context.eligible],
+        "max_hypotheses": max_hypotheses,
+        "output_contract": "structured_hypotheses_only_no_case_answers_no_hidden_reasoning",
+    }
+
+
+def proposal_evidence_refs(
+    context: OptimizationContext, label: FailureLabel
+) -> Tuple[str, ...]:
+    """Return stable lineage references without exposing diagnosis rationale text."""
+
+    refs = tuple(
+        sorted(
+            f"diagnosis://{item.run_id}/{item.rule_id}"
+            for item in context.eligible
+            if item.label == label
+        )
+    )
+    if not refs:
+        raise EvolutionError("proposal has no eligible train evidence")
+    return refs
 
 
 class EvolutionHandoff(FrozenModel):
@@ -401,13 +474,6 @@ class FailureGuidedEvolutionResult:
 class FailureGuidedSkillEvolution:
     """Create hypotheses from train diagnoses and delegate selection to the existing search."""
 
-    EXCLUDED = {
-        FailureLabel.ENVIRONMENT,
-        FailureLabel.BUDGET,
-        FailureLabel.JUDGE,
-        FailureLabel.UNKNOWN,
-    }
-
     def __init__(self, workspace: Path) -> None:
         self.workspace = workspace.resolve()
         self.writer = AtomicFileWriter()
@@ -429,7 +495,7 @@ class FailureGuidedSkillEvolution:
         bundle_sha = self._sha(spec.failure_bundle_path.read_bytes())
         validation_sha = self._sha(spec.validation_search_path.read_bytes())
         regression_sha = self._sha(spec.regression_dev_path.read_bytes())
-        decisions = self._classify(bundle)
+        decisions = classify_failure_bundle(bundle)
         context = OptimizationContext(
             source_split=bundle.split,
             base_skill_sha256=base_sha,
@@ -493,7 +559,9 @@ class FailureGuidedSkillEvolution:
             if artifact.generator != generator_identity:
                 raise EvolutionError("persisted hypothesis generator identity mismatch")
             if process_generator is not None or deepseek_generator is not None:
-                request = self._process_request(base, context, spec.generator.max_hypotheses)
+                request = build_hypothesis_request(
+                    base, context, spec.generator.max_hypotheses
+                )
                 if artifact.invocation_evidence is None:
                     raise EvolutionError("persisted proposal Generator evidence is missing")
                 expected_request_sha = self._sha(canonical_json(request))
@@ -505,7 +573,7 @@ class FailureGuidedSkillEvolution:
                         raise EvolutionError("persisted DeepSeek Generator request hash mismatch")
             hypotheses = artifact.hypotheses
         elif process_generator is not None:
-            request = self._process_request(base, context, spec.generator.max_hypotheses)
+            request = build_hypothesis_request(base, context, spec.generator.max_hypotheses)
             try:
                 generated = process_generator.generate(
                     request,
@@ -519,7 +587,7 @@ class FailureGuidedSkillEvolution:
                     failure_label=item.failure_label,
                     hypothesis=item.hypothesis,
                     instruction=item.instruction,
-                    evidence_refs=self._evidence_refs(context, item.failure_label),
+                    evidence_refs=proposal_evidence_refs(context, item.failure_label),
                     risks=item.risks,
                 )
                 for item in generated.proposals
@@ -538,7 +606,7 @@ class FailureGuidedSkillEvolution:
             )
             self._write(hypotheses_path, artifact.model_dump(mode="json"))
         elif deepseek_generator is not None:
-            request = self._process_request(base, context, spec.generator.max_hypotheses)
+            request = build_hypothesis_request(base, context, spec.generator.max_hypotheses)
             try:
                 deepseek_generated = deepseek_generator.generate(
                     request,
@@ -552,7 +620,7 @@ class FailureGuidedSkillEvolution:
                     failure_label=item.failure_label,
                     hypothesis=item.hypothesis,
                     instruction=item.instruction,
-                    evidence_refs=self._evidence_refs(context, item.failure_label),
+                    evidence_refs=proposal_evidence_refs(context, item.failure_label),
                     risks=item.risks,
                 )
                 for item in deepseek_generated.proposals
@@ -683,35 +751,6 @@ class FailureGuidedSkillEvolution:
         path = self.workspace / "evolution-jobs" / str(evolution_id) / "evolution-report.json"
         return EvolutionReport.model_validate_json(path.read_bytes())
 
-    @staticmethod
-    def _process_request(
-        base_skill: Path, context: OptimizationContext, max_hypotheses: int
-    ) -> Dict[str, object]:
-        return {
-            "schema_version": "ase/process-hypothesis-request/v1alpha1",
-            "source_split": "train",
-            "base_skill": {
-                "sha256": context.base_skill_sha256,
-                "content": base_skill.read_text(encoding="utf-8"),
-            },
-            "eligible_failures": [item.model_dump(mode="json") for item in context.eligible],
-            "max_hypotheses": max_hypotheses,
-            "output_contract": ("structured_hypotheses_only_no_case_answers_no_hidden_reasoning"),
-        }
-
-    @staticmethod
-    def _evidence_refs(context: OptimizationContext, label: FailureLabel) -> Tuple[str, ...]:
-        refs = tuple(
-            sorted(
-                f"diagnosis://{item.run_id}/{item.rule_id}"
-                for item in context.eligible
-                if item.label == label
-            )
-        )
-        if not refs:
-            raise EvolutionError("Process Generator proposal has no eligible evidence")
-        return refs
-
     def _regression_gate(
         self,
         spec: FailureGuidedEvolutionSpec,
@@ -791,31 +830,6 @@ class FailureGuidedSkillEvolution:
                 len(losses) <= spec.constraints.max_loss_cases
                 and overhead <= spec.constraints.max_token_overhead_ratio
             ),
-        )
-
-    @classmethod
-    def _classify(cls, bundle: FailureEvidenceBundle) -> Tuple[EligibilityDecision, ...]:
-        decisions = []
-        for diagnosis in bundle.diagnoses:
-            for finding in diagnosis.findings:
-                eligible = diagnosis.status == "diagnosed" and finding.label not in cls.EXCLUDED
-                decisions.append(
-                    EligibilityDecision(
-                        run_id=diagnosis.run_id,
-                        label=finding.label,
-                        rule_id=finding.rule_id,
-                        confidence=finding.confidence,
-                        evidence_sequence_nos=finding.evidence_sequence_nos,
-                        eligible=eligible,
-                        reason=(
-                            "observable Agent/Skill behavior can be changed by guidance"
-                            if eligible
-                            else "infrastructure, budget, Judge, unknown, or abstained failure"
-                        ),
-                    )
-                )
-        return tuple(
-            sorted(decisions, key=lambda item: (str(item.run_id), item.label.value, item.rule_id))
         )
 
     @staticmethod

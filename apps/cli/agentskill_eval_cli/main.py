@@ -72,6 +72,8 @@ from agentskill_eval_skill_optimizer import (
     PromotionWorkflow,
     PromotionWorkflowResult,
     RealEvaluationAuthorization,
+    RealLLMProposalService,
+    RealLLMProposalSpec,
 )
 from agentskill_eval_trace_intelligence import compare_traces
 
@@ -105,6 +107,8 @@ evolution_release_app = typer.Typer(help="Prepare and verify offline evolution r
 evolution_app.add_typer(evolution_release_app, name="release")
 evolve_app = typer.Typer(help="Generate Skill candidates from train failure diagnoses.")
 optimize_app.add_typer(evolve_app, name="evolve")
+proposal_app = typer.Typer(help="Generate audited real-LLM proposals without running search.")
+optimize_app.add_typer(proposal_app, name="proposal")
 final_app = typer.Typer(help="Evaluate a frozen base/winner pair on an independent split.")
 app.add_typer(final_app, name="final")
 skill_app = typer.Typer(help="Inspect and promote immutable Agent Skill versions.")
@@ -1110,6 +1114,121 @@ def evolve_status(
 ) -> None:
     """Read one immutable failure-guided evolution report."""
     typer.echo(FailureGuidedSkillEvolution(workspace).load(evolution_id).model_dump_json(indent=2))
+
+
+@proposal_app.command("preflight")
+def proposal_preflight(
+    spec_path: Path = typer.Argument(  # noqa: B008
+        ..., exists=True, dir_okay=False, help="Frozen real-LLM proposal-only spec."
+    ),
+) -> None:
+    """Show the exact model identity, hashes, call count, and conservative cost bound."""
+    spec = RealLLMProposalSpec.load(spec_path)
+    preflight = RealLLMProposalService(Path(".")).preflight(spec)
+    typer.echo(preflight.model_dump_json(indent=2))
+
+
+@proposal_app.command("run")
+def proposal_run(
+    spec_path: Path = typer.Argument(  # noqa: B008
+        ..., exists=True, dir_okay=False, help="Frozen real-LLM proposal-only spec."
+    ),
+    workspace: Path = typer.Option(  # noqa: B008
+        Path(".agentskill-eval-workspace"), "--workspace", file_okay=False
+    ),
+    confirm_real_run: bool = typer.Option(False, "--confirm-real-run"),  # noqa: B008
+    max_cost_microusd: Optional[int] = typer.Option(  # noqa: B008
+        None, "--max-cost-microusd", min=1
+    ),
+    max_calls: Optional[int] = typer.Option(None, "--max-calls", min=1),  # noqa: B008
+) -> None:
+    """Perform one explicitly authorized proposal call and persist immutable evidence."""
+    spec = RealLLMProposalSpec.load(spec_path)
+    service = RealLLMProposalService(workspace)
+    preflight = service.preflight(spec)
+    if not confirm_real_run:
+        raise typer.BadParameter(
+            "real LLM proposal generation requires --confirm-real-run",
+            param_hint="--confirm-real-run",
+        )
+    if max_cost_microusd is None or max_calls is None:
+        raise typer.BadParameter(
+            "real LLM proposal generation requires cost and call limits",
+            param_hint="--max-cost-microusd/--max-calls",
+        )
+    typer.echo(
+        json.dumps(
+            {
+                "event": "real_llm_proposal_authorization",
+                "provider": preflight.provider,
+                "model": preflight.model,
+                "planned_calls": preflight.planned_calls,
+                "candidate_count": preflight.candidate_count,
+                "estimated_max_cost_microusd": preflight.estimated_max_cost_microusd,
+                "authorized_calls": max_calls,
+                "authorized_cost_microusd": max_cost_microusd,
+                "search_will_execute": False,
+                "locked_test_will_execute": False,
+            },
+            sort_keys=True,
+        ),
+        err=True,
+    )
+    authorization = DeepSeekGeneratorAuthorization(
+        confirm_real_run=True,
+        max_calls=max_calls,
+        max_cost_microusd=max_cost_microusd,
+    )
+    result = service.run(spec, authorization)
+    typer.echo(
+        json.dumps(
+            {
+                "proposal_job_id": str(result.manifest.proposal_job_id),
+                "provider": result.manifest.provider,
+                "model": result.manifest.model,
+                "proposal_count": result.manifest.proposal_count,
+                "cost_microusd": result.manifest.invocation_evidence.cost_microusd,
+                "calls_consumed": authorization.calls_consumed,
+                "search_executed": result.manifest.search_executed,
+                "locked_test_accessed": result.manifest.locked_test_accessed,
+                "manifest": str(result.directory / "proposal-manifest.json"),
+                "report_json": str(result.report_json),
+                "report_html": str(result.report_html),
+            },
+            sort_keys=True,
+        )
+    )
+
+
+@proposal_app.command("inspect")
+def proposal_inspect(
+    proposal_directory: Path = typer.Argument(..., exists=True, file_okay=False),  # noqa: B008
+) -> None:
+    """Inspect a completed proposal job after verifying all immutable artifacts."""
+    result = RealLLMProposalService(proposal_directory.parent.parent).verify(
+        proposal_directory
+    )
+    typer.echo(result.manifest.model_dump_json(indent=2))
+
+
+@proposal_app.command("verify")
+def proposal_verify(
+    proposal_directory: Path = typer.Argument(..., exists=True, file_okay=False),  # noqa: B008
+) -> None:
+    """Verify proposal artifact hashes and cross-file semantic consistency."""
+    result = RealLLMProposalService(proposal_directory.parent.parent).verify(
+        proposal_directory
+    )
+    typer.echo(
+        json.dumps(
+            {
+                "passed": True,
+                "proposal_job_id": str(result.manifest.proposal_job_id),
+                "proposal_count": result.manifest.proposal_count,
+            },
+            sort_keys=True,
+        )
+    )
 
 
 @benchmark_app.command("generate")

@@ -54,7 +54,7 @@ commit: e2febda Add audited Process Skill proposal generator
 | 0 | Integration Baseline | 合并 PR、RC tag | 否 | 已完成 |
 | 1 | Observed Failure Evidence Bridge | 真实 train FailureEvidenceBundle | 可先不产生 | 已完成 |
 | 2 | Real Optimizer Evaluator | 真实候选选择信号 | smoke 已授权执行 | 已完成 |
-| 3 | DeepSeek Skill Proposal | 真实模型生成的 3～5 个候选 | 是，需授权 | 两次 train smoke 证据不足；train 已扩至 4 Case |
+| 3 | DeepSeek Skill Proposal | 真实模型生成的 3～5 个候选 | 是，需授权 | proposal-only smoke 已生成 4 个候选；尚未搜索 |
 | 4 | SkillVersion Promotion | Confirm、Locked、Skill v2 Manifest | 终评需授权 | 待执行 |
 | 5 | Real Evolution Evidence Release | 完整 v1→v2 实验报告 | 是，需授权 | 待执行 |
 | 6 | Second Skill Family | MCP Skill 真实实证 | 可选 | 暂缓 |
@@ -319,8 +319,15 @@ Train Experiment：41ff1ca2-ab2e-5990-b05b-70b7aa1f274d
 Train Runs：首次 4（2 completed，2 invalid）；工具预算修正后复跑 4（2 completed，2 invalid）
 Train Agent 费用：首次 101266 / 300000；复跑 100941 / 220000 microusd
 Failure Bridge：两次均 INSUFFICIENT；复跑 treatment 因 turn_limit invalid，仍无 eligible task failure
-候选数：0；证据不足，proposal 按协议未调用
-Generator 费用：0 / 100000 microusd
+历史 coupled-evolution 尝试候选数：0；当时证据不足，proposal 按协议未调用。
+
+2026-07-14 后续以独立 proposal-only CLI 完成真实 Generator smoke：
+
+- DeepSeek 调用：1；
+- 候选数：4；
+- Generator 费用：921 / 10000 microusd；
+- 输入证据：synthetic/simulated 脱敏 train fixture；
+- search、regression、confirmation、locked test：均未执行。
 CI：Python、Dashboard、Secret Scan 全部通过
 ```
 

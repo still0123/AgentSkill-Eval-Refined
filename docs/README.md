@@ -26,6 +26,7 @@
 - [Benchmark-guided Skill Search MVP](./benchmark-guided-skill-search.md)
 - [Failure-Guided Skill Evolution MVP](./failure-guided-skill-evolution.md)
 - [Audited Process Skill Proposal Generator MVP](./audited-process-skill-proposal-generator.md)
+- [Real LLM / DeepSeek Skill Proposal MVP](./deepseek-skill-proposal.md)
 - [Observed Failure Evidence Bridge MVP](./observed-failure-evidence-bridge.md)
 - [Independent Final Evaluation MVP](./independent-final-evaluation.md)
 - [Real Agent Evaluation Evidence MVP](./real-agent-evidence.md)

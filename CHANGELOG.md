@@ -5,6 +5,15 @@ after the first stable release.
 
 ## [Unreleased]
 
+### Added
+
+- A proposal-only real LLM job and CLI that reuse the DeepSeek OpenAI-compatible Generator without
+  constructing search, regression, confirmation, or locked-test work.
+- Immutable proposal manifests and offline reports freezing provider/model parameters, prompt,
+  schema, request, input and candidate hashes, token/cost evidence, and modification lineage.
+- One authorized `deepseek-v4-pro` proposal-only smoke producing four candidates for 921 microusd,
+  with offline verification and Secret scans passing and no search or locked-test access.
+
 ### Fixed
 
 - Replaced the contradictory repository-per-split policy with one executable exposure-zone
