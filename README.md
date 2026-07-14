@@ -278,6 +278,10 @@ docs/                    模块级设计和操作文档
 
 完整文档索引见 [`docs/README.md`](./docs/README.md)。
 
+后续开发请按
+[`Skill v1→v2 分阶段执行工作文档`](./docs/skill-evolution-execution-roadmap.md)
+逐阶段进行；该路线优先完成真实优化证据，不提前扩建平台。
+
 ## 当前边界
 
 `v0.1.0-rc1` 是可本地复现的研究型 RC，不是完整生产平台：

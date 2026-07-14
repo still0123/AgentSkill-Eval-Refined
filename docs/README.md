@@ -2,6 +2,10 @@
 
 本目录保存架构边界、实验协议、复现方法和各纵切的结论限制。
 
+## 后续执行路线
+
+- [Skill v1→v2 分阶段执行工作文档](./skill-evolution-execution-roadmap.md)
+
 ## 可信实验基础
 
 - [P0 本地存储与恢复协议](./local-storage.md)
