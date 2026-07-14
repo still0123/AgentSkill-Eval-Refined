@@ -2,7 +2,7 @@
 
 更新日期：2026-07-14
 
-基线：`main@5e35f91`
+基线：`main@ae5e842`
 
 状态：核心工程 MVP 已完成；真实 Skill v2 研究闭环保留为后续实验课题
 
@@ -33,6 +33,7 @@ Skill 缺陷，也没有消费已授权但不满足前提的 proposal 调用。
 | Skill Search | 候选生成、真实/模拟 evaluator、successive halving、regression_dev | adaptive search 结果不等同 locked-test 结论 |
 | 独立终评 | confirmation、一次性 locked test、burn rule | 工程链路已完成 |
 | Promotion | 人工审核、父版本哈希、不可变 SkillVersion、回滚指针 | 当前真实 v2 未发布；Fake fixture 只证明流程 |
+| Evidence Release | `prepare`、`verify`、`inspect` CLI，离线 HTML、diff、索引和审计包 | Stage 5A.2 已用 Fake Promotion fixture 完成端到端验收 |
 | 多场景 | 软件工程、MCP、Memory/RAG 统一入口与专项指标 | MCP、Memory/RAG 仍是离线 simulated Lab |
 | 可视化 | 本地只读 Dashboard 展示实验、Trace、候选和版本谱系 | 不承担写操作或在线调度 |
 
@@ -109,8 +110,9 @@ v1→v2 正向案例仍是后续研究目标。
 恢复后仍必须沿用 train、validation_search、regression_dev、validation_confirm 和 locked_test
 隔离，不得借用验证集生成候选。
 
-## 8. 与 Stage 5A.2 的边界
+## 8. Stage 5A.2 集成状态
 
-Stage 5A.2 Evidence Release CLI Integration 在独立 worktree/分支开发。本收口阶段不修改其
-CLI、`release_evidence.py`、Promotion manifest、测试或发布目录。Stage 5A.2 合并后，只需把
-其最终 CLI 命令和产物链接补充到项目导航，不需要重新设计本报告。
+Stage 5A.2 Evidence Release CLI Integration 已通过 PR #15 合入 `main`。它复用 Promotion
+Release Manifest 和既有发布准备层，提供 `evolution release prepare/verify/inspect`，并使用
+Fake Promotion fixture 验证从 handoff 到离线发布包的完整链路、幂等 prepare、哈希校验和篡改
+检测。该结果证明发布工具可用，但仍不表示真实 Skill v2 已产生或通过 locked test。
