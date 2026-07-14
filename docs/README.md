@@ -30,6 +30,7 @@
 - [阶段 4A：SkillVersion Promotion Core](./skill-version-promotion.md)
 - [阶段 4B：Promotion Workflow Integration](./promotion-workflow-integration.md)
 - [Stage 5 Evidence Release Prep](./evidence-release-prep.md)
+- [Stage 5A.2 Evidence Release CLI Integration](./evolution-evidence-release-cli.md)
 
 ## 专项 Lab 与界面
 

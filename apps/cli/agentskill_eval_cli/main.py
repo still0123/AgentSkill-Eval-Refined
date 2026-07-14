@@ -1,6 +1,7 @@
 """AgentSkill-Eval command-line interface."""
 
 import asyncio
+import hashlib
 import json
 from pathlib import Path
 from typing import List, Optional
@@ -55,6 +56,8 @@ from agentskill_eval_scenarios import UnifiedScenarioRunner, UnifiedScenarioSpec
 from agentskill_eval_skill_optimizer import (
     BenchmarkGuidedSkillSearch,
     DeepSeekGeneratorAuthorization,
+    EvolutionEvidenceReleasePreparer,
+    EvolutionReleaseConfig,
     FailureBridgeError,
     FailureGuidedEvolutionSpec,
     FailureGuidedSkillEvolution,
@@ -94,6 +97,10 @@ benchmark_app = typer.Typer(help="Generate, review, and publish audited benchmar
 app.add_typer(benchmark_app, name="benchmark")
 optimize_app = typer.Typer(help="Search validation data for a frozen Skill candidate.")
 app.add_typer(optimize_app, name="optimize")
+evolution_app = typer.Typer(help="Package and inspect frozen Skill evolution evidence.")
+app.add_typer(evolution_app, name="evolution")
+evolution_release_app = typer.Typer(help="Prepare and verify offline evolution releases.")
+evolution_app.add_typer(evolution_release_app, name="release")
 evolve_app = typer.Typer(help="Generate Skill candidates from train failure diagnoses.")
 optimize_app.add_typer(evolve_app, name="evolve")
 final_app = typer.Typer(help="Evaluate a frozen base/winner pair on an independent split.")
@@ -552,6 +559,73 @@ def final_status(
             sort_keys=True,
         )
     )
+
+
+@evolution_release_app.command("prepare")
+def evolution_release_prepare(
+    config_path: Path = typer.Argument(..., exists=True, dir_okay=False),  # noqa: B008
+    workspace: Path = typer.Option(  # noqa: B008
+        ..., "--workspace", file_okay=False, help="Output root for evolution-release/."
+    ),
+) -> None:
+    """Prepare one deterministic offline release from frozen Fake evidence."""
+    try:
+        config = EvolutionReleaseConfig.load(config_path)
+        result = EvolutionEvidenceReleasePreparer(workspace).prepare(config)
+    except (OSError, ValueError, RuntimeError) as exc:
+        raise typer.BadParameter(str(exc), param_hint="CONFIG") from exc
+    typer.echo(
+        json.dumps(
+            {
+                "release_dir": str(result.release_dir),
+                "manifest_sha256": result.manifest_sha256,
+                "report_json": str(result.report_json),
+                "report_html": str(result.report_html),
+                "audit_bundle": str(result.audit_bundle),
+                "idempotent_replay": result.idempotent_replay,
+                "simulated": True,
+                "evidence_class": "simulated",
+            },
+            sort_keys=True,
+        )
+    )
+
+
+@evolution_release_app.command("verify")
+def evolution_release_verify(
+    release_dir: Path = typer.Argument(..., exists=True, file_okay=False),  # noqa: B008
+) -> None:
+    """Verify manifest, members, parent lineage, and deterministic audit tar."""
+    try:
+        preparer = EvolutionEvidenceReleasePreparer(release_dir.parent)
+        manifest = preparer.verify(release_dir)
+    except (OSError, ValueError, RuntimeError) as exc:
+        raise typer.BadParameter(str(exc), param_hint="RELEASE_DIR") from exc
+    typer.echo(
+        json.dumps(
+            {
+                "valid": True,
+                "release_dir": str(release_dir.resolve()),
+                "manifest_sha256": hashlib.sha256(
+                    (release_dir / "release-manifest.json").read_bytes()
+                ).hexdigest(),
+                "input_fingerprint": manifest["input_fingerprint"],
+            },
+            sort_keys=True,
+        )
+    )
+
+
+@evolution_release_app.command("inspect")
+def evolution_release_inspect(
+    release_dir: Path = typer.Argument(..., exists=True, file_okay=False),  # noqa: B008
+) -> None:
+    """Verify and print a compact, claim-limited release summary."""
+    try:
+        summary = EvolutionEvidenceReleasePreparer(release_dir.parent).inspect(release_dir)
+    except (OSError, ValueError, RuntimeError) as exc:
+        raise typer.BadParameter(str(exc), param_hint="RELEASE_DIR") from exc
+    typer.echo(json.dumps(summary, ensure_ascii=False, sort_keys=True))
 
 
 def _promotion_summary(result: PromotionWorkflowResult) -> dict[str, object]:
