@@ -79,7 +79,7 @@ timeout/budget   → invalid 或预算终止
 ```
 
 再说明 provenance、许可证、commit、fixture、grader 和 split 都有内容哈希；同源缺陷不能跨
-train/validation/locked split。
+任何 split，repository/fork 不能从 adaptive 开发域进入 confirmation/locked holdout 域。
 
 ### 4:00–4:40：展示优化与版本发布
 
@@ -135,7 +135,7 @@ Human-gated Immutable Promotion
 - PairBlock 固定两臂顺序，避免时间、缓存和环境漂移；
 - 确定性 grader 优先，LLM Judge 只处理无法机械判断的语义质量；
 - simulated、process integration 和 observed-Agent 是不同证据类别，禁止混合聚合；
-- train、validation_search、regression_dev、confirmation 和 locked_test 按缺陷家族隔离。
+- Case/缺陷家族跨所有 split 隔离；仓库与 fork 在 adaptive 开发域和 frozen holdout 域之间隔离。
 
 ## 5. 高频面试问题
 

@@ -75,6 +75,30 @@ def test_dataset_validate_reports_frozen_demo_identity() -> None:
     assert len(payload["independence_groups"]) == 6
 
 
+def test_benchmark_split_plan_audit_reports_nonempty_locked_inventory() -> None:
+    result = runner.invoke(
+        app,
+        [
+            "benchmark",
+            "audit-split-plan",
+            str(ROOT / "examples/benchmark-sources/real-bug-fix-split-plan.yaml"),
+        ],
+    )
+
+    assert result.exit_code == 0, result.stdout
+    payload = json.loads(result.stdout)
+    assert payload["passed"] is True
+    assert payload["case_count"] == 12
+    assert payload["repository_isolation"] == "adaptive_vs_holdout"
+    assert payload["split_inventory"] == {
+        "locked_test": 4,
+        "regression_dev": 1,
+        "train": 1,
+        "validation_confirm": 4,
+        "validation_search": 2,
+    }
+
+
 def test_demo_run_command_executes_service_free_mock_loop(tmp_path: Path) -> None:
     result = runner.invoke(
         app,

@@ -19,18 +19,20 @@ test fails three times before the fix, passes three times after the fix, fails
 three times after reversing the production patch, and passes three times with a
 distinct alternative repair.
 
-## Replay
+## Historical replay boundary
 
-Follow `docs/automatic-benchmark-generation.md` using:
+This record predates the executable v1alpha2 split plan and intentionally remains immutable. The
+current CLI refuses to republish the twelve-Case source catalog directly. Follow
+`docs/automatic-benchmark-generation.md` to reconstruct the same candidate evidence through the
+audited five-split plan using:
 
 - `examples/benchmark-sources/more-itertools.bundle`
 - `examples/benchmark-sources/cachetools.bundle`
 - `examples/benchmark-sources/cross-repository-generation.example.yaml`
 
-The spec hash is path-independent, so cloning the bundles into another absolute
-directory preserves the job identity. Timestamps in transition manifests are
-expected to differ; frozen source, candidate, artifact, and DatasetVersion
-identities do not.
+Machine paths remain excluded from semantic hashes. The new split-specific Job and DatasetVersion
+identities differ from this historical four-Case publication because the allocation contract is now
+part of their frozen input.
 
 `result.sanitized.json` contains only hashes, public repository provenance, and
 aggregate verification facts. Raw temporary workspaces and verifier output are

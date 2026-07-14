@@ -17,6 +17,7 @@ sources:
     license_path: LICENSE
     contamination_risk: high
 target_split: validation_search
+split_plan_required: true
 generator_profile: local-git-history/v2
 verifier_profile: deterministic-subprocess/v1
 quality_gate:

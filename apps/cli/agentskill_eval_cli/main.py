@@ -12,8 +12,10 @@ import typer
 from agentskill_eval_benchmark_gen import (
     AutomaticBenchmarkGenerator,
     BenchmarkGenerationSpec,
+    BenchmarkSplitPlan,
     BenchmarkStore,
     DatasetLoader,
+    DatasetSplit,
     DemoExperimentRunner,
     DemoMode,
     DemoRunConfig,
@@ -1132,6 +1134,69 @@ def generate_benchmark(
                     candidate.provenance_family or candidate.after_commit
                     for candidate in spec.candidates
                 ),
+                "candidates": [
+                    {"id": str(item.id), "key": item.key, "status": item.status.value}
+                    for item in result.candidates
+                ],
+            },
+            sort_keys=True,
+        )
+    )
+
+
+@benchmark_app.command("audit-split-plan")
+def audit_benchmark_split_plan(
+    plan_path: Path = typer.Argument(  # noqa: B008
+        ..., exists=True, dir_okay=False, help="Complete five-split benchmark allocation."
+    ),
+) -> None:
+    """Fail closed unless every candidate is assigned once and exposure isolation passes."""
+    plan = BenchmarkSplitPlan.load(plan_path)
+    report = plan.audit()
+    report.require_passed()
+    inventory = {
+        split.value: len(case_ids) for split, case_ids in plan.splits.by_split().items()
+    }
+    typer.echo(
+        json.dumps(
+            {
+                "name": plan.name,
+                "version": plan.version,
+                "repository_isolation": plan.repository_isolation,
+                "locked_test_visibility": plan.locked_test_visibility,
+                "case_count": len(report.entries),
+                "split_inventory": inventory,
+                "passed": report.passed,
+                "claim_limit": plan.claim_limit,
+            },
+            ensure_ascii=False,
+            sort_keys=True,
+        )
+    )
+
+
+@benchmark_app.command("generate-split")
+def generate_benchmark_split(
+    plan_path: Path = typer.Argument(  # noqa: B008
+        ..., exists=True, dir_okay=False, help="Audited five-split benchmark allocation."
+    ),
+    split: DatasetSplit = typer.Argument(..., help="One split to materialize."),  # noqa: B008
+    workspace: Path = typer.Option(  # noqa: B008
+        Path(".agentskill-eval-workspace"), "--workspace", file_okay=False
+    ),
+) -> None:
+    """Generate one DatasetVersion input from an already-audited complete split plan."""
+    plan = BenchmarkSplitPlan.load(plan_path)
+    spec = plan.generation_spec(split)
+    result = AutomaticBenchmarkGenerator(workspace).generate(spec)
+    typer.echo(
+        json.dumps(
+            {
+                "job_id": str(result.job.id),
+                "status": result.job.status.value,
+                "plan": f"{plan.name}@{plan.version}",
+                "split": split.value,
+                "candidate_count": len(result.candidates),
                 "candidates": [
                     {"id": str(item.id), "key": item.key, "status": item.status.value}
                     for item in result.candidates

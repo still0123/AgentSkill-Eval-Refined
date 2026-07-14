@@ -205,8 +205,9 @@ CI：Ruff、mypy、182 pytest、wheel、Dashboard、Secret Scan 全部通过
 
 Benchmark 范围：
 - 将现有真实 Bug Fix Benchmark 扩展到约 10～16 个 Case
-- 至少来自 3 个仓库或独立缺陷家族
-- 明确划分 train、validation_search、regression_dev、validation_confirm
+- 至少来自多个仓库和独立缺陷家族
+- 明确划分 train、validation_search、regression_dev、validation_confirm、locked_test
+- repository/fork 不得跨 adaptive/holdout 暴露域，缺陷家族不得跨任何 split
 - 不追求 50 个 Case，不做大规模 GitHub 抓取
 
 本阶段不做：

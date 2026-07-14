@@ -34,13 +34,22 @@ from agentskill_eval_benchmark_gen.spec import (
 )
 from agentskill_eval_benchmark_gen.split_audit import (
     PROTECTED_SPLITS,
+    SPLIT_EXPOSURE_ZONES,
+    ExposureZone,
     SplitAuditEntry,
     SplitAuditError,
     SplitAuditReport,
     SplitLeakage,
     audit_loaded_datasets,
     audit_split_entries,
+    exposure_zone,
+    require_common_split_plan_lineage,
     split_inventory,
+)
+from agentskill_eval_benchmark_gen.split_plan import (
+    BenchmarkSplitPlan,
+    BenchmarkSplitPlanError,
+    SplitAssignments,
 )
 
 __all__ = [
@@ -48,6 +57,8 @@ __all__ = [
     "BenchmarkGenerationError",
     "BenchmarkGenerationSpec",
     "BenchmarkStore",
+    "BenchmarkSplitPlan",
+    "BenchmarkSplitPlanError",
     "BudgetSpec",
     "CaseCategory",
     "CaseGroupKeys",
@@ -65,15 +76,20 @@ __all__ = [
     "LoadedCase",
     "LoadedDataset",
     "GenerationResult",
+    "ExposureZone",
     "QualityGateSpec",
     "PROTECTED_SPLITS",
+    "SPLIT_EXPOSURE_ZONES",
     "RepositorySourceSpec",
     "SpecError",
+    "SplitAssignments",
     "SplitAuditEntry",
     "SplitAuditError",
     "SplitAuditReport",
     "SplitLeakage",
     "audit_loaded_datasets",
     "audit_split_entries",
+    "exposure_zone",
+    "require_common_split_plan_lineage",
     "split_inventory",
 ]

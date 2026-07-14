@@ -29,7 +29,7 @@ Skill 缺陷，也没有消费已授权但不满足前提的 proposal 调用。
 | 配对评测 | without/with Skill、v1/v2、PairBlock、重复实验、W/T/L | 支持 simulated 与 observed-Agent 严格隔离 |
 | 执行证据 | 不可变 Manifest、Trace、工具/命令/文件事件、审计包 | 不保存模型隐藏思维过程 |
 | 失败诊断 | 规则诊断、terminal reason、FailureEvidenceBundle | invalid 不进入 Skill 优化输入 |
-| Benchmark | 12 个真实 Git 历史缺陷家族、split 隔离、provenance、mutation 与替代修复验证 | 仅覆盖首个 Python Bug Fix family |
+| Benchmark | 12 个真实 Git 历史缺陷家族、暴露域隔离、非空 locked split、provenance、mutation 与替代修复验证 | locked Case 公开且高污染，仅覆盖首个 Python Bug Fix family |
 | Skill Search | 候选生成、真实/模拟 evaluator、successive halving、regression_dev | adaptive search 结果不等同 locked-test 结论 |
 | 独立终评 | confirmation、一次性 locked test、burn rule | 工程链路已完成 |
 | Promotion | 人工审核、父版本哈希、不可变 SkillVersion、回滚指针 | 当前真实 v2 未发布；Fake fixture 只证明流程 |

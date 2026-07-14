@@ -15,7 +15,13 @@ from uuid import NAMESPACE_URL, UUID, uuid5
 
 import yaml
 
-from agentskill_eval_benchmark_gen import DatasetLoader, DatasetSplit, LoadedDataset
+from agentskill_eval_benchmark_gen import (
+    DatasetLoader,
+    DatasetSplit,
+    LoadedDataset,
+    SplitAuditError,
+    require_common_split_plan_lineage,
+)
 from agentskill_eval_contracts import (
     CandidateEvaluation,
     CandidateOrigin,
@@ -371,6 +377,8 @@ class IndependentFinalEvaluator:
             raise FinalEvaluationError("non-simulated evaluator refuses a demo_only dataset")
         if any(item.metadata.split != expected_split for item in loaded.cases):
             raise FinalEvaluationError(f"dataset must contain {spec.stage} cases only")
+        if loaded.dataset_version is None:
+            raise FinalEvaluationError("process final input must be a published DatasetVersion")
         self._assert_disjoint_from_search(optimization_job_id, loaded)
         prepared = _PreparedDataset(
             source=source,
@@ -392,8 +400,17 @@ class IndependentFinalEvaluator:
             / "validation-dataset"
         )
         if not search_root.exists():
-            return
+            raise FinalEvaluationError("optimization job lacks frozen validation_search dataset")
         search = DatasetLoader().load(search_root)
+        if search.dataset_version is None:
+            raise FinalEvaluationError("validation_search input is not a published DatasetVersion")
+        assert final.dataset_version is not None
+        try:
+            require_common_split_plan_lineage(
+                (search.dataset_version.metadata, final.dataset_version.metadata)
+            )
+        except SplitAuditError as exc:
+            raise FinalEvaluationError(str(exc)) from exc
         fields = ("independence_group", "repository", "fork_lineage", "patch_family")
         for field in fields:
             search_values = {

@@ -5,7 +5,15 @@ after the first stable release.
 
 ## [Unreleased]
 
-No changes yet.
+### Fixed
+
+- Replaced the contradictory repository-per-split policy with one executable exposure-zone
+  contract: repositories/forks cannot cross adaptive to holdout, while Case and defect-family
+  identities remain unique across every split.
+- Reallocated all twelve public Git-history Cases so `more-itertools` is adaptive-only,
+  `cachetools` is holdout-only, and `locked_test` contains four one-shot public Cases.
+- Added fail-closed split-plan audit and per-split generation CLI commands; historical Stage 3 runs
+  that crossed the new boundary remain evidence but are ineligible for Promotion.
 
 ## [0.3.0-rc1] - 2026-07-14
 
