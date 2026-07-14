@@ -7,13 +7,14 @@ import { parseReportFile, parseReportText } from './parser'
 import type { CaseRow, DashboardState, ImportedReport } from './domain'
 import { safeExternalUrl } from './security'
 
-type Tab = 'overview' | 'cases' | 'trace' | 'benchmark' | 'search'
+type Tab = 'overview' | 'cases' | 'trace' | 'benchmark' | 'search' | 'promotion'
 const tabs: { id: Tab; label: string; eyebrow: string }[] = [
   { id: 'overview', label: 'Overview', eyebrow: '01' },
   { id: 'cases', label: 'Paired Cases', eyebrow: '02' },
   { id: 'trace', label: 'Trace & Diagnosis', eyebrow: '03' },
   { id: 'benchmark', label: 'Benchmark Generation', eyebrow: '04' },
   { id: 'search', label: 'Skill Search', eyebrow: '05' },
+  { id: 'promotion', label: 'Promotion', eyebrow: '06' },
 ]
 const state = ref<DashboardState>({ reports: [], loading: false, error: null })
 const active = ref<Tab>('overview')
@@ -22,6 +23,18 @@ const filter = ref({ outcome: 'all', category: 'all', group: 'all', query: '' })
 const experiment = computed(() => state.value.reports.find((r) => r.kind === 'experiment'))
 const benchmark = computed(() => state.value.reports.find((r) => r.kind === 'benchmark'))
 const search = computed(() => state.value.reports.find((r) => r.kind === 'skill-search'))
+const promotionReports = computed(() => state.value.reports.filter((r) => r.kind === 'promotion'))
+const promotion = computed(
+  () =>
+    promotionReports.value.find((r) => r.schemaVersion === 'ase/promotion-workflow/v1alpha1') ??
+    promotionReports.value.find((r) => r.schemaVersion === 'ase/skill-version-promotion/v1alpha1'),
+)
+const promotionRelease = computed(() =>
+  promotionReports.value.find((r) => r.schemaVersion === 'ase/promotion-release/v1alpha1'),
+)
+const skillVersion = computed(() =>
+  promotionReports.value.find((r) => r.schemaVersion === 'ase/skill-version/v1alpha1'),
+)
 const standaloneTraces = computed(() =>
   state.value.reports.filter((r) => ['trace', 'diagnosis', 'pair-diff'].includes(r.kind)),
 )
@@ -72,6 +85,40 @@ const benchmarkCandidates = computed<any[]>(
   () => benchmarkData.value.candidates ?? (benchmarkData.value.id ? [benchmarkData.value] : []),
 )
 const searchData = computed<any>(() => search.value?.data ?? {})
+const promotionData = computed<any>(() => promotion.value?.data ?? {})
+const promotionReleaseData = computed<any>(() => promotionRelease.value?.data ?? {})
+const skillVersionData = computed<any>(() => skillVersion.value?.data ?? {})
+const isWorkflow = computed(
+  () => promotion.value?.schemaVersion === 'ase/promotion-workflow/v1alpha1',
+)
+const promotionEvidence = computed<any[]>(() =>
+  isWorkflow.value
+    ? [promotionData.value.confirmation, promotionData.value.locked_test].filter(Boolean)
+    : (promotionData.value.evidence ?? []),
+)
+const humanReview = computed<any>(() =>
+  isWorkflow.value
+    ? promotionData.value.human_review
+    : [...(promotionData.value.transitions ?? [])]
+        .reverse()
+        .find((item: any) => ['APPROVED', 'REJECTED'].includes(item.to_status)),
+)
+const promotionLineage = computed<any[]>(
+  () => promotionData.value.lineage ?? promotionReleaseData.value.lineage ?? [],
+)
+const promotionSteps = computed<any[]>(() => {
+  if (!isWorkflow.value) return promotionData.value.transitions ?? []
+  const steps: any[] = [{ sequence: 1, to_status: 'HANDOFF_ACCEPTED' }]
+  if (promotionData.value.confirmation)
+    steps.push({ sequence: 2, to_status: 'VALIDATION_CONFIRMED' })
+  if (promotionData.value.locked_test)
+    steps.push({ sequence: 3, to_status: 'LOCKED_TEST_COMPLETED' })
+  if (promotionData.value.human_review)
+    steps.push({ sequence: 4, to_status: promotionData.value.human_review.decision })
+  if (promotionRelease.value)
+    steps.push({ sequence: 5, to_status: `RELEASE_${promotionReleaseData.value.decision}` })
+  return steps
+})
 const searchCandidates = computed<any[]>(
   () => searchData.value.candidates ?? (searchData.value.id ? [searchData.value] : []),
 )
@@ -162,7 +209,12 @@ function delta(value: number | null, suffix = ''): string {
   return value === null ? 'N/A' : `${value > 0 ? '+' : ''}${value.toLocaleString()}${suffix}`
 }
 function outcomeTone(value: string) {
-  return value === 'win' || value === 'pass' || value === 'FROZEN' || value === 'PUBLISHED'
+  return value === 'win' ||
+    value === 'pass' ||
+    value === 'FROZEN' ||
+    value === 'PUBLISHED' ||
+    value === 'APPROVED' ||
+    value === 'RELEASE_APPROVED'
     ? 'good'
     : value === 'loss' || value === 'fail' || value === 'REJECTED'
       ? 'bad'
@@ -177,6 +229,11 @@ function variantLabel(role: string) {
   return item
     ? `${item.name} · ${item.runner_snapshot?.name ?? 'runner'} / ${item.agent_snapshot?.model ?? 'agent'}`
     : 'N/A'
+}
+function available(value: unknown): string {
+  return value === undefined || value === null || value === ''
+    ? 'Unavailable / not provided'
+    : String(value)
 }
 
 async function importFiles(event: Event) {
@@ -203,6 +260,10 @@ async function loadDemo() {
       'trace-diagnosis.json',
       'benchmark-generation.json',
       'skill-search.json',
+      'promotion.json',
+      'skill-version.json',
+      'promotion-workflow.json',
+      'promotion-release.json',
     ]
     const loaded: ImportedReport[] = []
     for (const file of files) {
@@ -283,8 +344,8 @@ function clearData() {
         <h2>把已有报告带到一个安全的本地视图</h2>
         <p>
           支持 report.json、search-report.json、Benchmark
-          job/report、TraceManifest、FailureDiagnosis 与
-          PairTraceDiff。不会上传或执行其中的任何内容。
+          job/report、TraceManifest、FailureDiagnosis 与 PairTraceDiff、Promotion 和 SkillVersion
+          Manifest。不会上传或执行其中的任何内容。
         </p>
         <div>
           <label class="button primary"
@@ -661,7 +722,7 @@ function clearData() {
           </article>
         </section>
 
-        <section v-else class="content-stack">
+        <section v-else-if="active === 'search'" class="content-stack">
           <div v-if="search" class="simulation-banner">
             <Badge :tone="searchData.simulated ? 'warn' : 'info'">{{
               searchData.simulated ? 'SIMULATED SEARCH' : 'VALIDATION ONLY'
@@ -754,6 +815,287 @@ function clearData() {
                 }}</em></span
               >
             </div>
+          </div>
+        </section>
+
+        <section v-else class="content-stack promotion-view">
+          <div class="section-note">
+            <strong>Read-only promotion evidence</strong
+            ><span
+              >仅展示导入的可观测字段；缺失字段明确标记 unavailable，不推断审核或执行结果。</span
+            >
+          </div>
+          <div v-if="promotion" class="identity-row">
+            <div>
+              <span>PROMOTION</span><code>{{ promotionData.id }}</code>
+            </div>
+            <div>
+              <span>SKILL / TARGET VERSION</span
+              ><strong>{{ promotionData.skill_name }}@{{ promotionData.target_version }}</strong>
+            </div>
+            <div>
+              <span>STATUS</span
+              ><Badge :tone="outcomeTone(promotionData.status)">{{ promotionData.status }}</Badge>
+            </div>
+          </div>
+          <div v-else class="inline-empty">
+            Promotion state unavailable。请导入 ase/promotion-workflow/v1alpha1 或 Stage 4a
+            Promotion Manifest。
+          </div>
+
+          <div v-if="promotion" class="two-column">
+            <article class="panel">
+              <header>
+                <div>
+                  <p class="kicker">PROPOSAL LINEAGE</p>
+                  <h2>Frozen winner provenance</h2>
+                </div>
+                <Badge :tone="promotion.simulated ? 'warn' : 'info'">{{
+                  promotion.simulated ? 'FIXTURE / FAKE' : 'OBSERVED'
+                }}</Badge>
+              </header>
+              <dl class="data-list">
+                <div>
+                  <dt>Evolution / proposal</dt>
+                  <dd>
+                    <code>{{ available(promotionData.evolution_id) }}</code>
+                  </dd>
+                </div>
+                <div>
+                  <dt>Optimization job</dt>
+                  <dd>
+                    <code>{{ available(promotionData.optimization_job_id) }}</code>
+                  </dd>
+                </div>
+                <div>
+                  <dt>Winner candidate</dt>
+                  <dd>
+                    <code>{{ available(promotionData.winner_candidate_id) }}</code>
+                  </dd>
+                </div>
+                <div>
+                  <dt>Parent Skill SHA-256</dt>
+                  <dd>
+                    <code>{{ available(promotionData.base_skill_sha256) }}</code>
+                  </dd>
+                </div>
+                <div>
+                  <dt>Winner Skill SHA-256</dt>
+                  <dd>
+                    <code>{{ available(promotionData.winner_skill_sha256) }}</code>
+                  </dd>
+                </div>
+                <div>
+                  <dt>Published SkillVersion</dt>
+                  <dd>
+                    <code>{{
+                      available(
+                        promotionData.published_skill_version_id ??
+                          promotionData.skill_version_manifest_sha256 ??
+                          promotionReleaseData.skill_version_manifest_sha256,
+                      )
+                    }}</code>
+                  </dd>
+                </div>
+              </dl>
+            </article>
+            <article class="panel">
+              <header>
+                <div>
+                  <p class="kicker">HUMAN REVIEW</p>
+                  <h2>Decision</h2>
+                </div>
+                <Badge
+                  :tone="
+                    outcomeTone(
+                      humanReview?.decision ?? humanReview?.to_status ?? promotionData.status,
+                    )
+                  "
+                  >{{ humanReview?.decision ?? humanReview?.to_status ?? 'UNAVAILABLE' }}</Badge
+                >
+              </header>
+              <dl class="data-list">
+                <div>
+                  <dt>Actor</dt>
+                  <dd>{{ available(humanReview?.reviewer ?? humanReview?.actor) }}</dd>
+                </div>
+                <div>
+                  <dt>Decision time</dt>
+                  <dd>{{ available(humanReview?.reviewed_at ?? humanReview?.occurred_at) }}</dd>
+                </div>
+                <div>
+                  <dt>Reason</dt>
+                  <dd>{{ available(humanReview?.reason ?? promotionData.rejection_reason) }}</dd>
+                </div>
+                <div>
+                  <dt>Evidence class</dt>
+                  <dd>{{ promotion.simulated ? 'Fake / fixture only' : 'Observed evidence' }}</dd>
+                </div>
+              </dl>
+            </article>
+          </div>
+
+          <article v-if="promotion && promotionLineage.length" class="panel">
+            <header>
+              <div>
+                <p class="kicker">CONTENT-ADDRESSED LINEAGE</p>
+                <h2>Handoff → evolution → regression → hypotheses → search</h2>
+              </div>
+              <code>{{ shortId(promotionData.lineage_sha256) }}</code>
+            </header>
+            <div class="lineage-grid">
+              <div v-for="artifact in promotionLineage" :key="artifact.role">
+                <Badge tone="info">{{ artifact.role }}</Badge>
+                <code>{{ shortId(artifact.sha256) }}</code>
+                <small>{{ compact(artifact.size_bytes) }} bytes</small>
+              </div>
+            </div>
+          </article>
+
+          <article v-if="promotion" class="panel">
+            <header>
+              <div>
+                <p class="kicker">CONTROL FLOW</p>
+                <h2>Confirmation → locked test → review → publication</h2>
+              </div>
+            </header>
+            <div class="state-track promotion-track">
+              <span
+                v-for="step in promotionSteps"
+                :key="step.sequence"
+                class="reached"
+                :class="{ rejected: step.to_status === 'REJECTED' }"
+                :title="available(step.reason)"
+                >{{ step.to_status }}</span
+              >
+            </div>
+            <div class="promotion-evidence-grid">
+              <div v-for="stage in ['validation_confirm', 'locked_test']" :key="stage">
+                <template v-if="promotionEvidence.find((item) => item.stage === stage)">
+                  <Badge
+                    :tone="
+                      promotionEvidence.find((item) => item.stage === stage).decision ===
+                      'CONFIRMED'
+                        ? 'good'
+                        : 'bad'
+                    "
+                  >
+                    {{ promotionEvidence.find((item) => item.stage === stage).decision }}
+                  </Badge>
+                  <strong>{{ stage }}</strong>
+                  <code>{{
+                    available(
+                      promotionEvidence.find((item) => item.stage === stage)
+                        .final_evaluation_job_id,
+                    )
+                  }}</code>
+                  <small
+                    >report
+                    {{
+                      shortId(promotionEvidence.find((item) => item.stage === stage).report_sha256)
+                    }}
+                    · validator
+                    {{
+                      available(
+                        promotionEvidence.find((item) => item.stage === stage).validator_version,
+                      )
+                    }}</small
+                  >
+                </template>
+                <template v-else>
+                  <Badge tone="warn">UNAVAILABLE</Badge><strong>{{ stage }}</strong
+                  ><small>Evidence field unavailable</small>
+                </template>
+              </div>
+            </div>
+          </article>
+
+          <article v-if="promotionRelease" class="panel">
+            <header>
+              <div>
+                <p class="kicker">IMMUTABLE PROMOTION RELEASE</p>
+                <h2>Decision · {{ promotionReleaseData.decision }}</h2>
+              </div>
+              <Badge :tone="outcomeTone(promotionReleaseData.decision)">{{
+                promotionReleaseData.decision
+              }}</Badge>
+            </header>
+            <div class="candidate-grid">
+              <div>
+                <span>Workflow ID</span
+                ><code>{{ available(promotionReleaseData.workflow_id) }}</code>
+              </div>
+              <div>
+                <span>Promotion ID</span
+                ><code>{{ available(promotionReleaseData.promotion_id) }}</code>
+              </div>
+              <div>
+                <span>Parent → winner hash</span
+                ><code
+                  >{{ shortId(promotionReleaseData.parent_skill_sha256) }} →
+                  {{ shortId(promotionReleaseData.winner_skill_sha256) }}</code
+                >
+              </div>
+              <div>
+                <span>SkillVersion Manifest SHA-256</span
+                ><code>{{ available(promotionReleaseData.skill_version_manifest_sha256) }}</code>
+              </div>
+              <div>
+                <span>Diff SHA-256</span
+                ><code>{{ available(promotionReleaseData.diff_sha256) }}</code>
+              </div>
+              <div>
+                <span>Released at</span
+                ><strong>{{ available(promotionReleaseData.released_at) }}</strong>
+              </div>
+            </div>
+            <div class="claim-limit">
+              <strong>Claim limit</strong
+              ><span>{{ available(promotionReleaseData.claim_limit) }}</span>
+            </div>
+          </article>
+
+          <article v-if="skillVersion" class="panel">
+            <header>
+              <div>
+                <p class="kicker">IMMUTABLE SKILLVERSION</p>
+                <h2>{{ skillVersionData.skill_name }}@{{ skillVersionData.version }}</h2>
+              </div>
+              <Badge :tone="skillVersionData.simulated_evidence ? 'warn' : 'good'">PUBLISHED</Badge>
+            </header>
+            <div class="candidate-grid">
+              <div>
+                <span>Manifest ID</span><code>{{ available(skillVersionData.id) }}</code>
+              </div>
+              <div>
+                <span>Promotion ID</span><code>{{ available(skillVersionData.promotion_id) }}</code>
+              </div>
+              <div>
+                <span>Parent → content hash</span
+                ><code
+                  >{{ shortId(skillVersionData.parent_content_sha256) }} →
+                  {{ shortId(skillVersionData.content_sha256) }}</code
+                >
+              </div>
+              <div>
+                <span>Diff SHA-256</span><code>{{ available(skillVersionData.diff_sha256) }}</code>
+              </div>
+              <div>
+                <span>Published at</span
+                ><strong>{{ available(skillVersionData.published_at) }}</strong>
+              </div>
+              <div>
+                <span>Content bytes</span
+                ><strong>{{ compact(skillVersionData.content_bytes) }}</strong>
+              </div>
+            </div>
+            <div class="claim-limit">
+              <strong>Claim limit</strong><span>{{ available(skillVersionData.claim_limit) }}</span>
+            </div>
+          </article>
+          <div v-if="!skillVersion && !promotionRelease" class="inline-empty">
+            Immutable SkillVersion Manifest unavailable；REJECTED 或尚未发布的 Promotion 不应生成
+            Manifest。
           </div>
         </section>
       </template>

@@ -75,6 +75,13 @@ from agentskill_eval_contracts.promotion import (
     SkillVersionManifest,
     SkillVersionPromotion,
 )
+from agentskill_eval_contracts.promotion_workflow import (
+    HumanReviewRecord,
+    PromotionLineageArtifact,
+    PromotionReleaseManifest,
+    PromotionWorkflowRecord,
+    PromotionWorkflowStatus,
+)
 from agentskill_eval_contracts.real_evidence import (
     ExecutableSnapshot,
     RealAttemptEvidence,
@@ -162,6 +169,7 @@ __all__ = [
     "FinalEvaluationStage",
     "FinalEvaluationStatus",
     "HexDigest",
+    "HumanReviewRecord",
     "MemoryRagSnapshot",
     "LockedTestReceipt",
     "OptimizationJob",
@@ -171,8 +179,12 @@ __all__ = [
     "PairTraceDiff",
     "PriceSnapshot",
     "PromotionEvidenceRef",
+    "PromotionLineageArtifact",
+    "PromotionReleaseManifest",
     "PromotionStatus",
     "PromotionTransition",
+    "PromotionWorkflowRecord",
+    "PromotionWorkflowStatus",
     "PublishedCase",
     "QualityGateResult",
     "ReplayBundleManifest",

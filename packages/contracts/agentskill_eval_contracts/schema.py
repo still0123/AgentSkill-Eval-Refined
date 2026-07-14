@@ -25,6 +25,10 @@ from agentskill_eval_contracts.final_evaluation import FinalEvaluationJob, Final
 from agentskill_eval_contracts.measurements import RunMeasurement
 from agentskill_eval_contracts.optimizer import OptimizationJob, SkillCandidate
 from agentskill_eval_contracts.promotion import SkillVersionManifest, SkillVersionPromotion
+from agentskill_eval_contracts.promotion_workflow import (
+    PromotionReleaseManifest,
+    PromotionWorkflowRecord,
+)
 from agentskill_eval_contracts.real_evidence import (
     RealAttemptEvidence,
     RealEvidenceRunManifest,
@@ -60,6 +64,8 @@ SCHEMA_MODELS: Dict[str, Type[BaseModel]] = {
         FinalEvaluationReport,
         SkillVersionPromotion,
         SkillVersionManifest,
+        PromotionWorkflowRecord,
+        PromotionReleaseManifest,
         RealPreflightReport,
         RealAttemptEvidence,
         RealEvidenceRunManifest,

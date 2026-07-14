@@ -927,6 +927,67 @@ td em {
 .candidate-table {
   overflow-x: auto;
 }
+.promotion-track {
+  padding-bottom: 4px;
+}
+.promotion-evidence-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 16px;
+}
+.promotion-evidence-grid > div {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 7px 10px;
+  padding: 13px;
+  border: 1px solid #293241;
+  border-radius: 6px;
+  background: #0d1219;
+}
+.promotion-evidence-grid code,
+.promotion-evidence-grid small {
+  grid-column: 2;
+  overflow-wrap: anywhere;
+  color: #718096;
+  font-size: 9px;
+}
+.lineage-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+.lineage-grid > div {
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid #293241;
+  border-radius: 6px;
+  background: #0d1219;
+}
+.lineage-grid code,
+.lineage-grid small {
+  color: #718096;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 9px;
+}
+.claim-limit {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 12px;
+  margin-top: 14px;
+  padding: 12px;
+  border-left: 2px solid var(--amber);
+  background: #2b241655;
+  color: #c9bea5;
+  font-size: 11px;
+}
+.claim-limit span {
+  overflow-wrap: anywhere;
+}
 @media (max-width: 1050px) {
   .shell {
     grid-template-columns: 76px minmax(0, 1fr);
@@ -1064,6 +1125,12 @@ td em {
     margin: 0;
   }
   .candidate-grid {
+    grid-template-columns: 1fr;
+  }
+  .promotion-evidence-grid {
+    grid-template-columns: 1fr;
+  }
+  .lineage-grid {
     grid-template-columns: 1fr;
   }
   .research-chart {

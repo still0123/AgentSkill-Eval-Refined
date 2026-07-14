@@ -1,5 +1,5 @@
 export type ReportKind =
-  'experiment' | 'trace' | 'diagnosis' | 'pair-diff' | 'benchmark' | 'skill-search'
+  'experiment' | 'trace' | 'diagnosis' | 'pair-diff' | 'benchmark' | 'skill-search' | 'promotion'
 
 export interface ImportedReport {
   id: string
