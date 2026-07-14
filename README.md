@@ -95,6 +95,7 @@ without-Skill       Skill v1         Skill v2
 | Real Optimizer Evaluator | 用真实 Agent 的 Case 结果、成本和 Trace 选择候选并执行 regression_dev | 已实现，真实 smoke 需单独授权 |
 | Observed Failure Bridge | 从真实 Skill treatment Run 导出可追溯的 train failure bundle | 已实现，不调用模型 |
 | Dashboard | 查看报告、Trace、候选、Promotion 谱系和 SkillVersion 状态 | 本地只读版 |
+| Skill Evolution Timeline | 聚合 Failure→Proposal→Search→Regression→Confirm→Locked→Review→Published 证据链 | Stage 4C 本地只读版已实现 |
 
 `simulated` 只证明评测管线可用，不能当作真实模型能力证据。
 

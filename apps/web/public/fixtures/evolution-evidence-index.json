@@ -1,0 +1,9 @@
+{
+  "schema_version": "ase/evolution-evidence-index/v1alpha1",
+  "input_fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "artifacts": [
+    { "role": "evolution_report", "archive_path": "evidence/evolution-report.json", "source_sha256": "4444444444444444444444444444444444444444444444444444444444444444", "bundle_sha256": "5555555555555555555555555555555555555555555555555555555555555555", "size_bytes": 4096 },
+    { "role": "confirmation_report", "archive_path": "evidence/confirmation-report.json", "source_sha256": "6666666666666666666666666666666666666666666666666666666666666666", "bundle_sha256": "7777777777777777777777777777777777777777777777777777777777777777", "size_bytes": 1024 },
+    { "role": "locked_test_report", "archive_path": "evidence/locked-test-report.json", "source_sha256": "8888888888888888888888888888888888888888888888888888888888888888", "bundle_sha256": "9999999999999999999999999999999999999999999999999999999999999999", "size_bytes": 1024 }
+  ]
+}

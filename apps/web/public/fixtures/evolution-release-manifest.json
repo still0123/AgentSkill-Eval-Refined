@@ -1,0 +1,22 @@
+{
+  "schema_version": "ase/evolution-evidence-release/v1alpha1",
+  "generator_version": "evolution-evidence-release/v1",
+  "input_fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "workflow_id": "fake-workflow-001",
+  "promotion_id": "fake-promotion-001",
+  "evolution_id": "fake-evolution-dashboard-001",
+  "optimization_job_id": "fake-search-001",
+  "skill_name": "python-review",
+  "parent_version": "1.0.0",
+  "version": "2.0.0-fixture",
+  "parent_content_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+  "content_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+  "diff_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+  "evidence_class": "simulated",
+  "simulated": true,
+  "claim_limit": "Synthetic fixture demonstrates the read-only release chain only.",
+  "files": [
+    { "path": "evolution-report.json", "sha256": "4444444444444444444444444444444444444444444444444444444444444444", "size_bytes": 4096 },
+    { "path": "skill-diff.patch", "sha256": "3333333333333333333333333333333333333333333333333333333333333333", "size_bytes": 256 }
+  ]
+}

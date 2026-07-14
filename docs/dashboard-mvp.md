@@ -10,17 +10,17 @@ Dashboard 是现有 JSON 评测证据的纯浏览器只读视图。它不会运�
 
 ```bash
 cd apps/web
-npm ci
-npm run dev
+pnpm install --frozen-lockfile
+pnpm run dev
 ```
 
 Vite 默认入口为 `http://localhost:5173/`。生产构建：
 
 ```bash
-npm run typecheck
-npm run lint
-npm test
-npm run build
+pnpm run typecheck
+pnpm run lint
+pnpm test
+pnpm run build
 ```
 
 静态产物位于 `apps/web/dist/`，可由任意静态文件服务器托管。
@@ -31,6 +31,8 @@ npm run build
 - Skill Search 报告、Job 或 Candidate：`ase/optimization-report/v1alpha1`、`ase/optimization-job/v1alpha1`、`ase/skill-candidate/v1alpha1`；
 - Benchmark Generation Job、Candidate、DatasetVersion，以及 Dashboard 聚合报告：对应 `ase/benchmark-*/v1alpha1`；
 - `TraceManifest`、`FailureDiagnosis`、`PairTraceDiff`：`ase/v1alpha1`，通过必需字段区分。
+- Evolution Evidence Release、Evidence Index、Real LLM Proposal 和 `skill-diff.patch`，用于
+  [Stage 4C Skill Evolution Timeline](./evolution-timeline-dashboard.md)。
 
 导入多个原子 Benchmark/Trace 文件时，Dashboard 会在对应视图并列展示。当前 Python 生成的 `report.json` 内嵌 `trace_intelligence` 也可直接展示。未知 schema version 会被拒绝并显示不兼容提示；缺失必需字段会显示具体错误。
 
@@ -49,7 +51,10 @@ npm run build
 
 ## Synthetic / simulated Fixture
 
-`apps/web/public/fixtures/` 提供四组脱敏演示数据：配对实验、Trace/Diagnosis、Benchmark Generation 和 Skill Search。Fixture 的 ID、结果、repository 和时间线均为合成内容；页面始终显示 `SYNTHETIC / SIMULATED` 警示。Fixture 只能验证界面、解析器和控制链路，不能伪装为真实 Agent/Skill 评测或支持任何性能、泛化和因果声明。
+`apps/web/public/fixtures/` 提供配对实验、Trace/Diagnosis、Benchmark Generation、Skill Search、
+Promotion 和 Evolution Evidence Release 脱敏演示数据。Fixture 的 ID、结果、repository 和时间线均为
+合成内容；页面始终显示 `SYNTHETIC / SIMULATED` 警示。Fixture 只能验证界面、解析器和控制链路，
+不能伪装为真实 Agent/Skill 评测或支持任何性能、泛化和因果声明。
 
 ## 当前不支持
 
@@ -58,7 +63,8 @@ npm run build
 - Skill 编辑、Candidate 生成、Benchmark 审核或发布操作；
 - Final Evaluation、locked-test 访问或确认性结论；
 - 飞书、Java、MCP Runtime、Memory/RAG Runtime；
-- 报告目录/zip 批量导入、跨文件引用完整性验证和数字签名验证。
+- ZIP/tar 解包、跨文件引用完整性验证和数字签名验证。Evolution Release 本地目录可选择导入，
+  但完整性仍须使用 CLI `evolution release verify` 验证。
 
 ## 后续接入 FastAPI 与飞书
 

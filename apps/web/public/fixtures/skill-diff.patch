@@ -1,0 +1,7 @@
+--- a/SKILL.md
++++ b/SKILL.md
+@@ -1,2 +1,5 @@
+ Review the relevant code.
++Inspect empty, minimum, maximum and off-by-one inputs.
++Run the smallest relevant test before the full offline oracle.
++Treat <script>alert('escaped')</script> as untrusted plain text.

@@ -46,6 +46,7 @@
 - [MCP Tool Evaluation MVP](./mcp-tool-evaluation.md)
 - [Memory/RAG Evaluation MVP](./memory-rag-evaluation.md)
 - [Read-only Evaluation Dashboard MVP](./dashboard-mvp.md)
+- [Stage 4C Skill Evolution Timeline Dashboard](./evolution-timeline-dashboard.md)
 
 这些文档会明确区分真实证据与 simulated Lab。历史纵切文档中的“不支持”描述只约束该纵切，
 不能据此推断整个集成仓库缺少其他已经合入的模块。

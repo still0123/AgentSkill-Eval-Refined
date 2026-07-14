@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseReportFile, parseReportText } from '../parser'
+import { parseReportFile, parseReportText, parseSha256File } from '../parser'
 import { IMPORT_LIMITS } from '../security'
 
 const minimal = {
@@ -46,6 +46,15 @@ describe('report parser', () => {
     await expect(parseReportFile(file)).rejects.toMatchObject({
       code: 'size',
     })
+  })
+
+  it('accepts only a strict SHA-256 release sidecar', async () => {
+    const valid = new File(['a'.repeat(64) + '\n'], 'release-manifest.sha256')
+    Object.defineProperty(valid, 'text', { value: async () => 'a'.repeat(64) + '\n' })
+    await expect(parseSha256File(valid)).resolves.toBe('a'.repeat(64))
+    const invalid = new File(['not-a-hash'], 'release-manifest.sha256')
+    Object.defineProperty(invalid, 'text', { value: async () => 'not-a-hash' })
+    await expect(parseSha256File(invalid)).rejects.toThrow(/格式无效/)
   })
 
   it('strictly requires the locked test boundary', () => {
@@ -136,5 +145,45 @@ describe('report parser', () => {
         }),
       ),
     ).toThrowError(/confirmation/)
+  })
+
+  it('recognizes Evolution Release, report, index and real proposal evidence', () => {
+    const report = parseReportText(
+      JSON.stringify({
+        schema_version: 'ase/evolution-evidence-report/v1alpha1',
+        skill_versions: {},
+        stages: {},
+        claim_limit: 'descriptive only',
+      }),
+    )
+    const manifest = parseReportText(
+      JSON.stringify({
+        schema_version: 'ase/evolution-evidence-release/v1alpha1',
+        evolution_id: 'evolution',
+        parent_content_sha256: 'parent',
+        content_sha256: 'child',
+        files: [],
+      }),
+    )
+    const index = parseReportText(
+      JSON.stringify({
+        schema_version: 'ase/evolution-evidence-index/v1alpha1',
+        artifacts: [],
+      }),
+    )
+    const proposal = parseReportText(
+      JSON.stringify({
+        schema_version: 'ase/real-llm-proposal-smoke-result/v1alpha1',
+        provider: 'deepseek',
+        model: 'deepseek-chat',
+        candidates: [],
+      }),
+    )
+    expect([report.kind, manifest.kind, index.kind, proposal.kind]).toEqual([
+      'evolution',
+      'evolution',
+      'evolution',
+      'evolution',
+    ])
   })
 })
