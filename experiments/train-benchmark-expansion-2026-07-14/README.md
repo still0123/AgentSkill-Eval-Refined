@@ -16,7 +16,7 @@ inference was used.
 - before, after, mutation, and alternative repair each repeated three times
 - all ten quality gates passed and all four candidates were explicitly reviewed
 - immutable DatasetVersion content SHA-256:
-  `e1abef442a625adb6640f72f395de12ab0c63bfac7684755db1595ef657beb7b`
+  `5224bdbc08ed565da4599ff9f6952c4ebeeacf27aaf728897744d4112136cb16`
 
 For every candidate, the test fails three times on the pinned pre-fix fixture,
 passes three times after the historical fix, fails three times after mutation,
@@ -34,6 +34,11 @@ Follow `docs/automatic-benchmark-generation.md` using the two offline bundles,
 `result.sanitized.json` contains public provenance, immutable hashes, quality
 gate outcomes, and aggregate verifier exits. Raw fixtures, command output, and
 machine-specific paths are intentionally not committed.
+
+The 2016 `cachetools` candidate uses a verifier compatibility shim for the
+standard-library relocation of `MutableMapping`. The shim only permits the
+historical fixture to import on supported modern Python versions; it does not
+change the fixture, repair, regression assertion, or expected exit pattern.
 
 ## Claim limit
 

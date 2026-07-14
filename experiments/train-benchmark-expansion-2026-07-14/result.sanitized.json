@@ -6,20 +6,20 @@
   "model_calls": 0,
   "paid_cost_microusd": 0,
   "job": {
-    "id": "80cb244c-fdf8-5fe0-80a2-a63bc1eb47c1",
+    "id": "afc59be9-acca-527b-bddc-5b27f058c54c",
     "status": "COMPLETED",
     "target_split": "train",
     "generator_profile": "local-git-history/v2",
     "verifier_profile": "deterministic-subprocess/v1",
     "candidate_count": 4,
     "command_count": 48,
-    "source_spec_sha256": "6c3b735fbd1f0aefe64a8dc5248b688de618d922385b2958e59de1a4cad2a5a7"
+    "source_spec_sha256": "508945c5d3781d2d1855dbc2db27bde6b77415980491aadb708435666bce2886"
   },
   "dataset_version": {
-    "id": "a8b9b201-cd40-5918-bf01-9f6dd440fbe1",
-    "version": "e1abef442a62",
+    "id": "1ca160d0-fa43-57cd-8f7d-3cea37461386",
+    "version": "5224bdbc08ed",
     "split": "train",
-    "content_sha256": "e1abef442a625adb6640f72f395de12ab0c63bfac7684755db1595ef657beb7b",
+    "content_sha256": "5224bdbc08ed565da4599ff9f6952c4ebeeacf27aaf728897744d4112136cb16",
     "case_count": 4,
     "source_lineages": [
       "github.com/more-itertools/more-itertools",

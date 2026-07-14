@@ -201,6 +201,10 @@ class CommandVerifier:
         guard_dir = runtime_dir / "guard"
         guard_dir.mkdir()
         (guard_dir / "sitecustomize.py").write_text(
+            "import collections\n"
+            "import collections.abc\n"
+            "if not hasattr(collections, 'MutableMapping'):\n"
+            "    collections.MutableMapping = collections.abc.MutableMapping\n"
             "import socket\n"
             "def _deny(*args, **kwargs):\n"
             "    raise RuntimeError('network disabled by benchmark verifier')\n"
