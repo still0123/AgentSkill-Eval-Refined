@@ -1,4 +1,4 @@
-"""Contracts for the Fake-evidence Skill promotion integration workflow."""
+"""Contracts for auditable Skill promotion integration workflows."""
 
 from __future__ import annotations
 
@@ -127,7 +127,7 @@ class PromotionReleaseManifest(FrozenModel):
     human_review: Optional[HumanReviewRecord] = None
     skill_version_manifest_sha256: Optional[HexDigest] = None
     diff_sha256: Optional[HexDigest] = None
-    simulated: Literal[True] = True
+    simulated: bool = True
     released_at: datetime
     claim_limit: str = Field(min_length=1)
 

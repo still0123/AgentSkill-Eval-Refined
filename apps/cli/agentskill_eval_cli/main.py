@@ -584,7 +584,7 @@ def evolution_release_prepare(
         ..., "--workspace", file_okay=False, help="Output root for evolution-release/."
     ),
 ) -> None:
-    """Prepare one deterministic offline release from frozen Fake evidence."""
+    """Prepare one deterministic offline release from consistent frozen evidence."""
     try:
         config = EvolutionReleaseConfig.load(config_path)
         result = EvolutionEvidenceReleasePreparer(workspace).prepare(config)
@@ -599,8 +599,8 @@ def evolution_release_prepare(
                 "report_html": str(result.report_html),
                 "audit_bundle": str(result.audit_bundle),
                 "idempotent_replay": result.idempotent_replay,
-                "simulated": True,
-                "evidence_class": "simulated",
+                "simulated": result.simulated,
+                "evidence_class": result.evidence_class,
             },
             sort_keys=True,
         )
