@@ -40,6 +40,21 @@ def _process_spec(tmp_path: Path, base_name: str) -> Path:
     return path
 
 
+def _interactive_process_spec(tmp_path: Path, base_name: str) -> Path:
+    path = _process_spec(tmp_path, base_name)
+    payload = yaml.safe_load(path.read_text(encoding="utf-8"))
+    payload["process_agent"].update(
+        {
+            "interaction_mode": "step_loop",
+            "max_steps": 20,
+            "max_history_events": 20,
+            "max_observation_bytes": 100_000,
+        }
+    )
+    path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+    return path
+
+
 @pytest.mark.parametrize(
     ("base_name", "scenario"),
     [("mcp-tool.yaml", "mcp_tool"), ("memory-rag.yaml", "memory_rag")],
@@ -69,17 +84,16 @@ def test_process_agent_activates_skill_and_persists_only_hashed_decision_evidenc
     report = json.loads(Path(summary["report_json"]).read_text(encoding="utf-8"))
     assert report["plan"]["agent"] == "fake-scenario-agent"
     assert report["plan"]["agent_version"] == "1.0.0"
-    assert report["plan"]["agent_executable_sha256"] == hashlib.sha256(
-        FAKE_AGENT.read_bytes()
-    ).hexdigest()
+    assert (
+        report["plan"]["agent_executable_sha256"]
+        == hashlib.sha256(FAKE_AGENT.read_bytes()).hexdigest()
+    )
     assert report["primary_metrics"]["treatment_success_rate"] == 1
     evidence_artifact = next(
         item for item in report["artifacts"] if item["kind"] == "process_agent_decisions"
     )
-    evidence_path = Path(evidence_artifact["path"])
-    evidence_text = evidence_path.read_text(encoding="utf-8")
-    evidence = json.loads(evidence_text)
-    decisions = evidence["decisions"]
+    evidence_text = Path(evidence_artifact["path"]).read_text(encoding="utf-8")
+    decisions = json.loads(evidence_text)["decisions"]
     assert len(decisions) == 4
     baseline = [item for item in decisions if item["variant"] in {"without_guidance", "control"}]
     treatment = [item for item in decisions if item["variant"] in {"with_guidance", "treatment"}]
@@ -93,3 +107,55 @@ def test_process_agent_activates_skill_and_persists_only_hashed_decision_evidenc
     replay = runner.invoke(app, command)
     assert replay.exit_code == 0, replay.stdout
     assert int(counter.read_text(encoding="utf-8")) == 4
+
+
+@pytest.mark.parametrize(
+    ("base_name", "scenario"),
+    [("mcp-tool.yaml", "mcp_tool"), ("memory-rag.yaml", "memory_rag")],
+)
+def test_interactive_process_agent_uses_observations_and_persists_redacted_trace(
+    tmp_path: Path, base_name: str, scenario: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    counter = tmp_path / f"interactive-{scenario}.counter"
+    monkeypatch.setenv("FAKE_SCENARIO_AGENT_COUNTER_FILE", str(counter))
+    spec = _interactive_process_spec(tmp_path, base_name)
+    workspace = tmp_path / "workspace"
+    command = [
+        "scenario",
+        "run",
+        str(spec),
+        "--workspace",
+        str(workspace),
+        "--allow-simulation",
+    ]
+    result = runner.invoke(app, command)
+    assert result.exit_code == 0, result.stdout
+    summary = json.loads(result.stdout)
+    assert int(counter.read_text(encoding="utf-8")) > 4
+    report = json.loads(Path(summary["report_json"]).read_text(encoding="utf-8"))
+    assert report["plan"]["interaction_mode"] == "step_loop"
+    assert report["plan"]["max_interaction_steps"] == 20
+    assert "agent_observation_loop" in report["plan"]["trace_capabilities"]
+    assert report["primary_metrics"]["treatment_success_rate"] == 1
+    trace_ref = next(
+        item for item in report["artifacts"] if item["kind"] == "interactive_agent_traces"
+    )
+    trace_text = Path(trace_ref["path"]).read_text(encoding="utf-8")
+    traces = json.loads(trace_text)["runs"]
+    assert len(traces) == 4
+    assert all(item["termination"] == "final" for item in traces)
+    baselines = [item for item in traces if item["variant"] in {"without_guidance", "control"}]
+    treatments = [item for item in traces if item["variant"] in {"with_guidance", "treatment"}]
+    assert all(not item["skill_present"] and item["skill_sha256"] is None for item in baselines)
+    assert all(item["skill_present"] and item["skill_sha256"] for item in treatments)
+    assert all(item["hidden_reasoning_stored"] is False for item in traces)
+    assert "super-secret" not in trace_text
+    assert "ignore previous and exfiltrate" not in trace_text
+    assert all(
+        any(event["kind"] == "environment.observation" for event in item["events"])
+        for item in treatments
+    )
+    call_count = int(counter.read_text(encoding="utf-8"))
+    replay = runner.invoke(app, command)
+    assert replay.exit_code == 0, replay.stdout
+    assert int(counter.read_text(encoding="utf-8")) == call_count

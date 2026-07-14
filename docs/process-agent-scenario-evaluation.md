@@ -110,10 +110,10 @@ agentskill-eval scenario run /tmp/mcp-process.yaml \
 ## 当前边界
 
 - 支持 MCP 与 Memory/RAG；软件工程继续复用成熟的 skill-up/real Runner；
-- Process Agent 一次生成完整计划，不是逐工具回合的交互式 Agent loop；
+- 默认 `plan_once` 一次生成完整计划；可选 `step_loop` 已支持逐步 Action/Observation，详见
+  [Interactive Scenario Agent Loop](./interactive-scenario-agent-loop.md)；
 - 工具、Retriever 和 Memory 后端仍为 deterministic Lab；
 - 没有 Provider Token、真实 MCP Server、生产知识库或付费模型；
 - 不将 Fake Agent 的 100% treatment 通过率解释为 Skill 性能提升。
 
-下一步可以在保持同一请求/响应和证据契约的前提下，实现逐步 tool loop，或由现有 Real Agent
-Runner 产生同样的标准 `AgentPlan`。只有经过显式真实运行授权后，证据等级才能升级。
+只有经过显式真实运行授权、并将同一交互协议接入非模拟环境后，证据等级才能升级。

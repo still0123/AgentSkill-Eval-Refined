@@ -140,7 +140,21 @@ class MemoryRagLabRunner:
         plan_provider: Optional[
             Callable[[MemoryRagCase, PairType, Literal["control", "treatment"]], AgentPlan]
         ] = None,
+        outcome_provider: Optional[
+            Callable[
+                [
+                    MemoryRagCase,
+                    MockRetrieverAdapter,
+                    MockMemoryAdapter,
+                    PairType,
+                    Literal["control", "treatment"],
+                ],
+                RunOutcome,
+            ]
+        ] = None,
     ) -> ExperimentArtifacts:
+        if plan_provider is not None and outcome_provider is not None:
+            raise ValueError("plan_provider and outcome_provider are mutually exclusive")
         dataset = MemoryRagDataset.load(config.dataset, allowed_root=config.dataset.parent)
         selected = set(config.selected_case_ids)
         cases = tuple(case for case in dataset.cases if not selected or case.case_id in selected)
@@ -182,7 +196,13 @@ class MemoryRagLabRunner:
                     sensitive_keys=case.sensitive_memory_keys,
                     failures=failures,
                 )
-                run = MemoryRagController().run(case, retriever, memory, plan, variant)
+                run = (
+                    outcome_provider(case, retriever, memory, pair.pair_type, variant)
+                    if outcome_provider is not None
+                    else MemoryRagController().run(case, retriever, memory, plan, variant)
+                )
+                if run.token_count > config.token_budget:
+                    raise ValueError(f"run token budget exceeded for {case.case_id}:{variant}")
                 score = CompositeMemoryRagGrader().grade(case, run)
                 if score.cost_usd > config.cost_budget_usd:
                     raise ValueError(f"run cost budget exceeded for {case.case_id}:{variant}")

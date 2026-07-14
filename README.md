@@ -4,36 +4,66 @@
 [![Python](https://img.shields.io/badge/Python-3.9%2B-blue)](./pyproject.toml)
 [![License](https://img.shields.io/badge/License-Apache--2.0-green)](./LICENSE)
 
-AgentSkill-Eval 用可复现的 A/B 实验回答一个问题：
+AgentSkill-Eval 是一个面向 Agent Skill 的**评测、诊断与迭代优化系统**。它不只回答
+“这个 Skill 得了多少分”，而是持续回答三个问题：
 
-> 给 Agent 加载某个 `SKILL.md` 后，任务成功率是否真正提升，又额外消耗了多少 Token、时间和费用？
+1. 加载 Skill 是否比不加载更有效？
+2. Skill v2 是否比 v1 更好，改进和回归分别发生在哪里？
+3. 如何利用失败 Case 与交互 Trace，生成并验证下一版 Skill？
 
-它会在相同 Agent、模型、Case 和环境下运行 `without-Skill` 与 `with-Skill`
-两组实验，保存结果、执行轨迹、失败诊断和审计证据，并支持后续回归分析。
+系统在冻结 Agent、模型、Case、环境和预算的前提下运行配对实验，保存结果、执行轨迹、
+失败诊断和审计证据，为后续 Skill 搜索、版本回归和自动优化提供可信依据。
 
 **当前版本：[`v0.1.0-rc1`](https://github.com/ranmaoxia0123/AgentSkill-Eval/tree/v0.1.0-rc1)**
 
-当前 RC2 候选在 RC1 基础上增加跨仓库 Benchmark 重建：使用两个真实 MIT 开源仓库、
-四个独立缺陷家族完成全离线质量门验证。该证据不调用模型，也不代表 Agent 性能结论。
+当前开发版在 RC1 基础上增加了跨仓库 Benchmark、真实 Agent 证据、多场景统一评测、
+Process Agent 接入和交互式 Action/Observation 循环；未完成能力会在下文明确标记。
+
+## 项目的核心方向
+
+这个项目的最终目标不是建立更多评分指标，而是让 Skill 能够被持续改进：
+
+```text
+Benchmark / Real Task
+          │
+          ▼
+without-Skill ── with-Skill ── Skill v1 / v2
+          │             │             │
+          └────── 配对执行与 Trace ────┘
+                        │
+                        ▼
+               失败诊断与回归定位
+                        │
+                        ▼
+               Skill 候选生成与筛选
+                        │
+                        ▼
+             Independent Locked Evaluation
+                        │
+                        ▼
+                 发布不可变 SkillVersion
+```
+
+因此，评测在系统中承担的是**优化方向发现和版本选择机制**，而不是终点。
 
 ## 30 秒理解工作流
 
 ```text
-           同一个 Case
-                │
-       ┌────────┴────────┐
-       │                 │
-without-Skill        with-Skill
-       │                 │
-       └────────┬────────┘
-                │
-       结果 + Trace + 费用
-                │
-       增益分析 + 失败诊断
+                   同一个 Case
+                        │
+       ┌────────────────┼────────────────┐
+       │                │                │
+without-Skill       Skill v1         Skill v2
+       │                │                │
+       └────────────────┼────────────────┘
+                        │
+            结果 + Trace + Token/费用
+                        │
+             增益、回归与失败归因
 ```
 
-配对设计的关键是：**除了是否加载 Skill，其他条件尽量保持一致。**
-因此结果表达的是 Skill 的边际价值，而不是 Agent 的绝对能力。
+配对设计的关键是：**每次比较只改变一个 Skill 变量。** 因此结果表达的是 Skill 的
+边际价值或版本增量，而不是 Agent 的绝对能力。
 
 ## 能做什么
 
@@ -49,6 +79,9 @@ without-Skill        with-Skill
 | Memory/RAG Lab | 评测检索、引用、污染、记忆更新和会话隔离 | 离线 simulated Lab |
 | Unified Scenario | 用同一协议运行软件工程、MCP、Memory/RAG 并保留专项指标 | 已实现，simulated MVP |
 | Process Scenario Agent | baseline/Skill 两臂由哈希固定进程生成 MCP/Memory-RAG 计划 | 已实现，process integration |
+| Interactive Agent Loop | Agent 根据每一步环境 Observation 决定下一步 Action | 开发中，兼容现有 `plan_once` |
+| Skill Version Regression | 比较 v1/v2 的改进、退化 Case 与成本变化 | 已有底层能力，统一工作流待完善 |
+| Failure-guided Optimization | 从失败诊断生成候选，经过训练集筛选和 locked test 终评 | 已有离线 Skill Search，闭环待完善 |
 | Dashboard | 查看已冻结的报告、Trace、W/T/L 和候选状态 | 本地只读版 |
 
 `simulated` 只证明评测管线可用，不能当作真实模型能力证据。
@@ -164,7 +197,7 @@ Secret 配置见 [Real Agent Evaluation Evidence](./docs/real-agent-evidence.md)
 Case / Dataset / Skill
           │
           ▼
-Experiment Planner ────冻结 Variant、PairBlock 和预算
+Experiment Planner ────冻结 Variant、SkillVersion、PairBlock 和预算
           │
           ▼
 Runner Adapter ──────Mock / skill-up / Process Agent
@@ -173,6 +206,7 @@ Runner Adapter ──────Mock / skill-up / Process Agent
 Manifest + Trace + Artifact
           │
           ├── Evaluator / Statistics / Failure Diagnosis
+          ├── Skill Candidate Search / Regression Analysis
           └── JSON / HTML Report / Replay Bundle
 ```
 
@@ -184,6 +218,17 @@ Manifest + Trace + Artifact
 - 缺少 Trace 能力时标记 `capability unavailable`，不猜测“没有发生”；
 - 不保存模型隐藏思维过程；
 - 真实证据与 simulated 结果不混合统计。
+
+## 三类核心实验
+
+| 实验 | 控制组 | 实验组 | 回答的问题 |
+|---|---|---|---|
+| Skill 增益 | without-Skill | with-Skill | Skill 是否提供真实边际价值？ |
+| 版本回归 | Skill v1 | Skill v2 | 哪些 Case 改进，哪些 Case 退化？ |
+| 候选选择 | 当前稳定版 | 多个候选版本 | 哪个候选能通过独立 locked test？ |
+
+只有前两类实验稳定可靠，自动优化才有可信的选择信号。候选不能根据最终 locked test
+反复修改，否则会把终评集变成训练集。
 
 ## 仓库结构
 
@@ -223,6 +268,7 @@ docs/                    模块级设计和操作文档
 | MCP / Memory-RAG 专项 Lab | [MCP Lab](./docs/mcp-tool-evaluation.md) / [Memory-RAG Lab](./docs/memory-rag-evaluation.md) |
 | 跨场景统一入口和结果协议 | [Unified Multi-Scenario Evaluation](./docs/unified-multi-scenario-evaluation.md) |
 | 本地 Process Agent Skill 激活 | [Process Agent Scenario Evaluation](./docs/process-agent-scenario-evaluation.md) |
+| 逐步 Action/Observation Agent 循环 | [Interactive Scenario Agent Loop](./docs/interactive-scenario-agent-loop.md) |
 | Dashboard 启动和限制 | [Dashboard](./docs/dashboard-mvp.md) |
 
 完整文档索引见 [`docs/README.md`](./docs/README.md)。
@@ -234,6 +280,8 @@ docs/                    模块级设计和操作文档
 - 尚无 FastAPI、账号权限、远程任务队列和多租户控制面；
 - Dashboard 只读取本地冻结报告；
 - MCP 与 Memory/RAG 目前是离线、确定性 Lab；
+- Process Agent 支持兼容的 `plan_once` 和有界 `step_loop`；后者当前只连接确定性本地环境；
+- Skill Search 已证明离线候选筛选链路，尚未形成面向所有 Skill 类型的自动优化器；
 - 真实 Agent 数据量很小，不支持泛化性能声明。
 
 ## 参与与安全

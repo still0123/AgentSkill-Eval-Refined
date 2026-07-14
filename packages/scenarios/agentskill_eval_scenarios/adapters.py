@@ -25,6 +25,11 @@ from agentskill_eval_scenarios.contracts import (
     VariantDescriptor,
     file_sha256,
 )
+from agentskill_eval_scenarios.interactive import InteractiveRunEvidence
+from agentskill_eval_scenarios.interactive_runtime import (
+    InteractiveMcpController,
+    InteractiveMemoryRagController,
+)
 from agentskill_eval_scenarios.process_agent import ProcessScenarioAgentClient
 
 
@@ -80,6 +85,14 @@ class McpScenarioAdapter:
             agent_executable_sha256=(
                 spec.process_agent.expected_sha256 if spec.process_agent else None
             ),
+            interaction_mode=(
+                spec.process_agent.interaction_mode if spec.process_agent else "plan_once"
+            ),
+            max_interaction_steps=(
+                spec.process_agent.max_steps
+                if spec.process_agent and spec.process_agent.interaction_mode == "step_loop"
+                else None
+            ),
             skill_name=spec.skill.name if spec.skill else None,
             skill_version=spec.skill.version if spec.skill else None,
             skill_activation_mode=spec.skill.activation_mode if spec.skill else None,
@@ -94,6 +107,11 @@ class McpScenarioAdapter:
                 "recovery",
                 "side_effects",
                 *(("agent_decision",) if spec.process_agent else ()),
+                *(
+                    ("agent_observation_loop",)
+                    if spec.process_agent and spec.process_agent.interaction_mode == "step_loop"
+                    else ()
+                ),
             ),
             claim_limit=spec.claim_limit,
         )
@@ -103,6 +121,7 @@ class McpScenarioAdapter:
     ) -> UnifiedEvaluationResult:
         native_workspace = workspace / "native" / self.kind.value / plan.plan_sha256
         client = ProcessScenarioAgentClient(spec.process_agent) if spec.process_agent else None
+        interactive_evidence: list[InteractiveRunEvidence] = []
 
         def provide_plan(case, variant):  # type: ignore[no-untyped-def]
             if client is None:
@@ -110,9 +129,22 @@ class McpScenarioAdapter:
             skill = spec.skill if variant == "with_guidance" else None
             return client.decide_mcp(case, variant, skill)
 
+        def provide_outcome(case, adapter, variant):  # type: ignore[no-untyped-def]
+            if client is None:
+                raise AssertionError("outcome provider requires Process Scenario Agent")
+            skill = spec.skill if variant == "with_guidance" else None
+            outcome, evidence = InteractiveMcpController().run(
+                case, adapter, client, variant, skill
+            )
+            interactive_evidence.append(evidence)
+            return outcome
+
+        step_loop = bool(client and client.spec.interaction_mode == "step_loop")
+
         artifacts = McpLabRunner(native_workspace).run(
             McpLabConfig.load(spec.native_config),
-            plan_provider=provide_plan if client else None,
+            plan_provider=provide_plan if client and not step_loop else None,
+            outcome_provider=provide_outcome if step_loop else None,
         )
         metrics = artifacts.report.paired_metrics
         primary: Dict[str, JsonValue] = {
@@ -130,6 +162,10 @@ class McpScenarioAdapter:
         ]
         if client is not None:
             artifact_refs.append(_write_decision_evidence(native_workspace, client))
+        if interactive_evidence:
+            artifact_refs.append(
+                _write_interactive_evidence(native_workspace, interactive_evidence)
+            )
         return UnifiedEvaluationResult(
             experiment_id=uuid5(NAMESPACE_URL, f"unified:{plan.plan_sha256}"),
             plan=plan,
@@ -173,6 +209,14 @@ class MemoryRagScenarioAdapter:
             agent_executable_sha256=(
                 spec.process_agent.expected_sha256 if spec.process_agent else None
             ),
+            interaction_mode=(
+                spec.process_agent.interaction_mode if spec.process_agent else "plan_once"
+            ),
+            max_interaction_steps=(
+                spec.process_agent.max_steps
+                if spec.process_agent and spec.process_agent.interaction_mode == "step_loop"
+                else None
+            ),
             skill_name=spec.skill.name if spec.skill else None,
             skill_version=spec.skill.version if spec.skill else None,
             skill_activation_mode=spec.skill.activation_mode if spec.skill else None,
@@ -185,6 +229,11 @@ class MemoryRagScenarioAdapter:
                 "memory_lifecycle",
                 "memory_safety",
                 *(("agent_decision",) if spec.process_agent else ()),
+                *(
+                    ("agent_observation_loop",)
+                    if spec.process_agent and spec.process_agent.interaction_mode == "step_loop"
+                    else ()
+                ),
             ),
             claim_limit=spec.claim_limit,
         )
@@ -194,6 +243,7 @@ class MemoryRagScenarioAdapter:
     ) -> UnifiedEvaluationResult:
         native_workspace = workspace / "native" / self.kind.value / plan.plan_sha256
         client = ProcessScenarioAgentClient(spec.process_agent) if spec.process_agent else None
+        interactive_evidence: list[InteractiveRunEvidence] = []
 
         def provide_plan(case, pair_type, variant):  # type: ignore[no-untyped-def]
             if client is None:
@@ -201,9 +251,22 @@ class MemoryRagScenarioAdapter:
             skill = spec.skill if variant == "treatment" else None
             return client.decide_memory_rag(case, pair_type, variant, skill)
 
+        def provide_outcome(case, retriever, memory, pair_type, variant):  # type: ignore[no-untyped-def]
+            if client is None:
+                raise AssertionError("outcome provider requires Process Scenario Agent")
+            skill = spec.skill if variant == "treatment" else None
+            outcome, evidence = InteractiveMemoryRagController().run(
+                case, retriever, memory, client, pair_type, variant, skill
+            )
+            interactive_evidence.append(evidence)
+            return outcome
+
+        step_loop = bool(client and client.spec.interaction_mode == "step_loop")
+
         artifacts = MemoryRagLabRunner(native_workspace).run(
             MemoryRagLabConfig.load(spec.native_config),
-            plan_provider=provide_plan if client else None,
+            plan_provider=provide_plan if client and not step_loop else None,
+            outcome_provider=provide_outcome if step_loop else None,
         )
         controls = [item for item in artifacts.report.runs if item.run.variant == "control"]
         treatments = [item for item in artifacts.report.runs if item.run.variant == "treatment"]
@@ -229,13 +292,19 @@ class MemoryRagScenarioAdapter:
             "wins": sum(item[1].score.final_score > item[0].score.final_score for item in valid),
             "ties": sum(item[1].score.final_score == item[0].score.final_score for item in valid),
             "losses": sum(item[1].score.final_score < item[0].score.final_score for item in valid),
-            "invalid": len(valid_pairs) - len(valid),
+            "invalid": max(
+                len(valid_pairs) - len(valid),
+                int(any(item.termination != "final" for item in interactive_evidence)),
+            ),
         }
         scenario_metrics: Dict[str, JsonValue] = {
             "pair_types": cast(
                 JsonValue,
                 [item.model_dump(mode="json") for item in artifacts.report.paired_metrics],
-            )
+            ),
+            "interactive_nonfinal_runs": sum(
+                item.termination != "final" for item in interactive_evidence
+            ),
         }
         artifact_refs = [
             _artifact("native_report_json", artifacts.report_json),
@@ -243,10 +312,19 @@ class MemoryRagScenarioAdapter:
         ]
         if client is not None:
             artifact_refs.append(_write_decision_evidence(native_workspace, client))
+        if interactive_evidence:
+            artifact_refs.append(
+                _write_interactive_evidence(native_workspace, interactive_evidence)
+            )
         return UnifiedEvaluationResult(
             experiment_id=uuid5(NAMESPACE_URL, f"unified:{plan.plan_sha256}"),
             plan=plan,
-            status="completed" if len(valid_pairs) == len(valid) else "invalid",
+            status=(
+                "completed"
+                if len(valid_pairs) == len(valid)
+                and all(item.termination == "final" for item in interactive_evidence)
+                else "invalid"
+            ),
             primary_metrics=primary,
             scenario_metrics=scenario_metrics,
             artifacts=tuple(artifact_refs),
@@ -394,6 +472,22 @@ def _write_decision_evidence(
         encoding="utf-8",
     )
     return _artifact("process_agent_decisions", path)
+
+
+def _write_interactive_evidence(
+    native_workspace: Path, evidence: list[InteractiveRunEvidence]
+) -> ArtifactReference:
+    path = native_workspace / "interactive-agent-traces.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "schema_version": "ase/interactive-agent-traces/v1alpha1",
+        "runs": [item.model_dump(mode="json") for item in evidence],
+    }
+    path.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    return _artifact("interactive_agent_traces", path)
 
 
 ADAPTERS: Dict[ScenarioKind, ScenarioAdapter] = {

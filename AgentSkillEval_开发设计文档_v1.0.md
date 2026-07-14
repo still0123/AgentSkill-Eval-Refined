@@ -1813,3 +1813,25 @@ oracle、gold answer、expected tools、memory expectations 或参考补丁。�
 Skill 对照决策，但 Fake Agent、Mock MCP、Mock Retriever 和 Mock Memory 不能支持真实模型性能
 结论。协议和运行模板见
 [`docs/process-agent-scenario-evaluation.md`](./docs/process-agent-scenario-evaluation.md)。
+
+---
+
+## 30. Interactive Scenario Agent Loop MVP 实现状态
+
+Process Agent 新增冻结的 `interaction_mode=plan_once|step_loop`。默认 `plan_once` 保持原配置和
+结果兼容；`step_loop` 使用版本化 Action/Observation 协议，每一步启动独立、哈希固定的进程，
+将有界历史观察返回 Agent，并由 Agent 选择下一次 MCP 工具、检索、Memory 操作或最终回答。
+
+MCP 与 Memory/RAG 交互 Controller 继续产出原生 `RunOutcome`，因此复用既有确定性 Grader 和
+报告口径。MCP 支持工具失败观察、Agent 自主重试、参数和副作用安全门；Memory/RAG 支持检索
+失败后的重新决策、文档观察、Memory 生命周期操作及带引用的最终回答。`max_steps`、历史事件数、
+观察字节数、进程超时和工具预算均冻结进 EvaluationPlan。
+
+系统逐 Decision 保存请求/响应哈希，并额外生成脱敏 `interactive-agent-traces.json`，记录 session、
+Skill 激活、action、环境接受/拒绝、observation、final 和 step-limit；原始文档正文、Memory 值、
+Secret 与隐藏思维过程不落盘。baseline 每一步均不含 Skill，treatment 每一步使用同一不可变 Skill
+SHA-256。已有统一结果幂等重放时不再次启动 Agent。
+
+该阶段仍为 `simulated=true, evidence_class=process_integration`。它证明本地 Agent 能基于确定性
+环境观察改变下一步行为，不证明真实 Provider 或生产 MCP/RAG 的普遍 Skill 增益。详细协议见
+[`docs/interactive-scenario-agent-loop.md`](./docs/interactive-scenario-agent-loop.md)。

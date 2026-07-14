@@ -136,6 +136,10 @@ class ProcessScenarioAgentSpec(FrozenModel):
     timeout_seconds: float = Field(default=10, gt=0, le=600)
     max_response_bytes: int = Field(default=1_000_000, ge=1, le=10_000_000)
     allowed_environment: Tuple[str, ...] = ("PATH", "LANG", "LC_ALL")
+    interaction_mode: Literal["plan_once", "step_loop"] = "plan_once"
+    max_steps: int = Field(default=12, ge=1, le=50)
+    max_history_events: int = Field(default=24, ge=1, le=200)
+    max_observation_bytes: int = Field(default=100_000, ge=1, le=1_000_000)
 
     @model_validator(mode="after")
     def environment_must_not_include_secrets(self) -> "ProcessScenarioAgentSpec":
@@ -143,9 +147,7 @@ class ProcessScenarioAgentSpec(FrozenModel):
             raise ValueError("allowed_environment values must be unique")
         secret_markers = ("KEY", "TOKEN", "SECRET", "PASSWORD", "AUTH", "CREDENTIAL")
         if any(
-            marker in name.upper()
-            for name in self.allowed_environment
-            for marker in secret_markers
+            marker in name.upper() for name in self.allowed_environment for marker in secret_markers
         ):
             raise ValueError("Process Scenario Agent cannot inherit Secret-like environment names")
         return self
@@ -164,6 +166,8 @@ class EvaluationPlan(FrozenModel):
     model: str = Field(min_length=1)
     agent_version: Optional[str] = None
     agent_executable_sha256: Optional[str] = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    interaction_mode: Literal["plan_once", "step_loop"] = "plan_once"
+    max_interaction_steps: Optional[int] = Field(default=None, ge=1, le=50)
     skill_name: Optional[str] = None
     skill_version: Optional[str] = None
     skill_activation_mode: Optional[

@@ -24,6 +24,7 @@
 
 - [Unified Multi-Scenario Evaluation MVP](./unified-multi-scenario-evaluation.md)
 - [Process Agent Scenario Evaluation MVP](./process-agent-scenario-evaluation.md)
+- [Interactive Scenario Agent Loop MVP](./interactive-scenario-agent-loop.md)
 - [MCP Tool Evaluation MVP](./mcp-tool-evaluation.md)
 - [Memory/RAG Evaluation MVP](./memory-rag-evaluation.md)
 - [Read-only Evaluation Dashboard MVP](./dashboard-mvp.md)

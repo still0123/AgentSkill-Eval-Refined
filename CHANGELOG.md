@@ -17,6 +17,9 @@ after the first stable release.
   frozen Skill hashes, explicit evidence classes, native metric preservation and immutable reports.
 - A hash-pinned Process Scenario Agent boundary for MCP and Memory/RAG with baseline cleanliness,
   treatment Skill activation, oracle-free requests and hashed decision evidence.
+- A backwards-compatible interactive Process Agent step loop for MCP and Memory/RAG with bounded
+  Action/Observation history, deterministic budgets, observation-driven recovery and redacted
+  per-step audit evidence.
 
 ### Evidence boundary
 
@@ -26,6 +29,8 @@ after the first stable release.
   evaluation system but do not prove that a real Agent loaded or followed the example Skills.
 - Process integration proves that a local Agent process received or did not receive a Skill and
   produced executable plans; deterministic tools and Fake Agents remain simulated evidence.
+- Interactive integration additionally proves that subsequent Process decisions can consume
+  deterministic environment observations; it remains simulated tool/Memory/RAG evidence.
 
 ## [0.1.0-rc1] - 2026-07-13
 

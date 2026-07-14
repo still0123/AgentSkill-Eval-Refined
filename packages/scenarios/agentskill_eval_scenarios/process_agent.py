@@ -8,7 +8,7 @@ import os
 import signal
 import subprocess
 import time
-from typing import Any, Dict, Literal, Mapping, Optional, Tuple
+from typing import Any, Dict, Literal, Mapping, Optional, Sequence, Tuple
 
 from pydantic import Field
 
@@ -18,6 +18,10 @@ from agentskill_eval_mcp_lab import McpCase
 from agentskill_eval_memory_rag_lab import AgentPlan as MemoryRagAgentPlan
 from agentskill_eval_memory_rag_lab import MemoryRagCase
 from agentskill_eval_scenarios.contracts import ProcessScenarioAgentSpec, SkillUnderTest
+from agentskill_eval_scenarios.interactive import (
+    InteractionHistoryEvent,
+    InteractiveAgentAction,
+)
 
 
 class ProcessAgentError(RuntimeError):
@@ -76,9 +80,7 @@ class ProcessScenarioAgentClient:
             variant,
             {
                 "task": case.task,
-                "available_tools": [
-                    tool.model_dump(mode="json") for tool in case.available_tools
-                ],
+                "available_tools": [tool.model_dump(mode="json") for tool in case.available_tools],
                 "max_tool_calls": case.max_tool_calls,
                 "side_effect_policy": case.side_effect_policy.model_dump(mode="json"),
             },
@@ -108,8 +110,7 @@ class ProcessScenarioAgentClient:
                 "query": case.query,
                 "k": case.k,
                 "documents": [
-                    {"document_id": item.document_id, "text": item.text}
-                    for item in case.documents
+                    {"document_id": item.document_id, "text": item.text} for item in case.documents
                 ],
                 "memory_policy": {
                     "forbidden_keys": list(case.forbidden_memory_keys),
@@ -123,6 +124,46 @@ class ProcessScenarioAgentClient:
             return MemoryRagAgentPlan.model_validate(payload)
         except ValueError as exc:
             raise ProcessAgentError(f"invalid Memory/RAG Agent plan: {exc}") from exc
+
+    def next_action(
+        self,
+        scenario: Literal["mcp_tool", "memory_rag"],
+        case_id: str,
+        variant: str,
+        case: Mapping[str, object],
+        history: Sequence[InteractionHistoryEvent],
+        skill: Optional[SkillUnderTest],
+        step: int,
+    ) -> InteractiveAgentAction:
+        """Request one action from a fresh process with bounded observation history."""
+        bounded = tuple(history[-self.spec.max_history_events :])
+        history_payload = [item.model_dump(mode="json") for item in bounded]
+        encoded_history = json.dumps(history_payload, ensure_ascii=False).encode("utf-8")
+        if len(encoded_history) > self.spec.max_observation_bytes:
+            raise ProcessAgentError("interactive observation history is too large")
+        request = self._request(scenario, case_id, variant, case, skill)
+        request.update(
+            {
+                "schema_version": "ase/interactive-agent-request/v1alpha1",
+                "step": step,
+                "max_steps": self.spec.max_steps,
+                "history": history_payload,
+                "output_contract": "single_action_only_no_hidden_reasoning",
+            }
+        )
+        payload = self._execute(
+            request,
+            scenario,
+            case_id,
+            variant,
+            skill,
+            response_schema="ase/interactive-agent-response/v1alpha1",
+            response_key="action",
+        )
+        try:
+            return InteractiveAgentAction.model_validate(payload)
+        except ValueError as exc:
+            raise ProcessAgentError(f"invalid interactive Agent action: {exc}") from exc
 
     def _request(
         self,
@@ -158,6 +199,9 @@ class ProcessScenarioAgentClient:
         case_id: str,
         variant: str,
         skill: Optional[SkillUnderTest],
+        *,
+        response_schema: str = "ase/process-agent-response/v1alpha1",
+        response_key: str = "plan",
     ) -> Dict[str, object]:
         request_bytes = json.dumps(
             request, ensure_ascii=False, allow_nan=False, separators=(",", ":"), sort_keys=True
@@ -186,24 +230,23 @@ class ProcessScenarioAgentClient:
             raise
         duration_ms = (time.monotonic() - started) * 1000
         if process.returncode != 0:
-            raise ProcessAgentError(
-                f"Process Scenario Agent exited with code {process.returncode}"
-            )
+            raise ProcessAgentError(f"Process Scenario Agent exited with code {process.returncode}")
         if len(stdout) > self.spec.max_response_bytes:
             raise ProcessAgentError("Process Scenario Agent response is too large")
         try:
             response = json.loads(stdout)
         except (json.JSONDecodeError, UnicodeDecodeError) as exc:
             raise ProcessAgentError("Process Scenario Agent returned invalid JSON") from exc
-        if not isinstance(response, dict) or set(response) != {"schema_version", "plan"}:
+        if not isinstance(response, dict) or set(response) != {"schema_version", response_key}:
             raise ProcessAgentError(
-                "Process Scenario Agent response must contain only schema_version and plan"
+                "Process Scenario Agent response must contain only schema_version and "
+                f"{response_key}"
             )
-        if response["schema_version"] != "ase/process-agent-response/v1alpha1":
+        if response["schema_version"] != response_schema:
             raise ProcessAgentError("unsupported Process Scenario Agent response version")
-        plan = response["plan"]
-        if not isinstance(plan, dict) or not _json_within_limits(plan, 20, 1_000):
-            raise ProcessAgentError("Process Scenario Agent plan exceeds JSON limits")
+        payload = response[response_key]
+        if not isinstance(payload, dict) or not _json_within_limits(payload, 20, 1_000):
+            raise ProcessAgentError("Process Scenario Agent payload exceeds JSON limits")
         response_sha256 = stable_sha256(response)
         self._evidence.append(
             AgentDecisionEvidence(
@@ -221,7 +264,7 @@ class ProcessScenarioAgentClient:
                 exit_code=process.returncode,
             )
         )
-        return plan
+        return payload
 
     def _verify_version(self) -> None:
         try:
@@ -241,16 +284,13 @@ class ProcessScenarioAgentClient:
             raise ValueError(f"Process Scenario Agent version check failed: {exc}") from exc
         if (
             process.returncode != 0
-            or stdout.decode("utf-8", errors="replace").strip()
-            != self.spec.expected_version_output
+            or stdout.decode("utf-8", errors="replace").strip() != self.spec.expected_version_output
         ):
             raise ValueError("Process Scenario Agent version mismatch")
 
     def _environment(self) -> Dict[str, str]:
         return {
-            name: os.environ[name]
-            for name in self.spec.allowed_environment
-            if name in os.environ
+            name: os.environ[name] for name in self.spec.allowed_environment if name in os.environ
         }
 
 
