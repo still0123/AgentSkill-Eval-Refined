@@ -1,6 +1,6 @@
 schema_version: ase/benchmark-generation/v1alpha2
 name: cross-repository-real-defects
-version: "2026.07.14"
+version: "2026.07.14.2"
 sources:
   - key: more-itertools
     repository_path: /absolute/path/to/offline/more-itertools
@@ -29,8 +29,8 @@ quality_gate:
   max_repository_files: 5000
   max_repository_bytes: 50000000
 budget:
-  max_candidates: 10
-  max_commands: 120
+  max_candidates: 12
+  max_commands: 144
   wall_seconds: 3000
 candidates:
   - key: more-itertools-last-reversed-none
@@ -418,3 +418,62 @@ candidates:
 
     category: negative
     tags: [python, regression, cache, exception]
+  - key: more-itertools-split-after-empty-tail
+    source_key: more-itertools
+    provenance_family: split-after-empty-tail
+    before_commit: 6793bd3e4ed15318746ed2511733f12a9932eb64
+    after_commit: 9245cd04c043d0d646497934df72549943d5f868
+    task: >-
+      Fix split_after with maxsplit=1 so an input ending at the first separator does not emit an
+      extra empty group. Preserve all non-empty trailing groups and existing split behavior.
+    issue_url: https://github.com/more-itertools/more-itertools/issues/658
+    production_paths: [more_itertools/more.py]
+    regression_test_paths: [tests/test_more.py]
+    test_command: ["${PYTHON}", -m, unittest, tests.test_more.SplitAfterTest.test_max_split]
+    alternative_patch: |
+      diff --git a/more_itertools/more.py b/more_itertools/more.py
+      index 7f73d6e..1111111 100755
+      --- a/more_itertools/more.py
+      +++ b/more_itertools/more.py
+      @@ -1391,7 +1391,9 @@ def split_after(iterable, pred, maxsplit=-1):
+               if pred(item) and buf:
+                   yield buf
+                   if maxsplit == 1:
+      -                yield list(it)
+      +                tail = list(it)
+      +                if tail:
+      +                    yield tail
+                       return
+                   buf = []
+                   maxsplit -= 1
+    category: robustness
+    tags: [python, regression, iterator, empty-output]
+  - key: cachetools-missing-oversized-value
+    source_key: cachetools
+    provenance_family: cache-missing-oversized-value
+    before_commit: d20f70bd188e490f24d093675dd182786a29ec2d
+    after_commit: 977e1c4f194cfd3c23679d2c32f645aec6d27da0
+    task: >-
+      Fix Cache.__missing__ so a generated value larger than maxsize is returned without being
+      stored or raising ValueError. Preserve insertion and eviction for values that fit.
+    issue_url: https://github.com/tkem/cachetools/issues/63
+    production_paths: [cachetools/cache.py]
+    regression_test_paths: [tests/__init__.py, tests/test_cache.py]
+    test_command: ["${PYTHON}", -m, unittest, tests.test_cache.CacheTest.test_cache_missing]
+    alternative_patch: |
+      diff --git a/cachetools/cache.py b/cachetools/cache.py
+      index 6eb2ed9..2222222 100644
+      --- a/cachetools/cache.py
+      +++ b/cachetools/cache.py
+      @@ -67,7 +67,8 @@ class Cache(DefaultMapping):
+
+           def __missing__(self, key):
+               value = self.__missing(key)
+      -        self.__setitem__(key, value)
+      +        if self.getsizeof(value) <= self.maxsize:
+      +            self.__setitem__(key, value)
+               return value
+
+           def __iter__(self):
+    category: robustness
+    tags: [python, regression, cache, oversized-value]

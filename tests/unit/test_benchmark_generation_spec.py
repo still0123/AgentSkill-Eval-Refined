@@ -63,8 +63,9 @@ def test_real_bug_fix_split_plan_covers_expanded_candidates_once() -> None:
     )
     assigned = [case_id for case_ids in plan["splits"].values() for case_id in case_ids]
 
-    assert len(spec.candidates) == 10
-    assert len(assigned) == len(set(assigned)) == 10
+    assert len(spec.candidates) == 12
+    assert len(assigned) == len(set(assigned)) == 12
     assert set(assigned) == {item.key for item in spec.candidates}
+    assert len(plan["splits"]["train"]) == 4
     assert len(plan["splits"]["validation_search"]) % 2 == 0
     assert len(plan["splits"]["regression_dev"]) % 2 == 0

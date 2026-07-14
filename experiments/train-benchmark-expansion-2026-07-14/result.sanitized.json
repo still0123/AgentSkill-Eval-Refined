@@ -1,0 +1,95 @@
+{
+  "schema_version": "ase/sanitized-benchmark-evidence/v1",
+  "generated_at": "2026-07-14",
+  "simulated": false,
+  "evidence_class": "offline_deterministic_benchmark_publication",
+  "model_calls": 0,
+  "paid_cost_microusd": 0,
+  "job": {
+    "id": "80cb244c-fdf8-5fe0-80a2-a63bc1eb47c1",
+    "status": "COMPLETED",
+    "target_split": "train",
+    "generator_profile": "local-git-history/v2",
+    "verifier_profile": "deterministic-subprocess/v1",
+    "candidate_count": 4,
+    "command_count": 48,
+    "source_spec_sha256": "6c3b735fbd1f0aefe64a8dc5248b688de618d922385b2958e59de1a4cad2a5a7"
+  },
+  "dataset_version": {
+    "id": "a8b9b201-cd40-5918-bf01-9f6dd440fbe1",
+    "version": "e1abef442a62",
+    "split": "train",
+    "content_sha256": "e1abef442a625adb6640f72f395de12ab0c63bfac7684755db1595ef657beb7b",
+    "case_count": 4,
+    "source_lineages": [
+      "github.com/more-itertools/more-itertools",
+      "github.com/tkem/cachetools"
+    ],
+    "selection_uses_agent_scores": false
+  },
+  "verification_contract": {
+    "repeats_per_variant": 3,
+    "expected_exit_codes": {
+      "before": [1, 1, 1],
+      "after": [0, 0, 0],
+      "mutation": [1, 1, 1],
+      "alternative": [0, 0, 0]
+    },
+    "quality_gates_per_candidate": 10
+  },
+  "cases": [
+    {
+      "case_id": "more-itertools-islice-release",
+      "repository": "https://github.com/more-itertools/more-itertools.git",
+      "license_spdx": "MIT",
+      "provenance_family": "islice-negative-stop-lifetime",
+      "before_commit": "569e0ad654a85c77581b318305edc2eb7c4068ae",
+      "after_commit": "a16e9c1c9b06747be55a7e301f279f8fac77693e",
+      "fixture_sha256": "98658b448c8b00fd8540f9ea461be02c4a3bcbe12fe9a58eaca91c3215252808",
+      "grader_sha256": "9be8e4bdbc6c22f8b43b7090a8168bd751eb4c9a55f24210a9ef2f058fd9034d",
+      "status": "PUBLISHED",
+      "review_decision": "APPROVED",
+      "all_quality_gates_passed": true
+    },
+    {
+      "case_id": "cachetools-lru-missing-item",
+      "repository": "https://github.com/tkem/cachetools.git",
+      "license_spdx": "MIT",
+      "provenance_family": "lru-missing-without-storage",
+      "before_commit": "5391d0990b53708836961fa19b772193a3af8188",
+      "after_commit": "c1cb33811b3586be32217b9583307d4da66a66cf",
+      "fixture_sha256": "bd9b4151d7221684ac07249646a2fc8d7d1135a417d20665aa174601467af775",
+      "grader_sha256": "99fbe74727ebbf264ab454e8bbf1d21b94143b37a57cfa754a472a87ca4d1133",
+      "status": "PUBLISHED",
+      "review_decision": "APPROVED",
+      "all_quality_gates_passed": true
+    },
+    {
+      "case_id": "more-itertools-split-after-empty-tail",
+      "repository": "https://github.com/more-itertools/more-itertools.git",
+      "license_spdx": "MIT",
+      "provenance_family": "split-after-empty-tail",
+      "before_commit": "6793bd3e4ed15318746ed2511733f12a9932eb64",
+      "after_commit": "9245cd04c043d0d646497934df72549943d5f868",
+      "fixture_sha256": "9c2c08b84f8133707c40d1db8f61df1fb5ac9aba124fb76c3fcad6de08cda11d",
+      "grader_sha256": "a63dca7f9edc6540b14b4fd9e09628e6cd848cd5b18b93837cd9e35d571e0755",
+      "status": "PUBLISHED",
+      "review_decision": "APPROVED",
+      "all_quality_gates_passed": true
+    },
+    {
+      "case_id": "cachetools-missing-oversized-value",
+      "repository": "https://github.com/tkem/cachetools.git",
+      "license_spdx": "MIT",
+      "provenance_family": "cache-missing-oversized-value",
+      "before_commit": "d20f70bd188e490f24d093675dd182786a29ec2d",
+      "after_commit": "977e1c4f194cfd3c23679d2c32f645aec6d27da0",
+      "fixture_sha256": "9287f0333507ef372ab97ad59f8b6568762885ea3168d73ecf286a4bf55f9c0d",
+      "grader_sha256": "63fb73b84ce13db96aa79ebfc1438583f066ffcf46384c279ac37f2ec443ffc9",
+      "status": "PUBLISHED",
+      "review_decision": "APPROVED",
+      "all_quality_gates_passed": true
+    }
+  ],
+  "claim_limit": "Offline deterministic train-dataset publication evidence only; no Agent or Skill improvement claim."
+}

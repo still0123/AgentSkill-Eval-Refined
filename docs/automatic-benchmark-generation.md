@@ -120,6 +120,6 @@ workspace/
 MVP 不包含 GitHub 大规模抓取、难度模型、embedding 近似去重、Skill Optimizer、MCP、
 Memory/RAG、FastAPI、Redis、Vue 或 Kubernetes。`locked_test` 虽被契约识别，但公开
 Git 历史默认污染风险高。最初四 Case 验收记录只发布到 `validation_search`；扩展配置包含
-十个独立缺陷家族，并通过 `real-bug-fix-split-plan.yaml` 明确分配到 train、
+十二个独立缺陷家族，并通过 `real-bug-fix-split-plan.yaml` 明确分配到 train、
 validation_search、regression_dev 和 validation_confirm。v1alpha1 单仓库配置保持兼容；
 新跨仓库配置使用 v1alpha2。
