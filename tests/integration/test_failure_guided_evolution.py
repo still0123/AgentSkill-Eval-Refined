@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 import yaml
+from click import unstyle
 from typer.testing import CliRunner
 
 from agentskill_eval_cli.main import app
@@ -108,8 +109,13 @@ def test_evolution_cli_requires_simulation_opt_in_and_status_is_read_only(
         ["optimize", "evolve", "run", str(EXAMPLE), "--workspace", str(workspace)],
     )
     assert denied.exit_code != 0
-    assert "simulated evaluator requires" in denied.output
-    assert "--allow-simulation" in denied.output
+    normalized_output = "".join(
+        character
+        for character in unstyle(denied.output)
+        if character.isalnum() or character == "-"
+    )
+    assert "simulatedevaluatorrequires" in normalized_output
+    assert "--allow-simulation" in normalized_output
 
     allowed = runner.invoke(
         app,
