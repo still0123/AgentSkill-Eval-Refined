@@ -1,0 +1,10 @@
+schema_version: ase/optimizer-regression/v1alpha1
+name: python-review-regression-simulation
+version: "1.0.0"
+split: regression_dev
+simulated: true
+cases:
+  - id: preserve-value-tracing
+    required_terms: ["trace real values"]
+  - id: preserve-false-positive-control
+    required_terms: ["try to disprove"]

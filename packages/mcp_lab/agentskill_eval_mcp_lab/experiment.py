@@ -5,7 +5,7 @@ from __future__ import annotations
 import html
 import json
 from pathlib import Path
-from typing import Dict, List, Literal, Tuple, cast
+from typing import Callable, Dict, List, Literal, Optional, Tuple, cast
 from uuid import NAMESPACE_URL, UUID, uuid5
 
 import yaml
@@ -14,6 +14,7 @@ from pydantic import Field
 from agentskill_eval_mcp_lab.adapters import FailureInjection, MockMcpAdapter
 from agentskill_eval_mcp_lab.contracts import (
     FailureKind,
+    McpCase,
     McpDataset,
     StrictModel,
     secure_input_path,
@@ -113,7 +114,21 @@ class McpLabRunner:
     def __init__(self, workspace: Path) -> None:
         self.workspace = workspace
 
-    def run(self, config: LabConfig) -> ExperimentArtifacts:
+    def run(
+        self,
+        config: LabConfig,
+        plan_provider: Optional[
+            Callable[[McpCase, Literal["without_guidance", "with_guidance"]], AgentPlan]
+        ] = None,
+        outcome_provider: Optional[
+            Callable[
+                [McpCase, MockMcpAdapter, Literal["without_guidance", "with_guidance"]],
+                RunOutcome,
+            ]
+        ] = None,
+    ) -> ExperimentArtifacts:
+        if plan_provider is not None and outcome_provider is not None:
+            raise ValueError("plan_provider and outcome_provider are mutually exclusive")
         dataset = McpDataset.load(config.dataset, allowed_root=config.dataset.parent)
         missing = {case.case_id for case in dataset.cases} - set(config.plans)
         extra = set(config.plans) - {case.case_id for case in dataset.cases}
@@ -142,8 +157,21 @@ class McpLabRunner:
                 ("with_guidance", variants.with_guidance),
             )
             for variant, plan in variants_and_plans:
+                if plan_provider is not None:
+                    plan = plan_provider(case, variant)
+                if plan.token_count > config.token_budget or plan.cost_usd > config.cost_budget_usd:
+                    raise ValueError(f"plan budget exceeded for {case.case_id}:{variant}")
                 adapter = MockMcpAdapter(case.available_tools, failures, config.seed)
-                run = McpEvaluationController().run(case, adapter, plan, variant)
+                run = (
+                    outcome_provider(case, adapter, variant)
+                    if outcome_provider is not None
+                    else McpEvaluationController().run(case, adapter, plan, variant)
+                )
+                if (
+                    run.token_count > config.token_budget
+                    or run.cost_usd > config.cost_budget_usd
+                ):
+                    raise ValueError(f"run budget exceeded for {case.case_id}:{variant}")
                 score = CompositeMcpGrader().grade(case, run)
                 scored_run = ScoredRun(
                     run=run,

@@ -5,11 +5,11 @@ from __future__ import annotations
 import html
 import json
 from pathlib import Path
-from typing import Dict, List, Literal, Tuple, cast
+from typing import Callable, Dict, List, Literal, Optional, Tuple, cast
 from uuid import NAMESPACE_URL, UUID, uuid5
 
 import yaml
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from agentskill_eval_memory_rag_lab.adapters import (
     FailureInjection,
@@ -18,6 +18,7 @@ from agentskill_eval_memory_rag_lab.adapters import (
 )
 from agentskill_eval_memory_rag_lab.contracts import (
     FailureKind,
+    MemoryRagCase,
     MemoryRagDataset,
     StrictModel,
     secure_input_path,
@@ -62,7 +63,14 @@ class LabConfig(StrictModel):
     cost_budget_usd: float = Field(default=0, ge=0)
     failure_injection: Tuple[FailureInjectionSpec, ...] = ()
     plans: Dict[str, PairPlans]
+    selected_case_ids: Tuple[str, ...] = ()
     simulated: Literal[True]
+
+    @model_validator(mode="after")
+    def selected_cases_must_be_unique(self) -> "LabConfig":
+        if len(self.selected_case_ids) != len(set(self.selected_case_ids)):
+            raise ValueError("selected_case_ids must be unique")
+        return self
 
     @classmethod
     def load(cls, path: Path) -> "LabConfig":
@@ -126,9 +134,34 @@ class MemoryRagLabRunner:
     def __init__(self, workspace: Path) -> None:
         self.workspace = workspace
 
-    def run(self, config: LabConfig) -> ExperimentArtifacts:
+    def run(
+        self,
+        config: LabConfig,
+        plan_provider: Optional[
+            Callable[[MemoryRagCase, PairType, Literal["control", "treatment"]], AgentPlan]
+        ] = None,
+        outcome_provider: Optional[
+            Callable[
+                [
+                    MemoryRagCase,
+                    MockRetrieverAdapter,
+                    MockMemoryAdapter,
+                    PairType,
+                    Literal["control", "treatment"],
+                ],
+                RunOutcome,
+            ]
+        ] = None,
+    ) -> ExperimentArtifacts:
+        if plan_provider is not None and outcome_provider is not None:
+            raise ValueError("plan_provider and outcome_provider are mutually exclusive")
         dataset = MemoryRagDataset.load(config.dataset, allowed_root=config.dataset.parent)
-        case_ids = {case.case_id for case in dataset.cases}
+        selected = set(config.selected_case_ids)
+        cases = tuple(case for case in dataset.cases if not selected or case.case_id in selected)
+        case_ids = {case.case_id for case in cases}
+        unknown = selected - {case.case_id for case in dataset.cases}
+        if unknown:
+            raise ValueError(f"selected_case_ids do not exist: {sorted(unknown)}")
         if set(config.plans) != case_ids:
             raise ValueError(
                 f"plans must exactly match cases; missing={sorted(case_ids - set(config.plans))}, "
@@ -146,13 +179,15 @@ class MemoryRagLabRunner:
             for item in config.failure_injection
         )
         scored: List[ScoredRun] = []
-        for case in dataset.cases:
+        for case in cases:
             pair = config.plans[case.case_id]
             variants: Tuple[Tuple[Literal["control", "treatment"], AgentPlan], ...] = (
                 ("control", pair.control),
                 ("treatment", pair.treatment),
             )
             for variant, plan in variants:
+                if plan_provider is not None:
+                    plan = plan_provider(case, pair.pair_type, variant)
                 if plan.token_count > config.token_budget or plan.cost_usd > config.cost_budget_usd:
                     raise ValueError(f"plan budget exceeded for {case.case_id}:{variant}")
                 retriever = MockRetrieverAdapter(case.documents, failures)
@@ -161,7 +196,13 @@ class MemoryRagLabRunner:
                     sensitive_keys=case.sensitive_memory_keys,
                     failures=failures,
                 )
-                run = MemoryRagController().run(case, retriever, memory, plan, variant)
+                run = (
+                    outcome_provider(case, retriever, memory, pair.pair_type, variant)
+                    if outcome_provider is not None
+                    else MemoryRagController().run(case, retriever, memory, plan, variant)
+                )
+                if run.token_count > config.token_budget:
+                    raise ValueError(f"run token budget exceeded for {case.case_id}:{variant}")
                 score = CompositeMemoryRagGrader().grade(case, run)
                 if score.cost_usd > config.cost_budget_usd:
                     raise ValueError(f"run cost budget exceeded for {case.case_id}:{variant}")

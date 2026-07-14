@@ -43,6 +43,7 @@ packages = [
   "packages/real_evidence/agentskill_eval_real_evidence",
   "packages/mcp_lab/agentskill_eval_mcp_lab",
   "packages/memory_rag_lab/agentskill_eval_memory_rag_lab",
+  "packages/scenarios/agentskill_eval_scenarios",
 ]
 
 [tool.pytest.ini_options]
@@ -62,6 +63,7 @@ source = [
   "agentskill_eval_real_evidence",
   "agentskill_eval_mcp_lab",
   "agentskill_eval_memory_rag_lab",
+  "agentskill_eval_scenarios",
 ]
 
 [tool.coverage.report]
@@ -94,6 +96,7 @@ known-first-party = [
   "agentskill_eval_real_evidence",
   "agentskill_eval_mcp_lab",
   "agentskill_eval_memory_rag_lab",
+  "agentskill_eval_scenarios",
 ]
 
 [tool.mypy]

@@ -1772,3 +1772,106 @@ fixture、grader、provenance 和 metadata。生成器同时支持常见 `src/` 
 FAIL/PASS/FAIL/PASS，且必须通过补丁防泄漏、替代修复、许可证、Agent 分数选择独立性和去重门，
 再经逐候选人工审核后发布为一个不可变 DatasetVersion。公开 Git 历史污染风险仍标为 high；
 本阶段扩展的是可审计的数据基础，尚未产生新的付费 Agent 泛化结论。
+
+---
+
+## 28. Unified Multi-Scenario Evaluation MVP 实现状态
+
+截至 2026-07-14，软件工程、MCP 和 Memory/RAG 三条既有执行链路已通过薄
+`ScenarioAdapter` 接入统一协议。公共层冻结 `UnifiedScenarioSpec`、`EvaluationPlan`、
+control/treatment 变体、Skill 名称/版本/SHA-256、comparison、证据等级、Trace capability 和
+claim limit；执行后生成 `UnifiedEvaluationResult`，统一输出成功率、absolute gain、W/T/L、
+invalid 和带 SHA-256 的原生报告引用。各纵切专用指标仍由原 Grader 负责，禁止合成无语义的
+跨场景总分。
+
+CLI 新增 `scenario validate/run/report`。simulation 必须显式传入 `--allow-simulation`，
+`simulated_controller`、`process_integration` 和 `observed_agent` 的边界在契约层校验。软件工程
+示例复用 P0 配对实验引擎；MCP 与 Memory/RAG 示例复用各自确定性 Lab，并明确标记
+`precompiled_plan`，不得声称真实 Agent 已加载或遵循 Skill。Memory/RAG Lab 额外支持冻结
+Case 子集，使能力对照与污染压力测试能够分开运行。
+
+本阶段没有新增 FastAPI、MQ、Redis 或远程调度，也没有触发付费模型。真实 Bug Fix 证据继续
+由 `real` 命令的预算门保护。详细协议、命令与限制见
+[`docs/unified-multi-scenario-evaluation.md`](./docs/unified-multi-scenario-evaluation.md)。
+
+---
+
+## 29. Process Agent Scenario Evaluation MVP 实现状态
+
+MCP 与 Memory/RAG 统一场景已支持 `activation_mode=process_prompt`。每个 Case 的 baseline 和
+treatment 分别启动哈希、版本固定的本地 Process Agent：baseline 请求中的 Skill 必须为空，
+treatment 请求携带已校验的 Skill 名称、版本、SHA-256 和正文。Agent 只能返回现有严格
+`AgentPlan`，计划再由原 MCP 或 Memory/RAG Controller、确定性环境和专项 Grader 执行。
+
+Process Agent 使用无 shell 参数数组、最小环境白名单、Secret-like 环境变量拒绝、响应大小与
+JSON 复杂度限制、进程组超时/取消终止和严格版本校验。请求只包含 Agent 可见任务与环境，不包含
+oracle、gold answer、expected tools、memory expectations 或参考补丁。系统不保存请求正文、Skill
+正文、stderr 或隐藏思维过程，只保存 executable/Skill/request/response 哈希、Variant、耗时与退出码。
+统一结果存在时执行幂等读取，不再次启动进程。
+
+当前证据等级固定为 `simulated=true, evidence_class=process_integration`：它证明真实本地进程参与了
+Skill 对照决策，但 Fake Agent、Mock MCP、Mock Retriever 和 Mock Memory 不能支持真实模型性能
+结论。协议和运行模板见
+[`docs/process-agent-scenario-evaluation.md`](./docs/process-agent-scenario-evaluation.md)。
+
+---
+
+## 30. Interactive Scenario Agent Loop MVP 实现状态
+
+Process Agent 新增冻结的 `interaction_mode=plan_once|step_loop`。默认 `plan_once` 保持原配置和
+结果兼容；`step_loop` 使用版本化 Action/Observation 协议，每一步启动独立、哈希固定的进程，
+将有界历史观察返回 Agent，并由 Agent 选择下一次 MCP 工具、检索、Memory 操作或最终回答。
+
+MCP 与 Memory/RAG 交互 Controller 继续产出原生 `RunOutcome`，因此复用既有确定性 Grader 和
+报告口径。MCP 支持工具失败观察、Agent 自主重试、参数和副作用安全门；Memory/RAG 支持检索
+失败后的重新决策、文档观察、Memory 生命周期操作及带引用的最终回答。`max_steps`、历史事件数、
+观察字节数、进程超时和工具预算均冻结进 EvaluationPlan。
+
+系统逐 Decision 保存请求/响应哈希，并额外生成脱敏 `interactive-agent-traces.json`，记录 session、
+Skill 激活、action、环境接受/拒绝、observation、final 和 step-limit；原始文档正文、Memory 值、
+Secret 与隐藏思维过程不落盘。baseline 每一步均不含 Skill，treatment 每一步使用同一不可变 Skill
+SHA-256。已有统一结果幂等重放时不再次启动 Agent。
+
+该阶段仍为 `simulated=true, evidence_class=process_integration`。它证明本地 Agent 能基于确定性
+环境观察改变下一步行为，不证明真实 Provider 或生产 MCP/RAG 的普遍 Skill 增益。详细协议见
+[`docs/interactive-scenario-agent-loop.md`](./docs/interactive-scenario-agent-loop.md)。
+
+---
+
+## 31. Failure-Guided Skill Evolution MVP 实现状态
+
+截至 2026-07-14，Trace Intelligence 与 Benchmark-guided Skill Search 之间的缺失桥梁已经补齐。
+新控制器只接收 `train` FailureDiagnosis，将可由 Skill 指导改变的任务理解、规划、工具、检索、
+Memory、冲突和验证失败转成结构化 ImprovementHypothesis；环境、预算、Judge、未知及 abstained
+诊断明确排除。优化上下文只保留 label、rule ID、置信度和事件引用，不保存 rationale、Secret 或
+隐藏思维过程。
+
+假设以显式 MutationSpec 交给既有 successive-halving Search，继续复用 original/manual/random/search
+对照、预算、lint、候选谱系和 Pareto 门。validation winner 必须再与 base Skill 通过独立
+`regression_dev` loss/Token gate，才会生成状态为 `AWAITING_INDEPENDENT_FINAL_EVALUATION` 的冻结
+交接；该交接固定 `locked_test_accessed=false`、`auto_publish=false`，不会自动创建或发布 Skill v2。
+
+CLI 新增 `optimize evolve run/status`，确定性演示必须显式传入 `--allow-simulation`。当前 MVP 拒绝
+非 simulated evaluator，尚未加入真实模型候选生成或付费搜索；因此现有结果只证明诊断、假设、
+搜索、回归和独立终评交接的控制链路。完整协议见
+[`docs/failure-guided-skill-evolution.md`](./docs/failure-guided-skill-evolution.md)。
+
+---
+
+## 32. Audited Process Skill Proposal Generator MVP 实现状态
+
+Failure-Guided Evolution 已支持 `generator.type=process`。Generator executable、版本输出和
+SHA-256 被固定；首次生成使用无 shell 参数数组、最小环境白名单、进程组超时、请求/响应字节限制
+和 JSON 深度/字段限制。请求只携带 base Skill 与脱敏 train eligibility，不包含 rationale、excluded
+failure、validation/locked Case、oracle 或 grader。响应只能返回结构化 hypothesis，证据引用由
+Controller 根据 train label 重建。
+
+系统原子保存 Generator name/version、executable/request/response/hypotheses hash、duration、exit code
+和继承环境变量名称，不保存原始请求、原始响应、stderr 或隐藏推理。相同 Evolution 幂等重放校验
+request hash 并复用已有提案，不再次启动进程。非法 JSON、超时、hash/version 不匹配、Secret-like
+环境变量、重复 ID、越权 label 与数量超限均 fail closed。
+
+当前示例 executable 是确定性 Fake Process，随后仍使用 simulated evaluator；它证明可审计的候选
+生成边界，不证明真实 LLM 能改善 Skill。真实 Provider 必须另行增加显式费用确认、调用数/预算门、
+Secret Gateway 和费用幂等。详细协议见
+[`docs/audited-process-skill-proposal-generator.md`](./docs/audited-process-skill-proposal-generator.md)。

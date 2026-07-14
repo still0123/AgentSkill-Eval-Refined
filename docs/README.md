@@ -2,6 +2,10 @@
 
 本目录保存架构边界、实验协议、复现方法和各纵切的结论限制。
 
+## 后续执行路线
+
+- [Skill v1→v2 分阶段执行工作文档](./skill-evolution-execution-roadmap.md)
+
 ## 可信实验基础
 
 - [P0 本地存储与恢复协议](./local-storage.md)
@@ -17,11 +21,16 @@
 - [一条命令运行 P0 配对实验](./one-command-demo.md)
 - [Automatic Benchmark Generation MVP](./automatic-benchmark-generation.md)
 - [Benchmark-guided Skill Search MVP](./benchmark-guided-skill-search.md)
+- [Failure-Guided Skill Evolution MVP](./failure-guided-skill-evolution.md)
+- [Audited Process Skill Proposal Generator MVP](./audited-process-skill-proposal-generator.md)
 - [Independent Final Evaluation MVP](./independent-final-evaluation.md)
 - [Real Agent Evaluation Evidence MVP](./real-agent-evidence.md)
 
 ## 专项 Lab 与界面
 
+- [Unified Multi-Scenario Evaluation MVP](./unified-multi-scenario-evaluation.md)
+- [Process Agent Scenario Evaluation MVP](./process-agent-scenario-evaluation.md)
+- [Interactive Scenario Agent Loop MVP](./interactive-scenario-agent-loop.md)
 - [MCP Tool Evaluation MVP](./mcp-tool-evaluation.md)
 - [Memory/RAG Evaluation MVP](./memory-rag-evaluation.md)
 - [Read-only Evaluation Dashboard MVP](./dashboard-mvp.md)

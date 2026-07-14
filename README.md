@@ -16,8 +16,10 @@ AgentSkill-Eval 是一个面向 Agent Skill 的**评测、诊断与迭代优化�
 
 **当前版本：[`v0.1.0-rc1`](https://github.com/ranmaoxia0123/AgentSkill-Eval/tree/v0.1.0-rc1)**
 
-当前 RC2 候选在 RC1 基础上增加跨仓库 Benchmark 重建：使用两个真实 MIT 开源仓库、
-四个独立缺陷家族完成全离线质量门验证。该证据不调用模型，也不代表 Agent 性能结论。
+当前开发版在 RC1 基础上增加了跨仓库 Benchmark、真实 Agent 证据、多场景统一评测、
+Process Agent 接入、交互式 Action/Observation 循环、Failure-guided Skill Evolution 和受审计的
+Process Skill Proposal Generator；
+未完成能力会在下文明确标记。
 
 ## 项目的核心方向
 
@@ -77,9 +79,12 @@ without-Skill       Skill v1         Skill v2
 | Real Agent Evidence | 通过显式授权和预算门运行真实 Agent 实验 | 已实现 |
 | MCP Evaluation Lab | 评测工具选择、参数、顺序、恢复和副作用 | 离线 simulated Lab |
 | Memory/RAG Lab | 评测检索、引用、污染、记忆更新和会话隔离 | 离线 simulated Lab |
+| Unified Scenario | 用同一协议运行软件工程、MCP、Memory/RAG 并保留专项指标 | 已实现，simulated MVP |
+| Process Scenario Agent | baseline/Skill 两臂由哈希固定进程生成 MCP/Memory-RAG 计划 | 已实现，process integration |
+| Interactive Agent Loop | Agent 根据每一步环境 Observation 决定下一步 Action | 已实现，兼容现有 `plan_once` |
 | Skill Version Regression | 比较 v1/v2 的改进、退化 Case 与成本变化 | 已有底层能力，统一工作流待完善 |
-| Failure-guided Optimization | 从失败诊断生成候选，经过训练集筛选和 locked test 终评 | 已有离线 Skill Search，闭环待完善 |
-| Interactive Agent Loop | Agent 根据环境 Observation 决定下一步 Action | 功能分支开发中 |
+| Failure-guided Optimization | 从 train 失败诊断生成假设，经搜索与 regression_dev 门冻结候选 | 已实现 simulated MVP，独立 locked 终评不自动触发 |
+| Process Skill Proposal | 哈希/版本固定的本地进程根据脱敏 train 失败生成候选变异 | 已实现 Fake Process MVP，不代表真实 LLM 优化 |
 | Dashboard | 查看已冻结的报告、Trace、W/T/L 和候选状态 | 本地只读版 |
 
 `simulated` 只证明评测管线可用，不能当作真实模型能力证据。
@@ -115,6 +120,14 @@ agentskill-eval demo run --workspace .agentskill-eval/demo
 - Trace、失败诊断和审计产物。
 
 > 演示使用确定性模拟执行，结果会强制标记 `simulated=true`。
+
+也可以通过统一场景入口运行三类评测：
+
+```bash
+agentskill-eval scenario validate examples/unified/mcp-tool.yaml
+agentskill-eval scenario run examples/unified/mcp-tool.yaml \
+  --workspace .agentskill-eval/unified --allow-simulation
+```
 
 ### 3. 运行质量检查
 
@@ -234,6 +247,7 @@ packages/skill_optimizer/
 packages/real_evidence/
 packages/mcp_lab/
 packages/memory_rag_lab/
+packages/scenarios/       跨场景计划、Adapter 和统一结果 envelope
 examples/                演示 Skill、Dataset 和配置
 experiments/             可公开的脱敏实验记录
 tests/                   单元与集成测试
@@ -253,11 +267,20 @@ docs/                    模块级设计和操作文档
 | 统计口径、W/T/L 和报告 | [Statistics and Reports](./docs/statistics-and-reports.md) |
 | 自动生成 Benchmark | [Automatic Benchmark Generation](./docs/automatic-benchmark-generation.md) |
 | Skill 搜索与独立终评 | [Skill Search](./docs/benchmark-guided-skill-search.md) / [Final Evaluation](./docs/independent-final-evaluation.md) |
+| 失败驱动 Skill 演化 | [Failure-Guided Skill Evolution](./docs/failure-guided-skill-evolution.md) |
+| 受审计的 Process 候选生成 | [Process Skill Proposal Generator](./docs/audited-process-skill-proposal-generator.md) |
 | 真实 Agent 评测 | [Real Agent Evidence](./docs/real-agent-evidence.md) |
 | MCP / Memory-RAG 专项 Lab | [MCP Lab](./docs/mcp-tool-evaluation.md) / [Memory-RAG Lab](./docs/memory-rag-evaluation.md) |
+| 跨场景统一入口和结果协议 | [Unified Multi-Scenario Evaluation](./docs/unified-multi-scenario-evaluation.md) |
+| 本地 Process Agent Skill 激活 | [Process Agent Scenario Evaluation](./docs/process-agent-scenario-evaluation.md) |
+| 逐步 Action/Observation Agent 循环 | [Interactive Scenario Agent Loop](./docs/interactive-scenario-agent-loop.md) |
 | Dashboard 启动和限制 | [Dashboard](./docs/dashboard-mvp.md) |
 
 完整文档索引见 [`docs/README.md`](./docs/README.md)。
+
+后续开发请按
+[`Skill v1→v2 分阶段执行工作文档`](./docs/skill-evolution-execution-roadmap.md)
+逐阶段进行；该路线优先完成真实优化证据，不提前扩建平台。
 
 ## 当前边界
 
@@ -266,8 +289,9 @@ docs/                    模块级设计和操作文档
 - 尚无 FastAPI、账号权限、远程任务队列和多租户控制面；
 - Dashboard 只读取本地冻结报告；
 - MCP 与 Memory/RAG 目前是离线、确定性 Lab；
-- 交互式 Agent step loop 尚在功能分支开发，当前 main 仍以冻结计划执行为主；
-- Skill Search 已证明离线候选筛选链路，尚未形成面向所有 Skill 类型的自动优化器；
+- Process Agent 支持兼容的 `plan_once` 和有界 `step_loop`；后者当前只连接确定性本地环境；
+- Failure-guided Evolution 已连通诊断、Process 候选生成、搜索和回归门，但当前 Generator 仍是
+  确定性/Fake Process，尚未覆盖所有 Skill 类型或真实模型候选生成；
 - 真实 Agent 数据量很小，不支持泛化性能声明。
 
 ## 参与与安全

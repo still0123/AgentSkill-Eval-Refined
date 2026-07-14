@@ -1,0 +1,7 @@
+schema_version: ase-skill/v1alpha1
+name: mcp-tool-use-v1
+version: 1.0.0
+domain: mcp-tool-use
+injection_mode: precompiled_plan
+license: Apache-2.0
+skill_md_sha256: 00901ebf66ff5cce553de141525ffb6e0e714fba5a8a2624373963c2510d1ae2

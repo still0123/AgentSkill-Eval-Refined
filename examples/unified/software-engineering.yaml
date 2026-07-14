@@ -1,0 +1,16 @@
+schema_version: ase/unified-scenario/v1alpha1
+name: python-review-skill-paired-demo
+scenario: software_engineering
+comparison: skill_ab
+native_config: software-engineering.native.yaml
+skill:
+  name: python-review-v1
+  version: 1.0.0
+  path: ../skills/python-review-v1
+  expected_sha256: acdcc9d3d8abbc0d0e4826a8fb2b77c228d5b0b83f447e39a435296448e1843f
+  activation_mode: native_install
+simulated: true
+evidence_class: simulated_controller
+claim_limit: >-
+  Deterministic mock-runner integration evidence only; not observed-Agent or population-level
+  evidence of Skill improvement.

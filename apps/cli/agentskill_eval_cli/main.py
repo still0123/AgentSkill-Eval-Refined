@@ -51,8 +51,11 @@ from agentskill_eval_real_evidence import (
     RealAgentEvidenceSpec,
     RealEvidenceStore,
 )
+from agentskill_eval_scenarios import UnifiedScenarioRunner, UnifiedScenarioSpec
 from agentskill_eval_skill_optimizer import (
     BenchmarkGuidedSkillSearch,
+    FailureGuidedEvolutionSpec,
+    FailureGuidedSkillEvolution,
     FinalEvaluationStore,
     IndependentFinalEvaluationSpec,
     IndependentFinalEvaluator,
@@ -85,10 +88,16 @@ benchmark_app = typer.Typer(help="Generate, review, and publish audited benchmar
 app.add_typer(benchmark_app, name="benchmark")
 optimize_app = typer.Typer(help="Search validation data for a frozen Skill candidate.")
 app.add_typer(optimize_app, name="optimize")
+evolve_app = typer.Typer(help="Generate Skill candidates from train failure diagnoses.")
+optimize_app.add_typer(evolve_app, name="evolve")
 final_app = typer.Typer(help="Evaluate a frozen base/winner pair on an independent split.")
 app.add_typer(final_app, name="final")
 real_app = typer.Typer(help="Preflight and run budgeted observed-Agent evidence experiments.")
 app.add_typer(real_app, name="real")
+scenario_app = typer.Typer(
+    help="Validate and run heterogeneous evaluations through one audited protocol."
+)
+app.add_typer(scenario_app, name="scenario")
 
 
 mcp_app = typer.Typer(help="Validate and run auditable MCP tool-evaluation experiments.")
@@ -99,6 +108,62 @@ memory_rag_app = typer.Typer(help="Validate and run auditable Memory/RAG evaluat
 app.add_typer(memory_rag_app, name="memory-rag")
 memory_rag_lab_app = typer.Typer(help="Run the deterministic offline Memory/RAG lab.")
 memory_rag_app.add_typer(memory_rag_lab_app, name="lab")
+
+
+@scenario_app.command("validate")
+def scenario_validate(
+    spec_path: Path = typer.Argument(..., exists=True, dir_okay=False),  # noqa: B008
+) -> None:
+    """Validate a unified scenario and print its frozen execution plan."""
+    spec = UnifiedScenarioSpec.load(spec_path)
+    plan = UnifiedScenarioRunner(Path(".")).validate(spec)
+    payload = plan.model_dump(mode="json")
+    payload["plan_sha256"] = plan.plan_sha256
+    typer.echo(json.dumps(payload, ensure_ascii=False, sort_keys=True))
+
+
+@scenario_app.command("run")
+def scenario_run(
+    spec_path: Path = typer.Argument(..., exists=True, dir_okay=False),  # noqa: B008
+    workspace: Path = typer.Option(  # noqa: B008
+        Path(".agentskill-eval-workspace"), "--workspace", file_okay=False
+    ),
+    allow_simulation: bool = typer.Option(False, "--allow-simulation"),  # noqa: B008
+) -> None:
+    """Run one scenario without erasing its native metrics or evidence boundary."""
+    spec = UnifiedScenarioSpec.load(spec_path)
+    runner = UnifiedScenarioRunner(workspace)
+    try:
+        result = runner.run(spec, allow_simulation=allow_simulation)
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc), param_hint="CONFIG") from exc
+    output = runner.output_dir(result.experiment_id)
+    typer.echo(
+        json.dumps(
+            {
+                "experiment_id": str(result.experiment_id),
+                "scenario": result.plan.scenario.value,
+                "comparison": result.plan.comparison.value,
+                "simulated": result.simulated,
+                "evidence_class": result.evidence_class.value,
+                "report_json": str(output / "unified-report.json"),
+                "report_html": str(output / "unified-report.html"),
+                "claim_limit": result.claim_limit,
+            },
+            ensure_ascii=False,
+            sort_keys=True,
+        )
+    )
+
+
+@scenario_app.command("report")
+def scenario_report(
+    workspace: Path = typer.Argument(..., exists=True, file_okay=False),  # noqa: B008
+    experiment_id: UUID = typer.Argument(...),  # noqa: B008
+) -> None:
+    """Read one persisted unified result envelope."""
+    result = UnifiedScenarioRunner(workspace).load(experiment_id)
+    typer.echo(result.model_dump_json(indent=2))
 
 
 def _version_callback(value: bool) -> None:
@@ -538,6 +603,55 @@ def optimize_status(
             sort_keys=True,
         )
     )
+
+
+@evolve_app.command("run")
+def evolve_run(
+    spec_path: Path = typer.Argument(  # noqa: B008
+        ..., exists=True, dir_okay=False, help="Frozen failure-guided evolution spec."
+    ),
+    workspace: Path = typer.Option(  # noqa: B008
+        Path(".agentskill-eval-workspace"), "--workspace", file_okay=False
+    ),
+    allow_simulation: bool = typer.Option(False, "--allow-simulation"),  # noqa: B008
+) -> None:
+    """Generate auditable hypotheses, run existing search, and freeze a final handoff."""
+    spec = FailureGuidedEvolutionSpec.load(spec_path)
+    if spec.evaluator.simulated and not allow_simulation:
+        raise typer.BadParameter(
+            "simulated evaluator requires --allow-simulation",
+            param_hint="--allow-simulation",
+        )
+    result = FailureGuidedSkillEvolution(workspace).run(spec)
+    typer.echo(
+        json.dumps(
+            {
+                "evolution_id": str(result.report.evolution_id),
+                "optimization_job_id": str(result.report.optimization_job_id),
+                "hypothesis_count": len(result.report.hypotheses),
+                "generator_type": spec.generator.type,
+                "generator_evidence_present": result.report.generator_evidence is not None,
+                "candidate_count": result.report.candidate_count,
+                "winner_candidate_id": str(result.report.winner_candidate_id),
+                "winner_skill_sha256": result.report.winner_skill_sha256,
+                "report_json": str(result.report_json),
+                "report_html": str(result.report_html),
+                "final_handoff": str(result.handoff_path),
+                "locked_test_accessed": result.report.locked_test_accessed,
+                "simulated": result.report.simulated,
+            },
+            sort_keys=True,
+        )
+    )
+
+
+@evolve_app.command("status")
+def evolve_status(
+    workspace: Path = typer.Argument(..., exists=True, file_okay=False),  # noqa: B008
+    evolution_id: UUID = typer.Argument(...),  # noqa: B008
+) -> None:
+    """Read one immutable failure-guided evolution report."""
+    typer.echo(FailureGuidedSkillEvolution(workspace).load(evolution_id).model_dump_json(indent=2))
 
 
 @benchmark_app.command("generate")

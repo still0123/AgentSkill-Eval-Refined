@@ -1,0 +1,7 @@
+schema_version: ase-skill/v1alpha1
+name: memory-rag-v1
+version: 1.0.0
+domain: memory-rag
+injection_mode: precompiled_plan
+license: Apache-2.0
+skill_md_sha256: 524d2191fcc4791309c57284c41fa02f14f362a32faa92641fd2ef56f34c0e5f
