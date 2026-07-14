@@ -14,12 +14,13 @@ AgentSkill-Eval 是一个面向 Agent Skill 的**评测、诊断与迭代优化�
 系统在冻结 Agent、模型、Case、环境和预算的前提下运行配对实验，保存结果、执行轨迹、
 失败诊断和审计证据，为后续 Skill 搜索、版本回归和自动优化提供可信依据。
 
-**当前版本：[`v0.2.0-rc1`](https://github.com/ranmaoxia0123/AgentSkill-Eval/tree/v0.2.0-rc1)**
+**当前版本：`v0.3.0-rc1`（发布候选）**
 
 当前开发版在 RC1 基础上增加了跨仓库 Benchmark、真实 Agent 证据、多场景统一评测、
 Process Agent 接入、交互式 Action/Observation 循环、Failure-guided Skill Evolution 和受审计的
 Process Skill Proposal Generator、预算受控的 DeepSeek Skill Proposal Generator、
-Fake-evidence SkillVersion Promotion Workflow，以及 Stage 5A.2 离线 Evolution Evidence Release CLI；
+Fake-evidence SkillVersion Promotion Workflow、Stage 5A.2 离线 Evolution Evidence Release CLI，
+以及完整的项目收口证据和答辩演示；
 未完成能力会在下文明确标记。
 
 ## 项目的核心方向
@@ -302,14 +303,16 @@ docs/                    模块级设计和操作文档
 
 ## 当前边界
 
-`v0.1.0-rc1` 是可本地复现的研究型 RC，不是完整生产平台：
+`v0.3.0-rc1` 是可本地复现的研究型 RC，不是完整生产平台：
 
 - 尚无 FastAPI、账号权限、远程任务队列和多租户控制面；
 - Dashboard 只读取本地冻结报告；
 - MCP 与 Memory/RAG 目前是离线、确定性 Lab；
 - Process Agent 支持兼容的 `plan_once` 和有界 `step_loop`；后者当前只连接确定性本地环境；
-- Failure-guided Evolution 已连通诊断、Process 候选生成、搜索和回归门，但当前 Generator 仍是
-  确定性/Fake Process，尚未覆盖所有 Skill 类型或真实模型候选生成；
+- Failure-guided Evolution 已连通诊断、Process/DeepSeek 候选生成、搜索和回归门；当前真实
+  Stage 3 证据不足，未触发付费 proposal，也没有产生可发布的真实 Skill v2；
+- SkillVersion Promotion 与 Evolution Evidence Release 已通过 Fake/fixture 端到端验证，不能
+  被解释为真实模型优化效果；
 - 真实 Agent 数据量很小，不支持泛化性能声明。
 
 ## 参与与安全

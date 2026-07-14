@@ -5,65 +5,67 @@ after the first stable release.
 
 ## [Unreleased]
 
+No changes yet.
+
+## [0.3.0-rc1] - 2026-07-14
+
 ### Added
 
-- GitHub Actions quality gates for Python, Dashboard, wheel packaging, schemas and Secret scanning.
-- Release, contribution and security policy metadata.
-- Cross-repository Automatic Benchmark Generation v1alpha2 with explicit source keys,
-  provenance-family independence groups and published split-leakage guards.
-- A second audited offline source (`cachetools`) and a four-case, two-repository deterministic
-  evidence bundle whose DatasetVersion hash covers case, fixture, grader, provenance and metadata.
-- A unified multi-scenario facade for software engineering, MCP and Memory/RAG evaluations with
-  frozen Skill hashes, explicit evidence classes, native metric preservation and immutable reports.
-- A hash-pinned Process Scenario Agent boundary for MCP and Memory/RAG with baseline cleanliness,
-  treatment Skill activation, oracle-free requests and hashed decision evidence.
-- A backwards-compatible interactive Process Agent step loop for MCP and Memory/RAG with bounded
-  Action/Observation history, deterministic budgets, observation-driven recovery and redacted
-  per-step audit evidence.
-- A leakage-safe Failure-Guided Skill Evolution controller that converts eligible train diagnoses
-  into auditable hypotheses, reuses existing candidate search, applies an independent regression_dev
-  gate and freezes a no-auto-publish handoff for Independent Final Evaluation.
-- A hash/version-pinned Process Skill Proposal Generator with sanitized train-only requests, minimal
-  environment inheritance, bounded JSON I/O, fail-closed validation and idempotent invocation evidence.
 - A budget-gated Real Optimizer Evaluator that reuses paired observed-Agent execution, records
   candidate/Case outcomes and Trace references, and caches completed candidate/Case combinations.
-- An expanded twelve-case Python Bug Fix benchmark plan covering twelve independent defect families and
-  explicit train, validation_search, regression_dev and validation_confirm assignments.
-- A four-case immutable train DatasetVersion with two additional compact historical defects, 48
-  offline verifier executions, distinct alternative repairs and a sanitized publication record.
+- A twelve-case Python Bug Fix benchmark plan with independent defect families and explicit
+  `train`, `validation_search`, `regression_dev` and `validation_confirm` assignments.
+- A four-case immutable train DatasetVersion with offline verifier repetitions, alternative repairs
+  and a sanitized publication record.
 - A single-provider DeepSeek Skill Proposal Generator with explicit call/cost authorization,
-  train-only sanitized inputs, structured 3–5 candidate output, frozen prompt/schema hashes,
-  token/cost evidence and idempotent no-cost replay.
+  train-only sanitized inputs, structured candidate output, frozen prompt/schema hashes and
+  idempotent no-cost replay.
+- An Observed Failure Evidence Bridge that turns eligible real treatment failures into a traceable,
+  train-only optimizer input without exposing secrets or locked-test data.
+- SkillVersion Promotion Core and Promotion Workflow gates covering confirmation, locked test,
+  human review, immutable parent lineage and explicit rejection states.
+- Evolution Evidence Release CLI commands (`prepare`, `verify`, `inspect`) that generate an offline
+  report, Skill diff, evidence index and tamper-evident audit bundle from promotion evidence.
+- A project-completion evidence bundle, five-minute demo guide and interview/defence notes.
+
+### Changed
+
+- Python distribution version is now `0.3.0rc1`; the Dashboard package is `0.3.0-rc.1`.
+- Tool-call-limit, loop and turn-limit exits retain their specific terminal reason instead of being
+  collapsed into a generic execution error.
 
 ### Evidence boundary
 
-- The cross-repository evidence performs no model calls and proves only deterministic
-  reconstruction and publication controls; it is not Agent-performance evidence.
-- Unified MCP and Memory/RAG examples use precompiled deterministic plans; they validate the
-  evaluation system but do not prove that a real Agent loaded or followed the example Skills.
-- Process integration proves that a local Agent process received or did not receive a Skill and
-  produced executable plans; deterministic tools and Fake Agents remain simulated evidence.
-- Interactive integration additionally proves that subsequent Process decisions can consume
-  deterministic environment observations; it remains simulated tool/Memory/RAG evidence.
-- Failure-guided evolution currently uses deterministic hypotheses and simulated/Fake evaluators;
-  it proves the optimization control loop, not that a real model-generated Skill is better.
-- The Process Generator example is a deterministic local fixture and does not authorize Provider
-  Secrets, paid calls or real-LLM optimization claims.
-- Real optimizer Fake Process tests validate the observed execution chain with `simulated=false`;
-  Provider-backed candidate-selection evidence requires a separately authorized smoke run.
-- DeepSeek Fake API tests prove the proposal boundary and budget controls without paid calls; a
-  Provider-backed proposal smoke remains separate evidence and does not prove candidate quality.
-- The first Provider-backed Stage 3 train smoke produced no eligible treatment failure: one pair
-  passed and one pair was invalid in both arms. The bridge returned `INSUFFICIENT`, so the authorized
-  proposal call was deliberately not consumed; this negative result is retained rather than used as
-  a Skill task-failure signal.
-- Tool-call-limit exits are now parsed as `budget_exhausted` with the observed call count instead of
-  generic `execution_error`; real-evidence specs freeze a separate `max_tool_calls` value and require
-  Qwen's effective HOME setting to match it.
-- A second authorized train smoke with a 48-call limit still produced insufficient optimization
-  evidence: the hard Case hit action-stagnation/turn limits and the easy Case passed in both arms.
-  The proposal call remained unused; terminal reasons are now preserved as `loop_detected` and
-  `turn_limit` instead of generic infrastructure errors.
+- The two authorized Stage 3 train smokes did not produce eligible optimization evidence. The first
+  had one pass and one pair invalid in both arms; the second had one pass and one hard Case ending in
+  loop/turn limits. The DeepSeek proposal call was therefore not consumed.
+- Stage 4 Promotion and Stage 5A.2 Evidence Release are validated with Fake/simulated fixtures. They
+  prove workflow integrity and tamper detection, not that a real model-generated Skill v2 is better.
+- Real Agent samples are descriptive evidence only; the small number of Cases does not support a
+  generalized performance claim.
+- MCP and Memory/RAG remain deterministic offline Labs. The Dashboard remains a local read-only UI.
+
+## [0.2.0-rc1] - 2026-07-14
+
+### Added
+
+- Cross-repository Automatic Benchmark Generation with source provenance, independence groups,
+  split-leakage guards and a deterministic multi-repository DatasetVersion.
+- A unified multi-scenario facade for software engineering, MCP and Memory/RAG evaluation while
+  preserving scenario-specific metrics and evidence classes.
+- Hash-pinned Process Scenario Agent support and a bounded Action/Observation loop with redacted
+  per-step evidence and deterministic budgets.
+- Leakage-safe Failure-Guided Skill Evolution that converts eligible train diagnoses into auditable
+  hypotheses, reuses candidate search and applies an independent regression gate.
+- A hash/version-pinned Process Skill Proposal Generator with sanitized inputs, minimal environment
+  inheritance, bounded JSON I/O and fail-closed validation.
+
+### Evidence boundary
+
+- Cross-repository reconstruction is deterministic benchmark evidence, not Agent-performance
+  evidence.
+- MCP, Memory/RAG, Process Agent and optimizer examples in this release use deterministic or Fake
+  components and remain simulated evidence.
 
 ## [0.1.0-rc1] - 2026-07-13
 
@@ -82,5 +84,7 @@ after the first stable release.
 - RC1 includes real-agent execution infrastructure and Fake Process Agent CI coverage; a complete,
   successful paid smoke/evidence report is a separate release-evidence artifact.
 
-[Unreleased]: https://github.com/ranmaoxia0123/AgentSkill-Eval/compare/v0.1.0-rc1...HEAD
+[Unreleased]: https://github.com/ranmaoxia0123/AgentSkill-Eval/compare/v0.3.0-rc1...HEAD
+[0.3.0-rc1]: https://github.com/ranmaoxia0123/AgentSkill-Eval/compare/v0.2.0-rc1...v0.3.0-rc1
+[0.2.0-rc1]: https://github.com/ranmaoxia0123/AgentSkill-Eval/compare/v0.1.0-rc1...v0.2.0-rc1
 [0.1.0-rc1]: https://github.com/ranmaoxia0123/AgentSkill-Eval/releases/tag/v0.1.0-rc1
