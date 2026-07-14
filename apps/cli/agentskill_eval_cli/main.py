@@ -54,6 +54,7 @@ from agentskill_eval_real_evidence import (
 from agentskill_eval_scenarios import UnifiedScenarioRunner, UnifiedScenarioSpec
 from agentskill_eval_skill_optimizer import (
     BenchmarkGuidedSkillSearch,
+    DeepSeekGeneratorAuthorization,
     FailureBridgeError,
     FailureGuidedEvolutionSpec,
     FailureGuidedSkillEvolution,
@@ -600,18 +601,11 @@ def optimize_search(
             raise typer.BadParameter("real_agent config path is missing", param_hint="SPEC")
         real_spec = RealAgentEvidenceSpec.load(spec.evaluator.real_agent_config_path)
         candidate_count = 3 + len(spec.mutations)
-        unique_candidate_case_evaluations = (
-            candidate_count * spec.search.subset_size
-            + (3 + spec.search.promote_search_candidates)
-            * (
-                len(DatasetLoader().load(spec.validation_search_path).cases)
-                - spec.search.subset_size
-            )
-        )
+        unique_candidate_case_evaluations = candidate_count * spec.search.subset_size + (
+            3 + spec.search.promote_search_candidates
+        ) * (len(DatasetLoader().load(spec.validation_search_path).cases) - spec.search.subset_size)
         worst_case_runs = unique_candidate_case_evaluations * 2
-        estimated_cost = (
-            worst_case_runs * real_spec.pricing.estimated_cost_per_run_microusd
-        )
+        estimated_cost = worst_case_runs * real_spec.pricing.estimated_cost_per_run_microusd
         typer.echo(
             json.dumps(
                 {
@@ -634,9 +628,7 @@ def optimize_search(
             max_cost_microusd=max_cost_microusd,
             max_agent_runs=max_agent_runs,
         )
-    result = BenchmarkGuidedSkillSearch(workspace).run(
-        spec, real_authorization=authorization
-    )
+    result = BenchmarkGuidedSkillSearch(workspace).run(spec, real_authorization=authorization)
     typer.echo(
         json.dumps(
             {
@@ -742,6 +734,15 @@ def evolve_run(
     max_agent_runs: Optional[int] = typer.Option(  # noqa: B008
         None, "--max-agent-runs", min=1
     ),
+    confirm_generator_run: bool = typer.Option(  # noqa: B008
+        False, "--confirm-generator-run"
+    ),
+    max_generator_cost_microusd: Optional[int] = typer.Option(  # noqa: B008
+        None, "--max-generator-cost-microusd", min=1
+    ),
+    max_generator_calls: Optional[int] = typer.Option(  # noqa: B008
+        None, "--max-generator-calls", min=1
+    ),
 ) -> None:
     """Generate auditable hypotheses, run existing search, and freeze a final handoff."""
     spec = FailureGuidedEvolutionSpec.load(spec_path)
@@ -767,8 +768,48 @@ def evolve_run(
             max_cost_microusd=max_cost_microusd,
             max_agent_runs=max_agent_runs,
         )
+    generator_authorization = None
+    if spec.generator.type == "deepseek":
+        if not confirm_generator_run:
+            raise typer.BadParameter(
+                "DeepSeek proposal generation requires --confirm-generator-run",
+                param_hint="--confirm-generator-run",
+            )
+        if max_generator_cost_microusd is None or max_generator_calls is None:
+            raise typer.BadParameter(
+                "DeepSeek proposal generation requires cost and call limits",
+                param_hint="--max-generator-cost-microusd/--max-generator-calls",
+            )
+        approximate_input_bytes = (
+            spec.base_skill_path.joinpath("SKILL.md").stat().st_size
+            + spec.failure_bundle_path.stat().st_size
+            + 4_000
+        )
+        typer.echo(
+            json.dumps(
+                {
+                    "event": "deepseek_generator_preflight",
+                    "provider": "deepseek",
+                    "model": spec.generator.model,
+                    "planned_calls": 1,
+                    "approximate_input_bytes": approximate_input_bytes,
+                    "max_output_tokens": spec.generator.max_output_tokens,
+                    "authorized_calls": max_generator_calls,
+                    "authorized_cost_microusd": max_generator_cost_microusd,
+                },
+                sort_keys=True,
+            ),
+            err=True,
+        )
+        generator_authorization = DeepSeekGeneratorAuthorization(
+            confirm_real_run=True,
+            max_calls=max_generator_calls,
+            max_cost_microusd=max_generator_cost_microusd,
+        )
     result = FailureGuidedSkillEvolution(workspace).run(
-        spec, real_authorization=authorization
+        spec,
+        real_authorization=authorization,
+        generator_authorization=generator_authorization,
     )
     typer.echo(
         json.dumps(
@@ -786,6 +827,14 @@ def evolve_run(
                 "final_handoff": str(result.handoff_path),
                 "locked_test_accessed": result.report.locked_test_accessed,
                 "simulated": result.report.simulated,
+                "generator_calls_consumed": (
+                    generator_authorization.calls_consumed if generator_authorization else None
+                ),
+                "generator_cost_microusd": (
+                    generator_authorization.observed_or_reserved_cost_microusd
+                    if generator_authorization
+                    else None
+                ),
             },
             sort_keys=True,
         )

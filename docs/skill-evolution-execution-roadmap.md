@@ -54,7 +54,7 @@ commit: e2febda Add audited Process Skill proposal generator
 | 0 | Integration Baseline | 合并 PR、RC tag | 否 | 已完成 |
 | 1 | Observed Failure Evidence Bridge | 真实 train FailureEvidenceBundle | 可先不产生 | 已完成 |
 | 2 | Real Optimizer Evaluator | 真实候选选择信号 | smoke 已授权执行 | 已完成 |
-| 3 | DeepSeek Skill Proposal | 真实模型生成的 3～5 个候选 | 是，需授权 | 待执行 |
+| 3 | DeepSeek Skill Proposal | 真实模型生成的 3～5 个候选 | 是，需授权 | 代码完成，真实 smoke 待授权 |
 | 4 | SkillVersion Promotion | Confirm、Locked、Skill v2 Manifest | 终评需授权 | 待执行 |
 | 5 | Real Evolution Evidence Release | 完整 v1→v2 实验报告 | 是，需授权 | 待执行 |
 | 6 | Second Skill Family | MCP Skill 真实实证 | 可选 | 暂缓 |

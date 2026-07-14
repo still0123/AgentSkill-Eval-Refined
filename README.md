@@ -18,7 +18,7 @@ AgentSkill-Eval 是一个面向 Agent Skill 的**评测、诊断与迭代优化�
 
 当前开发版在 RC1 基础上增加了跨仓库 Benchmark、真实 Agent 证据、多场景统一评测、
 Process Agent 接入、交互式 Action/Observation 循环、Failure-guided Skill Evolution 和受审计的
-Process Skill Proposal Generator；
+Process Skill Proposal Generator，以及预算受控的 DeepSeek Skill Proposal Generator；
 未完成能力会在下文明确标记。
 
 ## 项目的核心方向
@@ -85,6 +85,7 @@ without-Skill       Skill v1         Skill v2
 | Skill Version Regression | 比较 v1/v2 的改进、退化 Case 与成本变化 | 已有底层能力，统一工作流待完善 |
 | Failure-guided Optimization | 从 train 失败诊断生成假设，经搜索与 regression_dev 门冻结候选 | 已实现 simulated MVP，独立 locked 终评不自动触发 |
 | Process Skill Proposal | 哈希/版本固定的本地进程根据脱敏 train 失败生成候选变异 | 已实现 Fake Process MVP，不代表真实 LLM 优化 |
+| DeepSeek Skill Proposal | 单次授权调用从 train 失败生成 3～5 个结构化候选，并冻结 prompt/schema/token/费用证据 | 代码与 Fake API 已实现，真实 smoke 需单独授权 |
 | Real Optimizer Evaluator | 用真实 Agent 的 Case 结果、成本和 Trace 选择候选并执行 regression_dev | 已实现，真实 smoke 需单独授权 |
 | Observed Failure Bridge | 从真实 Skill treatment Run 导出可追溯的 train failure bundle | 已实现，不调用模型 |
 | Dashboard | 查看已冻结的报告、Trace、W/T/L 和候选状态 | 本地只读版 |
@@ -196,6 +197,9 @@ agentskill-eval real preflight /absolute/path/to/observed-agent.yaml
 
 只有完成 Provider、model、Run 数和预算人工确认后，才应执行 smoke。完整命令与
 Secret 配置见 [Real Agent Evaluation Evidence](./docs/real-agent-evidence.md)。
+
+DeepSeek 候选生成使用独立的确认、调用数和费用预算门；配置、数据隔离和审计字段见
+[DeepSeek Skill Proposal MVP](./docs/deepseek-skill-proposal.md)。
 
 ## 系统组成
 

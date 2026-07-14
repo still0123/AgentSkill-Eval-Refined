@@ -1,0 +1,37 @@
+schema_version: ase/failure-guided-evolution/v1alpha1
+name: python-review-deepseek-proposal-demo
+base_skill_path: ../../skills/python-review-v1
+manual_skill_path: ../python-review-search/manual
+failure_bundle_path: train-failures.yaml
+validation_search_path: ../python-review-search/validation-search.yaml
+regression_dev_path: regression-dev.yaml
+generator:
+  type: deepseek
+  name: deepseek-skill-proposal
+  version: prompt-v1
+  max_hypotheses: 4
+  base_url: https://api.deepseek.com
+  model: deepseek-v4-pro
+  temperature: 0.0
+  max_output_tokens: 4000
+  secret_env_name: OPENAI_API_KEY
+  timeout_seconds: 60
+  input_cache_miss_microusd_per_million: 435000
+  input_cache_hit_microusd_per_million: 3625
+  output_microusd_per_million: 870000
+search:
+  algorithm: successive_halving
+  subset_size: 4
+  promote_search_candidates: 3
+  random_seed: 2026
+constraints:
+  max_skill_bytes: 20000
+  max_loss_cases: 0
+  max_token_overhead_ratio: 0.25
+budget:
+  max_candidate_case_evaluations: 80
+  timeout_seconds: 60
+evaluator:
+  type: simulated_keyword
+  version: deepseek-proposal-pipeline-demo-v1
+  simulated: true

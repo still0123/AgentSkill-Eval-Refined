@@ -21,7 +21,7 @@ class ProcessGeneratorError(RuntimeError):
 
 
 class HypothesisGeneratorSpec(FrozenModel):
-    type: Literal["deterministic", "process"] = "deterministic"
+    type: Literal["deterministic", "process", "deepseek"] = "deterministic"
     name: str = Field(default="failure-guidance", min_length=1)
     version: str = Field(min_length=1)
     max_hypotheses: int = Field(default=8, ge=3, le=20)
@@ -36,6 +36,14 @@ class HypothesisGeneratorSpec(FrozenModel):
     max_json_depth: int = Field(default=20, ge=1, le=50)
     max_json_fields: int = Field(default=1_000, ge=1, le=10_000)
     allowed_environment: Tuple[str, ...] = ("PATH", "LANG", "LC_ALL")
+    base_url: Optional[str] = None
+    model: Optional[str] = None
+    temperature: float = Field(default=0.0, ge=0, le=2)
+    max_output_tokens: int = Field(default=4_000, ge=256, le=20_000)
+    secret_env_name: Optional[str] = None
+    input_cache_miss_microusd_per_million: int = Field(default=435_000, ge=0)
+    input_cache_hit_microusd_per_million: int = Field(default=3_625, ge=0)
+    output_microusd_per_million: int = Field(default=870_000, ge=0)
 
     @model_validator(mode="after")
     def process_fields_and_environment_are_safe(self) -> "HypothesisGeneratorSpec":
@@ -46,20 +54,36 @@ class HypothesisGeneratorSpec(FrozenModel):
         )
         if self.type == "process" and any(value is None for value in process_fields):
             raise ValueError(
-                "process generator requires executable, expected_sha256 and "
-                "expected_version_output"
+                "process generator requires executable, expected_sha256 and expected_version_output"
             )
-        if self.type == "deterministic" and any(value is not None for value in process_fields):
-            raise ValueError("deterministic generator cannot declare process fields")
+        if self.type != "process" and any(value is not None for value in process_fields):
+            raise ValueError("non-process generator cannot declare process fields")
         if self.type == "process" and not str(self.expected_version_output).strip():
             raise ValueError("process generator expected_version_output must not be empty")
+        deepseek_fields = (self.base_url, self.model, self.secret_env_name)
+        if self.type == "deepseek" and any(value is None for value in deepseek_fields):
+            raise ValueError("deepseek generator requires base_url, model and secret_env_name")
+        if self.type != "deepseek" and any(value is not None for value in deepseek_fields):
+            raise ValueError("non-deepseek generator cannot declare DeepSeek fields")
+        if self.type == "deepseek":
+            base_url = str(self.base_url).rstrip("/")
+            if not (
+                base_url == "https://api.deepseek.com"
+                or base_url.startswith("http://127.0.0.1:")
+                or base_url.startswith("http://localhost:")
+            ):
+                raise ValueError("deepseek base_url must be official HTTPS or local Fake API")
+            if self.secret_env_name != "OPENAI_API_KEY":
+                raise ValueError("deepseek generator secret_env_name must be OPENAI_API_KEY")
+            if not str(self.model).startswith("deepseek-"):
+                raise ValueError("deepseek generator model must be a DeepSeek model")
+            if self.max_hypotheses > 5:
+                raise ValueError("deepseek generator supports at most five hypotheses per call")
         if len(set(self.allowed_environment)) != len(self.allowed_environment):
             raise ValueError("allowed_environment values must be unique")
         secret_markers = ("KEY", "TOKEN", "SECRET", "PASSWORD", "AUTH", "CREDENTIAL")
         if any(
-            marker in name.upper()
-            for name in self.allowed_environment
-            for marker in secret_markers
+            marker in name.upper() for name in self.allowed_environment for marker in secret_markers
         ):
             raise ValueError("Process Generator cannot inherit Secret-like environment names")
         safe_environment = {
@@ -240,9 +264,7 @@ class ProcessHypothesisGenerator:
 
     def _environment(self) -> Dict[str, str]:
         return {
-            name: os.environ[name]
-            for name in self.spec.allowed_environment
-            if name in os.environ
+            name: os.environ[name] for name in self.spec.allowed_environment if name in os.environ
         }
 
 

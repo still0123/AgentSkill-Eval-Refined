@@ -1,5 +1,12 @@
 """Leakage-safe benchmark-guided Agent Skill search package."""
 
+from agentskill_eval_skill_optimizer.deepseek_generator import (
+    DeepSeekGenerationResult,
+    DeepSeekGeneratorAuthorization,
+    DeepSeekGeneratorError,
+    DeepSeekGeneratorInvocationEvidence,
+    DeepSeekHypothesisGenerator,
+)
 from agentskill_eval_skill_optimizer.evaluator import (
     CandidateEvaluator,
     EvaluationError,
@@ -84,6 +91,11 @@ __all__ = [
     "CandidateEvaluator",
     "EvaluationError",
     "DeterministicHypothesisGenerator",
+    "DeepSeekGenerationResult",
+    "DeepSeekGeneratorAuthorization",
+    "DeepSeekGeneratorError",
+    "DeepSeekGeneratorInvocationEvidence",
+    "DeepSeekHypothesisGenerator",
     "EligibilityDecision",
     "EvolutionError",
     "EvolutionHandoff",
