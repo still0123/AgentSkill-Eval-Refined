@@ -317,7 +317,7 @@ Generator model：deepseek-v4-pro
 Train Experiment：41ff1ca2-ab2e-5990-b05b-70b7aa1f274d
 Train Runs：4（2 completed，2 invalid）
 Train Agent 费用：101266 / 300000 microusd
-Failure Bridge：INSUFFICIENT（0 eligible，1 ENVIRONMENT excluded）
+Failure Bridge：INSUFFICIENT（0 eligible；原始通用 ENVIRONMENT 经离线重放更正为 BUDGET）
 候选数：0；证据不足，proposal 按协议未调用
 Generator 费用：0 / 100000 microusd
 CI：Python、Dashboard、Secret Scan 全部通过

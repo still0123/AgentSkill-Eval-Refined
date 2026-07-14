@@ -20,7 +20,9 @@
       "baseline_pass_rate": 0.0,
       "treatment_pass_rate": 0.0,
       "evidence_status": "both_arms_invalid",
-      "invalid_reason_class": "execution_error"
+      "invalid_reason_class": "budget_exhausted",
+      "observed_tool_calls": 25,
+      "frozen_tool_call_limit": 24
     },
     {
       "case_id": "cachetools-lru-missing-item",
@@ -36,7 +38,7 @@
     "task_failed_runs": 0,
     "eligible_findings": 0,
     "excluded_findings": 1,
-    "excluded_label": "ENVIRONMENT",
+    "excluded_label": "BUDGET",
     "reason": "no eligible task-failure findings were observed in the Skill treatment arm"
   },
   "proposal": {
@@ -51,5 +53,11 @@
     "raw_secret_values_committed": false
   },
   "replay_bundle_sha256": "e158f1f9ba4edcb29c819dfcc4e158cbe578e623bbdecbeeebb753f8cb723579",
+  "diagnosis_correction": {
+    "original_parser_label": "ENVIRONMENT",
+    "corrected_label": "BUDGET",
+    "method": "offline replay of immutable Runner result with explicit tool-budget parser",
+    "raw_evidence_rewritten": false
+  },
   "claim_limit": "Two-case train smoke with one fully invalid pair; validates evidence gating only."
 }

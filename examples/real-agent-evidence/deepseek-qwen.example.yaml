@@ -28,6 +28,7 @@ agent:
   temperature: 0.0
   seed: null
   max_turns: 24
+  max_tool_calls: 48
   timeout_seconds: 900
   tool_capabilities: [filesystem, shell, tests]
   secret_env_names: [OPENAI_API_KEY]
@@ -42,7 +43,7 @@ agent:
         name: deepseek-v4-pro
         maxSessionTurns: 24
         maxWallTimeSeconds: 240
-        maxToolCalls: 24
+        maxToolCalls: 48
         maxSubagentDepth: 1
         sessionTokenLimit: 600000
         skipLoopDetection: false

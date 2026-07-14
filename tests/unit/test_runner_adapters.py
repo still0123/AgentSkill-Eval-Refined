@@ -159,6 +159,32 @@ def test_parser_requires_exact_case(tmp_path: Path) -> None:
         parse_skill_up_result(path, "e", "missing", 0)
 
 
+def test_parser_classifies_tool_call_limit_as_budget_exhaustion(tmp_path: Path) -> None:
+    path = tmp_path / "result.json"
+    path.write_text(
+        json.dumps(
+            {
+                "case_results": [
+                    {
+                        "case_id": "limited",
+                        "status": "ERROR",
+                        "error": (
+                            "Run aborted: tool-call budget of 24 exceeded "
+                            "(--max-tool-calls); observed 25."
+                        ),
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = parse_skill_up_result(path, "e", "limited", 55)
+
+    assert result.exit_reason == ExitReason.BUDGET_EXHAUSTED
+    assert result.tool_calls == 25
+
+
 def test_mock_runner_emits_events_and_supports_cancel(tmp_path: Path) -> None:
     async def scenario() -> None:
         events = []

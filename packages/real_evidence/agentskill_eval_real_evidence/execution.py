@@ -444,6 +444,7 @@ class RealAgentEvidenceRunner:
             "max_input_tokens": spec.agent.max_input_tokens,
             "max_output_tokens": spec.agent.max_output_tokens,
             "max_turns": spec.agent.max_turns,
+            "max_tool_calls": spec.agent.max_tool_calls,
             "timeout_seconds": spec.agent.timeout_seconds,
         }
         agent = AgentSnapshot(
@@ -462,6 +463,7 @@ class RealAgentEvidenceRunner:
             resource_limits={
                 "timeout_seconds": spec.agent.timeout_seconds,
                 "max_turns": spec.agent.max_turns,
+                "max_tool_calls": spec.agent.max_tool_calls,
             },
         )
         rates: dict[str, JsonValue] = {

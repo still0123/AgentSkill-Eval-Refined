@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from pathlib import Path
 from typing import Any, Mapping, Optional, Tuple
 
@@ -17,6 +18,12 @@ from agentskill_eval_runner_adapters.contracts import (
 
 class ResultParseError(ValueError):
     """Raised when the public result contract is absent or malformed."""
+
+
+_TOOL_BUDGET = re.compile(
+    r"tool-call budget of (?P<limit>\d+) exceeded .*? observed (?P<observed>\d+)",
+    re.IGNORECASE | re.DOTALL,
+)
 
 
 def _optional_int(value: object) -> Optional[int]:
@@ -68,10 +75,15 @@ def parse_skill_up_result(
         status = RunnerStatus(str(case["status"]).upper())
     except (KeyError, ValueError) as exc:
         raise ResultParseError(f"unsupported case status: {case.get('status')!r}") from exc
+    error = case.get("error")
+    error_text = error if isinstance(error, str) else ""
+    budget_match = _TOOL_BUDGET.search(error_text)
     if status == RunnerStatus.PASS:
         reason = ExitReason.COMPLETED
     elif status == RunnerStatus.FAIL:
         reason = ExitReason.CASE_FAILED
+    elif budget_match is not None:
+        reason = ExitReason.BUDGET_EXHAUSTED
     else:
         reason = ExitReason.EXECUTION_ERROR
     grading = case.get("grading")
@@ -88,7 +100,10 @@ def parse_skill_up_result(
         input_tokens=_optional_int(case.get("input_tokens")),
         output_tokens=_optional_int(case.get("output_tokens")),
         cached_input_tokens=_optional_int(case.get("cached_input_tokens")),
-        tool_calls=_optional_int(case.get("tool_calls")),
+        tool_calls=(
+            _optional_int(case.get("tool_calls"))
+            or (int(budget_match.group("observed")) if budget_match is not None else None)
+        ),
         cost_microusd=_optional_int(case.get("cost_microusd")),
         final_message=final_message,
         grading=grading if isinstance(grading, dict) else {},

@@ -124,6 +124,7 @@ def _spec(
             temperature=0,
             seed=7,
             max_turns=4,
+            max_tool_calls=8,
             timeout_seconds=5,
             tool_capabilities=("filesystem", "shell", "tests"),
             secret_env_names=("FAKE_PROVIDER_API_KEY", "FAKE_AGENT_COUNTER_FILE"),
@@ -154,6 +155,27 @@ def test_spec_rejects_literal_secret_in_agent_home_config(published_dataset: Pat
     }
     with pytest.raises(ValueError, match="literal Secret field"):
         RealAgentEvidenceSpec.model_validate(payload)
+
+
+def test_qwen_spec_requires_frozen_tool_budget(published_dataset: Path) -> None:
+    payload = _spec(published_dataset).model_dump(mode="python")
+    payload["agent"].update(
+        {
+            "engine": "qwen_code",
+            "max_tool_calls": 48,
+            "home_config_files": {
+                ".qwen/settings.json": {"model": {"maxToolCalls": 24}}
+            },
+        }
+    )
+    with pytest.raises(ValueError, match="maxToolCalls.*max_tool_calls"):
+        RealAgentEvidenceSpec.model_validate(payload)
+
+    payload["agent"]["home_config_files"][".qwen/settings.json"]["model"][
+        "maxToolCalls"
+    ] = 48
+    spec = RealAgentEvidenceSpec.model_validate(payload)
+    assert spec.agent.max_tool_calls == 48
 
 
 def test_pricing_accounts_for_cache_hits() -> None:
@@ -334,6 +356,8 @@ def test_fake_process_smoke_is_auditable_secret_safe_and_idempotent(
     variants = store.list_variants(result.manifest.experiment_id)
     baseline = next(item for item in variants if item.skill_snapshot is None)
     treatment = next(item for item in variants if item.skill_snapshot is not None)
+    assert baseline.agent_snapshot.generation_parameters["max_tool_calls"] == 8
+    assert baseline.sandbox_snapshot.resource_limits["max_tool_calls"] == 8
     attempt_path = workspace / "experiments" / str(result.manifest.experiment_id)
     attempt_path /= result.report.attempt_evidence_paths[0]
     attempt_payload = json.loads(attempt_path.read_text(encoding="utf-8"))

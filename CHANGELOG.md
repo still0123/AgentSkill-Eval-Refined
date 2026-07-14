@@ -53,7 +53,11 @@ after the first stable release.
   Provider-backed proposal smoke remains separate evidence and does not prove candidate quality.
 - The first Provider-backed Stage 3 train smoke produced no eligible treatment failure: one pair
   passed and one pair was invalid in both arms. The bridge returned `INSUFFICIENT`, so the authorized
-  proposal call was deliberately not consumed; this negative result is retained rather than relabeled.
+  proposal call was deliberately not consumed; this negative result is retained rather than used as
+  a Skill task-failure signal.
+- Tool-call-limit exits are now parsed as `budget_exhausted` with the observed call count instead of
+  generic `execution_error`; real-evidence specs freeze a separate `max_tool_calls` value and require
+  Qwen's effective HOME setting to match it.
 
 ## [0.1.0-rc1] - 2026-07-13
 

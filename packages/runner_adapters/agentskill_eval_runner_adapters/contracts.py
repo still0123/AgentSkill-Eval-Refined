@@ -19,6 +19,7 @@ class ExitReason(str, Enum):
     COMPLETED = "completed"
     CASE_FAILED = "case_failed"
     EXECUTION_ERROR = "execution_error"
+    BUDGET_EXHAUSTED = "budget_exhausted"
     CLI_ERROR = "cli_error"
     TIMEOUT = "timeout"
     CANCELLED = "cancelled"

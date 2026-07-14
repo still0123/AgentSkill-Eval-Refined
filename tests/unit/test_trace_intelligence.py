@@ -93,12 +93,16 @@ def test_rule_diagnoser_is_deterministic_and_abstains_without_evidence() -> None
     timeout = diagnoser.diagnose(
         trace, EvaluationOutcome.INVALID, error_code="runner_timeout"
     )
+    tool_budget = diagnoser.diagnose(
+        trace, EvaluationOutcome.INVALID, error_code="budget_exhausted"
+    )
     unknown = diagnoser.diagnose(trace, EvaluationOutcome.FAIL)
     success = diagnoser.diagnose(trace, EvaluationOutcome.PASS)
 
     assert timeout.status == "diagnosed"
     assert timeout.findings[0].label == FailureLabel.BUDGET
     assert timeout.findings[0].evidence_sequence_nos == (1,)
+    assert tool_budget.findings[0].label == FailureLabel.BUDGET
     assert unknown.status == "abstained"
     assert unknown.findings[0].label == FailureLabel.UNKNOWN
     assert success.status == "no_failure"

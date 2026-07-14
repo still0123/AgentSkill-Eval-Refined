@@ -29,6 +29,7 @@ agent:
   temperature: 0.0
   seed: 2026
   max_turns: 12
+  max_tool_calls: 24
   timeout_seconds: 900
   tool_capabilities: [filesystem, shell, tests]
   secret_env_names: [OPENAI_API_KEY]

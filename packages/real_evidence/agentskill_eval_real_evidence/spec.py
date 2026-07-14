@@ -41,6 +41,7 @@ class AgentSpec(ExecutableSpec):
     temperature: float = Field(ge=0, le=2)
     seed: Optional[int] = None
     max_turns: int = Field(ge=1, le=100)
+    max_tool_calls: int = Field(ge=1, le=1000)
     timeout_seconds: int = Field(ge=1, le=7200)
     tool_capabilities: Tuple[str, ...] = Field(min_length=1)
     secret_env_names: Tuple[str, ...] = Field(min_length=1)
@@ -65,6 +66,15 @@ class AgentSpec(ExecutableSpec):
             if any(marker in lowered for marker in ("sk-", "bearer ")):
                 raise ValueError(f"Agent HOME config {relative!r} appears to contain a Secret")
             self._reject_literal_secrets(relative, payload)
+        if self.engine == "qwen_code":
+            settings = self.home_config_files.get(".qwen/settings.json")
+            model = settings.get("model") if isinstance(settings, Mapping) else None
+            configured = model.get("maxToolCalls") if isinstance(model, Mapping) else None
+            if configured != self.max_tool_calls:
+                raise ValueError(
+                    "qwen_code requires .qwen/settings.json model.maxToolCalls "
+                    "to equal agent.max_tool_calls"
+                )
         return self
 
     @classmethod
