@@ -27,8 +27,10 @@ after the first stable release.
   environment inheritance, bounded JSON I/O, fail-closed validation and idempotent invocation evidence.
 - A budget-gated Real Optimizer Evaluator that reuses paired observed-Agent execution, records
   candidate/Case outcomes and Trace references, and caches completed candidate/Case combinations.
-- An expanded ten-case Python Bug Fix benchmark plan covering ten independent defect families and
+- An expanded twelve-case Python Bug Fix benchmark plan covering twelve independent defect families and
   explicit train, validation_search, regression_dev and validation_confirm assignments.
+- A four-case immutable train DatasetVersion with two additional compact historical defects, 48
+  offline verifier executions, distinct alternative repairs and a sanitized publication record.
 - A single-provider DeepSeek Skill Proposal Generator with explicit call/cost authorization,
   train-only sanitized inputs, structured 3–5 candidate output, frozen prompt/schema hashes,
   token/cost evidence and idempotent no-cost replay.

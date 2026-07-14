@@ -179,12 +179,13 @@ pnpm run build
 
 Automatic Benchmark Generation v1alpha2 可在一个冻结 Job 中重建多个本地 Git source，
 使用显式 provenance family 分组和去重，并阻止同一 fork lineage 跨 split 发布。仓库内的
-`more-itertools` 与 `cachetools` 离线 bundle 的扩展配置共提供十个独立缺陷家族；每个候选
-都执行 before、after、mutation 和 alternative repair 各三次，共 120 次确定性验证。
+`more-itertools` 与 `cachetools` 离线 bundle 的扩展配置共提供十二个独立缺陷家族；每个候选
+都执行 before、after、mutation 和 alternative repair 各三次，共 144 次确定性验证。
 仓库中的首份跨仓库验收记录仍保留当时四 Case 的结果，便于审计演进历史。
 
 - [跨仓库离线验收说明](./experiments/cross-repository-benchmark-2026-07-14/README.md)
 - [脱敏哈希与聚合结果](./experiments/cross-repository-benchmark-2026-07-14/result.sanitized.json)
+- [Stage 3 四 Case train DatasetVersion 证据](./experiments/train-benchmark-expansion-2026-07-14/README.md)
 
 ## 真实 Agent 运行安全门
 

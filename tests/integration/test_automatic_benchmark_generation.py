@@ -181,7 +181,7 @@ def test_cross_repository_generation_publishes_independent_families_and_blocks_s
 
     generated = generator.generate(spec)
 
-    assert len(generated.candidates) == 10
+    assert len(generated.candidates) == 12
     assert all(
         candidate.status == BenchmarkCandidateStatus.DEDUPED
         and len(candidate.command_evidence) == 12
@@ -206,7 +206,7 @@ def test_cross_repository_generation_publishes_independent_families_and_blocks_s
     loaded = DatasetLoader().load(destination)
 
     assert len(version.source_lineages) == 2
-    assert len(loaded.independence_groups) == 10
+    assert len(loaded.independence_groups) == 12
     assert all(case.metadata_sha256 is not None for case in version.cases)
     generator.store.assert_dataset_version_integrity(version, destination)
 
