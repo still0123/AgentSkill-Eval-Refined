@@ -112,6 +112,8 @@ class BenchmarkGenerationSpec(StrictModel):
         "validation_confirm",
         "locked_test",
     ] = "validation_search"
+    split_plan_required: bool = False
+    split_plan_sha256: Optional[str] = Field(default=None, pattern=r"^[0-9a-f]{64}$")
     generator_profile: str = "local-git-history/v1"
     verifier_profile: str = "deterministic-subprocess/v1"
     contamination_risk: Optional[Literal["low", "medium", "high", "unknown"]] = None
@@ -126,6 +128,8 @@ class BenchmarkGenerationSpec(StrictModel):
             raise ValueError("candidate keys must be unique")
         if len(keys) > self.budget.max_candidates:
             raise ValueError("candidate count exceeds max_candidates")
+        if self.split_plan_required and self.split_plan_sha256 is not None:
+            raise ValueError("split-plan source catalog cannot claim a derived plan hash")
         if self.sources:
             if self.schema_version != "ase/benchmark-generation/v1alpha2":
                 raise ValueError("multi-source specs require schema v1alpha2")

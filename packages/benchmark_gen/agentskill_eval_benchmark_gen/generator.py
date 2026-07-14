@@ -19,12 +19,14 @@ from uuid import NAMESPACE_URL, UUID, uuid5
 
 import yaml
 
+from agentskill_eval_benchmark_gen.dataset import DatasetSplit
 from agentskill_eval_benchmark_gen.git_source import GitSource, GitSourceError, GitTreeLimits
 from agentskill_eval_benchmark_gen.spec import (
     BenchmarkGenerationSpec,
     CandidateSpec,
     RepositorySourceSpec,
 )
+from agentskill_eval_benchmark_gen.split_audit import exposure_zone
 from agentskill_eval_contracts import (
     BenchmarkCandidate,
     BenchmarkCandidateStatus,
@@ -279,6 +281,10 @@ class AutomaticBenchmarkGenerator:
         self.store = BenchmarkStore(workspace)
 
     def generate(self, spec: BenchmarkGenerationSpec) -> GenerationResult:
+        if spec.split_plan_required:
+            raise BenchmarkGenerationError(
+                "source catalog requires an audited split plan; use benchmark generate-split"
+            )
         semantic_spec = spec.semantic_payload()
         source_hash = stable_sha256(semantic_spec)
         job_id = uuid5(NAMESPACE_URL, f"ase-benchmark-job:{source_hash}")
@@ -416,6 +422,13 @@ class AutomaticBenchmarkGenerator:
         published_cases = tuple(self._publish_case(candidate, staging) for candidate in candidates)
         content_sha = BenchmarkDatasetVersion.calculate_content_sha256(published_cases)
         version_id = uuid5(job_id, f"dataset:{content_sha}")
+        frozen_spec = json.loads(
+            (self.store.job_dir(job_id) / "source-spec.json").read_text(encoding="utf-8")
+        )
+        metadata = {"selection_uses_agent_scores": "false"}
+        split_plan_sha256 = frozen_spec.get("split_plan_sha256")
+        if isinstance(split_plan_sha256, str):
+            metadata["split_plan_sha256"] = split_plan_sha256
         version = BenchmarkDatasetVersion(
             id=version_id,
             name=f"generated-{job_id}",
@@ -427,7 +440,7 @@ class AutomaticBenchmarkGenerator:
             cases=published_cases,
             content_sha256=content_sha,
             source_lineages=tuple(sorted(lineages_by_split)),
-            metadata={"selection_uses_agent_scores": "false"},
+            metadata=metadata,
         )
         self._write_dataset_manifest(staging, version, candidates)
         destination = self.store.save_dataset_version(version, staging)
@@ -803,9 +816,11 @@ class AutomaticBenchmarkGenerator:
             if version.split == job.target_split:
                 continue
             existing_lineages = set(version.source_lineages)
-            if incoming_lineages & existing_lineages:
+            incoming_zone = exposure_zone(DatasetSplit(job.target_split))
+            existing_zone = exposure_zone(DatasetSplit(version.split))
+            if incoming_zone != existing_zone and incoming_lineages & existing_lineages:
                 raise BenchmarkGenerationError(
-                    "fork lineage crosses published dataset splits"
+                    "fork lineage crosses adaptive/holdout exposure boundary"
                 )
             for case in version.cases:
                 provenance = json.loads(

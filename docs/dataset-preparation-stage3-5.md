@@ -30,16 +30,24 @@
 - 保存许可证、来源 revision 和污染风险；
 - 发布后不可原地修改，只能创建新版本。
 
-跨 split 审计按以下身份拒绝交叉：
+跨 split 审计分成两层：
 
-- Case ID；
-- repository；
-- fork lineage；
-- patch family；
-- independence group。
+- Case ID、patch family 和 independence group 不得跨任何 protected split；
+- repository 和 fork lineage 不得跨越暴露域：
+  `train/validation_search/regression_dev` 为 adaptive，
+  `validation_confirm/locked_test` 为 holdout。
 
-这比只比较 Case ID 更严格：同一缺陷的改写、fork 或同仓库相邻补丁也不能被拆到搜索集和
-确认集。
+开发域内的三个 split 都可能影响 Skill，因此允许共享仓库但禁止共享缺陷家族。候选进入
+confirmation 前必须冻结内容哈希，confirmation 后不得再修改；因此 confirm 与 locked 可以
+共享 holdout 仓库，但必须是不同缺陷家族。任何仓库或 fork 从开发域进入留出域都会被拒绝。
+
+当前 12 Case 计划将 `more-itertools` 全部放在 adaptive 域，将 `cachetools` 全部放在 holdout
+域，并为 locked_test 分配 4 个 Case。执行前必须运行：
+
+```bash
+agentskill-eval benchmark audit-split-plan \
+  examples/benchmark-sources/real-bug-fix-split-plan.yaml
+```
 
 ## 阶段依赖
 
@@ -61,6 +69,7 @@
 
 ## 当前边界
 
-本阶段完成的是隔离机制和 Fake 数据测试。真实 `train`、`validation_confirm`、
-`locked_test` DatasetVersion 必须由阶段 3 数据流水线生成、复验和人工审核后才能冻结；不能
-把当前 synthetic demo 数据重新标记为真实证据。
+公开 locked Case 带有高预训练污染风险，只能支持本项目的一次性终评工作流声明。历史 Stage 3
+smoke 曾把 `cachetools` Case 用作 train；这些运行保留为历史执行证据，但不符合 v1alpha2 暴露
+域计划，不能进入真实 Promotion。新的 `train`、confirmation 和 locked DatasetVersion 必须从
+通过审计的计划重新生成、复验和人工审核，不能把 synthetic demo 或旧运行重新标记为合规证据。

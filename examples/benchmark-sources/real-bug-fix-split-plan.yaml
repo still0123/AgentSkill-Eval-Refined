@@ -1,25 +1,28 @@
-schema_version: ase/benchmark-split-plan/v1alpha1
+schema_version: ase/benchmark-split-plan/v1alpha2
 name: real-python-bug-fix-small
-version: "2026.07.14.2"
+version: "2026.07.14.3"
 source_spec: cross-repository-generation.example.yaml
-isolation_key: provenance_family
+repository_isolation: adaptive_vs_holdout
+locked_test_visibility: public_high_contamination
 claim_limit: >-
-  Twelve real Git-history cases from two repositories and twelve independent defect families. This is
-  a small engineering benchmark and does not support general Agent performance claims.
+  Twelve public Git-history cases from two repository exposure cohorts and twelve independent defect
+  families. Locked cases are one-shot workflow evidence but remain public and high-contamination;
+  this small benchmark does not support general Agent performance claims.
 splits:
   train:
     - more-itertools-islice-release
-    - cachetools-lru-missing-item
-    - more-itertools-split-after-empty-tail
-    - cachetools-missing-oversized-value
   validation_search:
     - more-itertools-last-reversed-none
+    - more-itertools-sample-strict-counts
+  regression_dev:
+    - more-itertools-split-after-empty-tail
+  validation_confirm:
     - cachetools-cachedmethod-autospec
     - cachetools-cachedmethod-bound-key
-    - cachetools-ttl-boundary-expiration
-  regression_dev:
-    - more-itertools-sample-strict-counts
-    - cachetools-hashkey-pickle
-  validation_confirm:
     - cachetools-cachedmethod-self-key
+    - cachetools-ttl-boundary-expiration
+  locked_test:
+    - cachetools-hashkey-pickle
+    - cachetools-lru-missing-item
     - cachetools-lru-popitem-context
+    - cachetools-missing-oversized-value

@@ -43,9 +43,12 @@ stdout/stderr 作为证据文件保存，manifest 只引用其 SHA-256。命令�
 - SPDX、许可证哈希、仓库 URL、commit、生成器和验证器版本必须完整；
 - before/after/mutation/alternative 各至少三次结果一致；
 - 使用规范化任务、参考补丁、fork lineage 和显式 provenance family 确定性去重；
-- 发布前扫描工作区内已有 DatasetVersion，同一 fork lineage 或 provenance family 不得跨 split；
+- 发布前扫描工作区内已有 DatasetVersion：provenance family 不得跨 split，fork lineage 不得
+  跨 adaptive/holdout 暴露域；
 - DatasetVersion 内容哈希覆盖 case、fixture、grader、provenance 和承载 split/group 的 metadata；
 - 输入中不存在 Agent 分数，发布 manifest 记录 `selection_uses_agent_scores=false`；
+- 从完整计划派生的 DatasetVersion 记录 `split_plan_sha256`，使五个 split 可追溯到同一冻结
+  分配；
 - 公开历史数据必须记录 contamination risk，不能宣称为无污染测试。
 
 当前 mutation 是“在修复后版本反向删除生产补丁”，因此 mutation score 为 1/1；替代
@@ -53,10 +56,10 @@ stdout/stderr 作为证据文件保存，manifest 只引用其 SHA-256。命令�
 
 ## 跨仓库离线真实样本
 
-仓库内保存两个 MIT 许可真实项目的离线 Git bundle，每个仓库包含两个固定历史缺陷：
+仓库内保存两个 MIT 许可真实项目的离线 Git bundle，覆盖当前计划使用的固定历史缺陷：
 
-- `more-itertools.bundle`：iterator 与 strict sampling 回归；
-- `cachetools.bundle`：cachedmethod introspection 与 cache-key pickle 回归。
+- `more-itertools.bundle`：4 个 iterator、sampling 与生命周期回归，全部属于 adaptive 域；
+- `cachetools.bundle`：8 个 caching、descriptor、pickle 与边界回归，全部属于 holdout 域。
 
 无需网络即可重放：
 
@@ -70,10 +73,16 @@ git clone examples/benchmark-sources/cachetools.bundle \
 git -C .agentskill-eval/sources/cachetools remote set-url origin \
   https://github.com/tkem/cachetools.git
 
-cp examples/benchmark-sources/cross-repository-generation.example.yaml /tmp/generation.yaml
-# 将 sources 中两个 repository_path 改为上面 clone 的绝对路径。
+mkdir -p /tmp/ase-benchmark
+cp examples/benchmark-sources/cross-repository-generation.example.yaml \
+  /tmp/ase-benchmark/generation.yaml
+cp examples/benchmark-sources/real-bug-fix-split-plan.yaml \
+  /tmp/ase-benchmark/split-plan.yaml
+# 将 generation.yaml 中两个 repository_path 改为上面 clone 的绝对路径，
+# 并将 split-plan.yaml 的 source_spec 改为 generation.yaml。
 
-agentskill-eval benchmark generate /tmp/generation.yaml \
+agentskill-eval benchmark audit-split-plan /tmp/ase-benchmark/split-plan.yaml
+agentskill-eval benchmark generate-split /tmp/ase-benchmark/split-plan.yaml train \
   --workspace .agentskill-eval/benchmark
 agentskill-eval benchmark status .agentskill-eval/benchmark JOB_UUID
 agentskill-eval benchmark review .agentskill-eval/benchmark JOB_UUID CANDIDATE_UUID \
@@ -82,7 +91,9 @@ agentskill-eval benchmark publish .agentskill-eval/benchmark JOB_UUID \
   --publisher YOUR_NAME
 ```
 
-四个候选都必须单独 review。发布后可继续用原有 loader 校验：
+对其余四个 split 重复 `generate-split`；每个候选都必须单独 review。source catalog 不能再由
+`benchmark generate` 直接发布，避免绕过完整分配和 locked 非空检查。发布后可继续用原有
+loader 校验：
 
 ```bash
 agentskill-eval dataset validate \
@@ -118,8 +129,13 @@ workspace/
 ## 明确不做
 
 MVP 不包含 GitHub 大规模抓取、难度模型、embedding 近似去重、Skill Optimizer、MCP、
-Memory/RAG、FastAPI、Redis、Vue 或 Kubernetes。`locked_test` 虽被契约识别，但公开
-Git 历史默认污染风险高。最初四 Case 验收记录只发布到 `validation_search`；扩展配置包含
-十二个独立缺陷家族，并通过 `real-bug-fix-split-plan.yaml` 明确分配到 train、
-validation_search、regression_dev 和 validation_confirm。v1alpha1 单仓库配置保持兼容；
-新跨仓库配置使用 v1alpha2。
+Memory/RAG、FastAPI、Redis、Vue 或 Kubernetes。公开 Git 历史默认污染风险高，因此这里的
+`locked_test` 是一次性工作流证据，不是秘密测试集。扩展配置包含十二个独立缺陷家族，
+并通过可执行的 `real-bug-fix-split-plan.yaml` 分配到 train、validation_search、
+regression_dev、validation_confirm 和 locked_test。
+
+split plan v1alpha2 使用两级隔离：Case ID、patch family 和 independence group 不得跨任何
+split；repository 和 fork lineage 不得从 adaptive 开发域跨入 frozen holdout 域。同一域内
+允许复用仓库，但必须使用不同缺陷家族。`benchmark audit-split-plan` 会检查完整覆盖、唯一
+分配、非空 locked split 和暴露域隔离；`benchmark generate-split` 只能从通过审计的完整计划
+派生单 split 生成配置。v1alpha1 单仓库生成配置保持兼容，新跨仓库配置使用 v1alpha2。

@@ -130,6 +130,7 @@ class LoadedDataset:
     cases: Tuple[LoadedCase, ...]
     dataset_sha256: str
     dataset_id: UUID
+    dataset_version: Optional[BenchmarkDatasetVersion] = None
 
     @property
     def category_counts(self) -> Mapping[CaseCategory, int]:
@@ -165,7 +166,7 @@ class DatasetLoader:
                     f"category {category.value} requires {minimum} cases, "
                     f"found {actual_counts[category]}"
                 )
-        self._validate_published_version(root, cases)
+        dataset_version = self._validate_published_version(root, cases)
         digest = stable_sha256(
             {
                 "manifest": manifest.model_dump(mode="json"),
@@ -182,14 +183,14 @@ class DatasetLoader:
         )
         identity = f"agentskill-eval:{manifest.name}:{manifest.version}:{digest}"
         dataset_id = uuid5(NAMESPACE_URL, identity)
-        return LoadedDataset(root, manifest, cases, digest, dataset_id)
+        return LoadedDataset(root, manifest, cases, digest, dataset_id, dataset_version)
 
     def _validate_published_version(
         self, root: Path, cases: Tuple[LoadedCase, ...]
-    ) -> None:
+    ) -> Optional[BenchmarkDatasetVersion]:
         version_path = root / "dataset-version.json"
         if not version_path.exists():
-            return
+            return None
         try:
             version = load_model(version_path.read_bytes(), BenchmarkDatasetVersion)
         except (IntegrityError, ValueError) as exc:
@@ -234,6 +235,7 @@ class DatasetLoader:
                 wanted["metadata"] = expected.metadata_sha256
             if actual != wanted:
                 raise DatasetError(f"published case integrity mismatch: {case_id}")
+        return version
 
     def _load_case(self, root: Path, metadata_ref: str) -> LoadedCase:
         metadata_path = self._safe_path(root, metadata_ref, file=True)

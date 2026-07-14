@@ -45,8 +45,13 @@ DatasetVersion 副本。
 - 所有 case 必须属于请求的唯一 split；
 - 非模拟 Evaluator 拒绝 `demo_only` 数据集；
 - DatasetVersion 在复制后及每次评测前后复验组合哈希；
-- 若搜索使用了真实 DatasetVersion，则 final split 与 `validation_search` 的 repository、
+- 若搜索使用了真实 DatasetVersion，则运行时 final split 与 `validation_search` 的 repository、
   fork lineage、patch family 和 independence group 均不得重叠；
+- 在进入搜索前，完整 split plan 还必须证明所有 adaptive 数据与 holdout 数据的 repository/
+  fork lineage 不重叠，且所有 split 的 Case、patch family、independence group 唯一；运行时
+  final gate 不是完整计划审计的替代品；
+- search 与 final DatasetVersion 必须携带相同的 `split_plan_sha256`；缺少谱系或来自不同计划
+  时 fail closed；
 - base 和 winner 必须使用完全相同的 case 顺序、Evaluator 哈希和重复次数。
 
 模拟模式使用显式 `simulated: true` 的 `final-validation.yaml`，仅验证控制器行为，不能作为

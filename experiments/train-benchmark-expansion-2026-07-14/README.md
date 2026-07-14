@@ -24,12 +24,14 @@ and passes three times with a distinct alternative repair. The published
 DatasetVersion contains frozen case, fixture, grader, provenance, and metadata
 hashes.
 
-## Replay
+## Historical replay boundary
 
-Follow `docs/automatic-benchmark-generation.md` using the two offline bundles,
+This train DatasetVersion predates the v1alpha2 exposure-zone contract and includes a `cachetools`
+Case that is now holdout-only. It remains valid historical execution evidence but is ineligible for
+Promotion. Follow `docs/automatic-benchmark-generation.md` using the two offline bundles,
 `examples/benchmark-sources/cross-repository-generation.example.yaml`, and the
 `train` assignments in
-`examples/benchmark-sources/real-bug-fix-split-plan.yaml`.
+`examples/benchmark-sources/real-bug-fix-split-plan.yaml` to generate the compliant replacement.
 
 `result.sanitized.json` contains public provenance, immutable hashes, quality
 gate outcomes, and aggregate verifier exits. Raw fixtures, command output, and

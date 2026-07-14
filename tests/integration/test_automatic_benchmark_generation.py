@@ -10,7 +10,10 @@ from agentskill_eval_benchmark_gen import (
     AutomaticBenchmarkGenerator,
     BenchmarkGenerationError,
     BenchmarkGenerationSpec,
+    BenchmarkSplitPlan,
     DatasetLoader,
+    DatasetSplit,
+    audit_loaded_datasets,
 )
 from agentskill_eval_contracts import BenchmarkCandidateStatus, ReviewDecision
 
@@ -166,57 +169,88 @@ def test_cross_repository_generation_publishes_independent_families_and_blocks_s
         cachetools,
         "https://github.com/tkem/cachetools.git",
     )
-    template = BenchmarkGenerationSpec.load(
+    catalog = BenchmarkGenerationSpec.load(
         project_root
         / "examples/benchmark-sources/cross-repository-generation.example.yaml"
     )
     paths = {"more-itertools": more_itertools, "cachetools": cachetools}
-    sources = tuple(
+    catalog_sources = tuple(
         source.model_copy(update={"repository_path": paths[source.key]})
-        for source in template.sources
+        for source in catalog.sources
     )
-    spec = template.model_copy(update={"sources": sources})
     workspace = tmp_path / "workspace"
     generator = AutomaticBenchmarkGenerator(workspace)
+    with pytest.raises(BenchmarkGenerationError, match="audited split plan"):
+        generator.generate(catalog.model_copy(update={"sources": catalog_sources}))
 
-    generated = generator.generate(spec)
-
-    assert len(generated.candidates) == 12
-    assert all(
-        candidate.status == BenchmarkCandidateStatus.DEDUPED
-        and len(candidate.command_evidence) == 12
-        for candidate in generated.candidates
+    plan = BenchmarkSplitPlan.load(
+        project_root / "examples/benchmark-sources/real-bug-fix-split-plan.yaml"
     )
+    loaded_datasets = []
+    published = {}
+    generated_candidates = []
+    for split in (
+        DatasetSplit.TRAIN,
+        DatasetSplit.VALIDATION_SEARCH,
+        DatasetSplit.REGRESSION_DEV,
+        DatasetSplit.VALIDATION_CONFIRM,
+        DatasetSplit.LOCKED_TEST,
+    ):
+        split_spec = plan.generation_spec(split)
+        split_sources = tuple(
+            source.model_copy(update={"repository_path": paths[source.key]})
+            for source in split_spec.sources
+        )
+        split_spec = split_spec.model_copy(update={"sources": split_sources})
+        generated = generator.generate(split_spec)
+        assert len(generated.candidates) == len(plan.splits.by_split()[split])
+        assert all(
+            candidate.status == BenchmarkCandidateStatus.DEDUPED
+            and len(candidate.command_evidence) == 12
+            for candidate in generated.candidates
+        )
+        generated_candidates.extend(generated.candidates)
+        for candidate in generated.candidates:
+            generator.review(
+                generated.job.id,
+                candidate.id,
+                "integration-test",
+                ReviewDecision.APPROVED,
+                f"{split.value} evidence reviewed",
+            )
+        version, destination = generator.publish(generated.job.id, "integration-test")
+        loaded = DatasetLoader().load(destination)
+        assert version.split == split.value
+        assert version.metadata["split_plan_sha256"] == plan.semantic_sha256()
+        assert all(item.metadata.split == split for item in loaded.cases)
+        assert all(case.metadata_sha256 is not None for case in version.cases)
+        generator.store.assert_dataset_version_integrity(version, destination)
+        loaded_datasets.append(loaded)
+        published[split] = (version, destination)
+
+    assert len(generated_candidates) == 12
     assert {
         candidate.provenance.repository_url  # type: ignore[union-attr]
-        for candidate in generated.candidates
+        for candidate in generated_candidates
     } == {
         "https://github.com/more-itertools/more-itertools.git",
         "https://github.com/tkem/cachetools.git",
     }
-    for candidate in generated.candidates:
-        generator.review(
-            generated.job.id,
-            candidate.id,
-            "integration-test",
-            ReviewDecision.APPROVED,
-            "cross-repository evidence reviewed",
-        )
-    version, destination = generator.publish(generated.job.id, "integration-test")
-    loaded = DatasetLoader().load(destination)
+    audit = audit_loaded_datasets(loaded_datasets)
+    assert audit.passed
+    assert len(published[DatasetSplit.LOCKED_TEST][0].cases) == 4
 
-    assert len(version.source_lineages) == 2
-    assert len(loaded.independence_groups) == 12
-    assert all(case.metadata_sha256 is not None for case in version.cases)
-    generator.store.assert_dataset_version_integrity(version, destination)
-
-    confirm_spec = spec.model_copy(
+    leaked_candidate = next(
+        item for item in catalog.candidates if item.source_key == "more-itertools"
+    )
+    leaked_source = next(item for item in catalog_sources if item.key == "more-itertools")
+    confirm_spec = plan.generation_spec(DatasetSplit.VALIDATION_CONFIRM).model_copy(
         update={
             "name": "cross-repository-split-leakage-check",
             "version": "2026.07.14-confirm",
-            "target_split": "validation_confirm",
-            "candidates": (spec.candidates[0],),
-            "budget": spec.budget.model_copy(
+            "sources": (leaked_source,),
+            "candidates": (leaked_candidate,),
+            "budget": catalog.budget.model_copy(
                 update={"max_candidates": 1, "max_commands": 12}
             ),
         }
@@ -229,9 +263,9 @@ def test_cross_repository_generation_publishes_independent_families_and_blocks_s
         ReviewDecision.APPROVED,
         "candidate evidence reviewed before split leakage gate",
     )
-    with pytest.raises(BenchmarkGenerationError, match="crosses published dataset splits"):
+    with pytest.raises(BenchmarkGenerationError, match="exposure boundary"):
         generator.publish(confirm.job.id, "integration-test")
-
+    version, destination = published[DatasetSplit.TRAIN]
     metadata = destination / f"metadata/{version.cases[0].case_id}.yaml"
     metadata.write_text(metadata.read_text(encoding="utf-8") + "# tampered\n", encoding="utf-8")
     with pytest.raises(BenchmarkGenerationError, match="metadata integrity mismatch"):

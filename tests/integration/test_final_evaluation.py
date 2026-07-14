@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
+from uuid import uuid4
 
 import pytest
 import yaml
@@ -115,3 +117,36 @@ def test_final_process_dataset_rejects_wrong_or_mixed_split(tmp_path: Path) -> N
 
     with pytest.raises(FinalEvaluationError, match="validation_confirm cases only"):
         IndependentFinalEvaluator(workspace).run(spec)
+
+
+def test_final_runtime_requires_matching_split_plan_lineage(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    evaluator = IndependentFinalEvaluator(tmp_path / "workspace")
+    optimization_job_id = uuid4()
+    search_root = (
+        evaluator.optimization_store.job_dir(optimization_job_id)
+        / "inputs"
+        / "validation-dataset"
+    )
+    search_root.mkdir(parents=True)
+    search = SimpleNamespace(
+        dataset_version=SimpleNamespace(metadata={"split_plan_sha256": "a" * 64}),
+        cases=(),
+    )
+    final = SimpleNamespace(
+        dataset_version=SimpleNamespace(metadata={"split_plan_sha256": "b" * 64}),
+        cases=(),
+    )
+    monkeypatch.setattr(
+        "agentskill_eval_skill_optimizer.final_evaluation.DatasetLoader.load",
+        lambda _self, _path: search,
+    )
+
+    with pytest.raises(FinalEvaluationError, match="lineage mismatch"):
+        evaluator._assert_disjoint_from_search(optimization_job_id, final)  # type: ignore[arg-type]
+
+    final.dataset_version.metadata["split_plan_sha256"] = "a" * 64
+    evaluator._assert_disjoint_from_search(  # type: ignore[arg-type]
+        optimization_job_id, final
+    )
