@@ -392,7 +392,12 @@ def test_deepseek_cli_requires_separate_confirmation_and_budget(
             ],
         )
         assert denied.exit_code != 0
-        assert "--confirm-generator-run" in denied.output
+        denied_output = "".join(
+            character
+            for character in unstyle(denied.output)
+            if not character.isspace()
+        )
+        assert "--confirm-generator-run" in denied_output
         assert _DeepSeekHandler.calls == 0
 
         no_budget = runner.invoke(
@@ -409,7 +414,12 @@ def test_deepseek_cli_requires_separate_confirmation_and_budget(
             ],
         )
         assert no_budget.exit_code != 0
-        assert "--max-generator-cost-microusd/--max-generator-calls" in no_budget.output
+        no_budget_output = "".join(
+            character
+            for character in unstyle(no_budget.output)
+            if not character.isspace()
+        )
+        assert "--max-generator-cost-microusd/--max-generator-calls" in no_budget_output
         assert _DeepSeekHandler.calls == 0
 
         allowed = runner.invoke(
