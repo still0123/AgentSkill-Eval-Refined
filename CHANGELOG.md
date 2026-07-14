@@ -7,6 +7,9 @@ after the first stable release.
 
 ### Added
 
+- Stage 3C budgeted real evolution execution with separately authorized `validation_search` and
+  `regression_dev` stages, immutable receipts, idempotent replay, regression gating, and a
+  confirmation-only handoff that keeps independent and locked data withheld.
 - Stage 3B Real Evolution Dry-Run Orchestration, which binds the Stage 2 five-way release to the
   Stage 3A plan, integrity-checks only adaptive DatasetVersions, rehearses a hash-pinned local
   Process, and retains confirmation/locked inputs as path-free receipts.

@@ -59,12 +59,14 @@ from agentskill_eval_real_evidence import (
 from agentskill_eval_scenarios import UnifiedScenarioRunner, UnifiedScenarioSpec
 from agentskill_eval_skill_optimizer import (
     BenchmarkGuidedSkillSearch,
+    BudgetedRealEvolutionExecutor,
     DeepSeekGeneratorAuthorization,
     EvolutionDryRunOrchestrator,
     EvolutionDryRunSpec,
     EvolutionEvidenceReleasePreparer,
     EvolutionExecutionPlanSpec,
     EvolutionReleaseConfig,
+    EvolutionRuntimeSpec,
     FailureBridgeError,
     FailureGuidedEvolutionSpec,
     FailureGuidedSkillEvolution,
@@ -121,6 +123,10 @@ evolution_dry_run_app = typer.Typer(
     help="Bind Stage 2 datasets and rehearse Stage 3A through a local Process only."
 )
 evolution_app.add_typer(evolution_dry_run_app, name="dry-run")
+evolution_execute_app = typer.Typer(
+    help="Run budgeted real validation_search and regression_dev stages."
+)
+evolution_app.add_typer(evolution_execute_app, name="execute")
 evolve_app = typer.Typer(help="Generate Skill candidates from train failure diagnoses.")
 optimize_app.add_typer(evolve_app, name="evolve")
 proposal_app = typer.Typer(help="Generate audited real-LLM proposals without running search.")
@@ -682,9 +688,7 @@ def evolution_plan_prepare(
                 "plan_id": str(result.plan.plan_id),
                 "directory": str(result.directory),
                 "total_agent_runs": result.plan.total_agent_runs,
-                "total_estimated_cost_microusd": (
-                    result.plan.total_estimated_cost_microusd
-                ),
+                "total_estimated_cost_microusd": (result.plan.total_estimated_cost_microusd),
                 "real_calls_executed": False,
                 "locked_content_accessed": False,
             },
@@ -699,9 +703,7 @@ def evolution_plan_inspect(
 ) -> None:
     """Verify and print the complete immutable execution plan."""
     try:
-        result = RealEvolutionExecutionPlanner(plan_directory.parent.parent).verify(
-            plan_directory
-        )
+        result = RealEvolutionExecutionPlanner(plan_directory.parent.parent).verify(plan_directory)
     except (OSError, ValueError, RuntimeError) as exc:
         raise typer.BadParameter(str(exc), param_hint="PLAN_DIR") from exc
     typer.echo(result.plan.model_dump_json(indent=2))
@@ -713,9 +715,7 @@ def evolution_plan_verify(
 ) -> None:
     """Detect any modification to a prepared execution plan."""
     try:
-        result = RealEvolutionExecutionPlanner(plan_directory.parent.parent).verify(
-            plan_directory
-        )
+        result = RealEvolutionExecutionPlanner(plan_directory.parent.parent).verify(plan_directory)
     except (OSError, ValueError, RuntimeError) as exc:
         raise typer.BadParameter(str(exc), param_hint="PLAN_DIR") from exc
     typer.echo(
@@ -805,6 +805,173 @@ def evolution_dry_run_verify(
                 "dry_run_id": str(result.report.dry_run_id),
                 "status": result.report.status,
                 "real_calls_executed": False,
+                "locked_content_accessed": False,
+            },
+            sort_keys=True,
+        )
+    )
+
+
+@evolution_execute_app.command("preflight")
+def evolution_execute_preflight(
+    config_path: Path = typer.Argument(..., exists=True, dir_okay=False),  # noqa: B008
+) -> None:
+    """Verify all frozen inputs and print separate paid-stage envelopes."""
+    try:
+        spec = EvolutionRuntimeSpec.load(config_path)
+        preflight = BudgetedRealEvolutionExecutor(Path(".")).preflight(spec)
+    except (OSError, ValueError, RuntimeError) as exc:
+        raise typer.BadParameter(str(exc), param_hint="CONFIG") from exc
+    typer.echo(preflight.model_dump_json(indent=2))
+
+
+def _real_stage_authorization(
+    *,
+    confirm_real_run: bool,
+    max_cost_microusd: Optional[int],
+    max_agent_runs: Optional[int],
+    stage: str,
+) -> RealEvaluationAuthorization:
+    if not confirm_real_run:
+        raise typer.BadParameter(
+            f"{stage} requires --confirm-real-run", param_hint="--confirm-real-run"
+        )
+    if max_cost_microusd is None or max_agent_runs is None:
+        raise typer.BadParameter(
+            f"{stage} requires cost and Agent Run limits",
+            param_hint="--max-cost-microusd/--max-agent-runs",
+        )
+    return RealEvaluationAuthorization(
+        confirm_real_run=True,
+        max_cost_microusd=max_cost_microusd,
+        max_agent_runs=max_agent_runs,
+    )
+
+
+@evolution_execute_app.command("search")
+def evolution_execute_search(
+    config_path: Path = typer.Argument(..., exists=True, dir_okay=False),  # noqa: B008
+    workspace: Path = typer.Option(  # noqa: B008
+        Path(".agentskill-eval-workspace"), "--workspace", file_okay=False
+    ),
+    confirm_real_run: bool = typer.Option(False, "--confirm-real-run"),  # noqa: B008
+    max_cost_microusd: Optional[int] = typer.Option(  # noqa: B008
+        None, "--max-cost-microusd", min=1
+    ),
+    max_agent_runs: Optional[int] = typer.Option(  # noqa: B008
+        None, "--max-agent-runs", min=1
+    ),
+) -> None:
+    """Execute only validation_search under its frozen authorization cap."""
+    authorization = _real_stage_authorization(
+        confirm_real_run=confirm_real_run,
+        max_cost_microusd=max_cost_microusd,
+        max_agent_runs=max_agent_runs,
+        stage="validation_search",
+    )
+    try:
+        spec = EvolutionRuntimeSpec.load(config_path)
+        preflight = BudgetedRealEvolutionExecutor(workspace).preflight(spec)
+        typer.echo(
+            json.dumps(
+                {
+                    "event": "validation_search_authorization",
+                    "provider": preflight.provider,
+                    "model": preflight.model,
+                    "planned_agent_runs": preflight.search_agent_runs,
+                    "authorized_agent_runs": max_agent_runs,
+                    "authorized_cost_microusd": max_cost_microusd,
+                },
+                sort_keys=True,
+            ),
+            err=True,
+        )
+        result = BudgetedRealEvolutionExecutor(workspace).run_search(spec, authorization)
+    except (OSError, ValueError, RuntimeError) as exc:
+        raise typer.BadParameter(str(exc), param_hint="CONFIG") from exc
+    typer.echo(result.model_dump_json(indent=2))
+
+
+@evolution_execute_app.command("regression")
+def evolution_execute_regression(
+    config_path: Path = typer.Argument(..., exists=True, dir_okay=False),  # noqa: B008
+    workspace: Path = typer.Option(  # noqa: B008
+        Path(".agentskill-eval-workspace"), "--workspace", file_okay=False
+    ),
+    confirm_real_run: bool = typer.Option(False, "--confirm-real-run"),  # noqa: B008
+    max_cost_microusd: Optional[int] = typer.Option(  # noqa: B008
+        None, "--max-cost-microusd", min=1
+    ),
+    max_agent_runs: Optional[int] = typer.Option(  # noqa: B008
+        None, "--max-agent-runs", min=1
+    ),
+) -> None:
+    """Execute only regression_dev and write a confirmation handoff on success."""
+    authorization = _real_stage_authorization(
+        confirm_real_run=confirm_real_run,
+        max_cost_microusd=max_cost_microusd,
+        max_agent_runs=max_agent_runs,
+        stage="regression_dev",
+    )
+    try:
+        spec = EvolutionRuntimeSpec.load(config_path)
+        preflight = BudgetedRealEvolutionExecutor(workspace).preflight(spec)
+        typer.echo(
+            json.dumps(
+                {
+                    "event": "regression_dev_authorization",
+                    "provider": preflight.provider,
+                    "model": preflight.model,
+                    "planned_agent_runs": preflight.regression_agent_runs,
+                    "authorized_agent_runs": max_agent_runs,
+                    "authorized_cost_microusd": max_cost_microusd,
+                },
+                sort_keys=True,
+            ),
+            err=True,
+        )
+        result = BudgetedRealEvolutionExecutor(workspace).run_regression(spec, authorization)
+    except (OSError, ValueError, RuntimeError) as exc:
+        raise typer.BadParameter(str(exc), param_hint="CONFIG") from exc
+    typer.echo(result.model_dump_json(indent=2))
+
+
+@evolution_execute_app.command("inspect")
+def evolution_execute_inspect(
+    execution_directory: Path = typer.Argument(  # noqa: B008
+        ..., exists=True, file_okay=False
+    ),
+) -> None:
+    """Verify and print the current adaptive execution checkpoint."""
+    try:
+        result = BudgetedRealEvolutionExecutor(execution_directory.parent.parent).verify(
+            execution_directory
+        )
+    except (OSError, ValueError, RuntimeError) as exc:
+        raise typer.BadParameter(str(exc), param_hint="EXECUTION_DIR") from exc
+    typer.echo(result.model_dump_json(indent=2))
+
+
+@evolution_execute_app.command("verify")
+def evolution_execute_verify(
+    execution_directory: Path = typer.Argument(  # noqa: B008
+        ..., exists=True, file_okay=False
+    ),
+) -> None:
+    """Detect any modification to adaptive execution receipts or results."""
+    try:
+        result = BudgetedRealEvolutionExecutor(execution_directory.parent.parent).verify(
+            execution_directory
+        )
+    except (OSError, ValueError, RuntimeError) as exc:
+        raise typer.BadParameter(str(exc), param_hint="EXECUTION_DIR") from exc
+    typer.echo(
+        json.dumps(
+            {
+                "valid": True,
+                "execution_id": str(result.preflight.execution_id),
+                "search_completed": result.search_receipt is not None,
+                "regression_completed": result.regression_receipt is not None,
                 "locked_content_accessed": False,
             },
             sort_keys=True,
@@ -1383,9 +1550,7 @@ def proposal_inspect(
     proposal_directory: Path = typer.Argument(..., exists=True, file_okay=False),  # noqa: B008
 ) -> None:
     """Inspect a completed proposal job after verifying all immutable artifacts."""
-    result = RealLLMProposalService(proposal_directory.parent.parent).verify(
-        proposal_directory
-    )
+    result = RealLLMProposalService(proposal_directory.parent.parent).verify(proposal_directory)
     typer.echo(result.manifest.model_dump_json(indent=2))
 
 
@@ -1394,9 +1559,7 @@ def proposal_verify(
     proposal_directory: Path = typer.Argument(..., exists=True, file_okay=False),  # noqa: B008
 ) -> None:
     """Verify proposal artifact hashes and cross-file semantic consistency."""
-    result = RealLLMProposalService(proposal_directory.parent.parent).verify(
-        proposal_directory
-    )
+    result = RealLLMProposalService(proposal_directory.parent.parent).verify(proposal_directory)
     typer.echo(
         json.dumps(
             {
@@ -1451,9 +1614,7 @@ def audit_benchmark_split_plan(
     plan = BenchmarkSplitPlan.load(plan_path)
     report = plan.audit()
     report.require_passed()
-    inventory = {
-        split.value: len(case_ids) for split, case_ids in plan.splits.by_split().items()
-    }
+    inventory = {split.value: len(case_ids) for split, case_ids in plan.splits.by_split().items()}
     typer.echo(
         json.dumps(
             {
@@ -1629,9 +1790,7 @@ def publish_optimization_benchmark_split(
                 "case_count": release.total_case_count,
                 "repository_count": release.repository_count,
                 "independence_group_count": release.independence_group_count,
-                "split_counts": {
-                    item.split.value: item.case_count for item in release.splits
-                },
+                "split_counts": {item.split.value: item.case_count for item in release.splits},
                 "locked_policy": release.locked_policy,
             },
             ensure_ascii=False,

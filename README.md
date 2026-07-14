@@ -94,6 +94,7 @@ without-Skill       Skill v1         Skill v2
 | DeepSeek Skill Proposal | proposal-only 单次授权调用从脱敏 train 失败生成 3～5 个结构化候选，并冻结 prompt/schema/token/费用证据 | 已完成 1 次真实 smoke，生成 4 个候选；不触发 search 或 locked test |
 | Real Evolution Planner | 冻结 Proposal、四段 Dataset 元数据、真实 Agent 身份及逐阶段 Run/Token/费用上限 | Stage 3A 已实现；只生成计划，不调用模型、不读取 locked 内容 |
 | Real Evolution Dry Run | 将 Stage 2 DatasetVersion 绑定到 Stage 3A，并以哈希固定的本地 Process 演练 adaptive stages | Stage 3B 已实现；confirm/locked 仅保留收据，不调用模型或 Agent |
+| Budgeted Real Evolution Execution | 分别授权并执行 `validation_search` 与 `regression_dev`，冻结 winner、费用和 confirmation handoff | Stage 3C 已实现；代码与 Fake Process 集成测试不产生费用，confirm/locked 保持隔离 |
 | Real Optimizer Evaluator | 用真实 Agent 的 Case 结果、成本和 Trace 选择候选并执行 regression_dev | 已实现，真实 smoke 需单独授权 |
 | Observed Failure Bridge | 从真实 Skill treatment Run 导出可追溯的 train failure bundle | 已实现，不调用模型 |
 | Dashboard | 查看报告、Trace、候选、Promotion 谱系和 SkillVersion 状态 | 本地只读版 |
@@ -299,6 +300,7 @@ docs/                    模块级设计和操作文档
 | 真实 Agent 评测 | [Real Agent Evidence](./docs/real-agent-evidence.md) |
 | 真实演化执行计划 | [Real Evolution Execution Planner](./docs/real-evolution-execution-planner.md) |
 | 真实演化 Dry Run | [Real Evolution Dry-Run Orchestration](./docs/real-evolution-dry-run-orchestration.md) |
+| 预算化真实 Search / Regression | [Budgeted Real Evolution Execution](./docs/budgeted-real-evolution-execution.md) |
 | Skill 演化证据发布 CLI | [Evolution Evidence Release](./docs/evolution-evidence-release-cli.md) |
 | MCP / Memory-RAG 专项 Lab | [MCP Lab](./docs/mcp-tool-evaluation.md) / [Memory-RAG Lab](./docs/memory-rag-evaluation.md) |
 | 跨场景统一入口和结果协议 | [Unified Multi-Scenario Evaluation](./docs/unified-multi-scenario-evaluation.md) |

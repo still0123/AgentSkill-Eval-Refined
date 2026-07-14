@@ -1,0 +1,27 @@
+# Paid execution template. Run `evolution execute preflight` before requesting authorization.
+schema_version: ase/real-evolution-runtime-spec/v1alpha1
+name: python-bug-fix-budgeted-adaptive-execution-v1
+execution_plan_directory: /absolute/path/to/evolution-execution-plans/PLAN_ID
+dry_run_directory: /absolute/path/to/evolution-dry-runs/DRY_RUN_ID
+benchmark_workspace: /absolute/path/to/stage-2-benchmark-workspace
+proposal_directory: /absolute/path/to/proposal-jobs/PROPOSAL_JOB_ID
+base_skill_path: /absolute/path/to/python-bug-fix-v1
+manual_skill_path: /absolute/path/to/manual-comparator-skill
+real_agent_config_path: /absolute/path/to/observed-agent.yaml
+
+# These values must reproduce the search envelope frozen in Stage 3A.
+search:
+  algorithm: successive_halving
+  subset_size: 2
+  promote_search_candidates: 2
+  random_seed: 2026
+
+constraints:
+  max_skill_bytes: 20000
+  max_loss_cases: 0
+  max_token_overhead_ratio: 0.25
+
+timeout_seconds: 900
+claim_limit: >-
+  Adaptive observed-Agent evidence only. Search and regression_dev may select a provisional
+  winner, but validation_confirm and locked_test remain unaccessed and Skill v2 is not publishable.

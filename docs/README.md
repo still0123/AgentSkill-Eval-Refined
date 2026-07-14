@@ -29,6 +29,7 @@
 - [Real LLM / DeepSeek Skill Proposal MVP](./deepseek-skill-proposal.md)
 - [Stage 3A Real Evolution Execution Planner](./real-evolution-execution-planner.md)
 - [Stage 3B Real Evolution Dry-Run Orchestration](./real-evolution-dry-run-orchestration.md)
+- [Stage 3C Budgeted Real Search / Regression Execution](./budgeted-real-evolution-execution.md)
 - [Observed Failure Evidence Bridge MVP](./observed-failure-evidence-bridge.md)
 - [Independent Final Evaluation MVP](./independent-final-evaluation.md)
 - [Real Agent Evaluation Evidence MVP](./real-agent-evidence.md)

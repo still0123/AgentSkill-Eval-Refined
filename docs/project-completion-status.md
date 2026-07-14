@@ -32,6 +32,7 @@ Skill 缺陷，也没有消费已授权但不满足前提的 proposal 调用。
 | Benchmark | 20 个真实 Git 历史缺陷 Case、5 个独立仓库、五段 DatasetVersion、provenance、mutation 与替代修复验证 | locked Case 公开且高污染，仅覆盖首个 Python Bug Fix family |
 | Skill Search | 候选生成、真实/模拟 evaluator、successive halving、regression_dev | adaptive search 结果不等同 locked-test 结论 |
 | Real Evolution Dry Run | Stage 2/3A 绑定、adaptive Process 演练、confirm/locked 收据隔离 | simulated Process 集成证据；未调用模型或 Agent |
+| Real Evolution Execution | 逐阶段预算授权、真实 validation_search、regression_dev、幂等 receipt 与 confirmation handoff | Stage 3C 执行器和 Fake Process 测试已完成；尚未授权本阶段真实付费实验 |
 | 独立终评 | confirmation、一次性 locked test、burn rule | 工程链路已完成 |
 | Promotion | 人工审核、父版本哈希、不可变 SkillVersion、回滚指针 | 当前真实 v2 未发布；Fake fixture 只证明流程 |
 | Evidence Release | `prepare`、`verify`、`inspect` CLI，离线 HTML、diff、索引和审计包 | Stage 5A.2 已用 Fake Promotion fixture 完成端到端验收 |
@@ -135,3 +136,11 @@ Stage 3B 将 Stage 2 五段不可变 DatasetVersion 与 Stage 3A 真实执行计
 自适应阶段；`validation_confirm`、`locked_test` 只保留不含路径和 Case key 的收据。输出状态
 为 `AWAITING_REAL_AUTHORIZATION`，明确标记 `simulated=true`，不产生模型费用、不运行 Agent，
 也不声称 Skill 改进。
+
+## 11. Stage 3C 自适应执行状态
+
+Stage 3C 已提供 `evolution execute preflight/search/regression/inspect/verify`。Search 与 regression
+必须分别显式授权并遵守 Stage 3A 冻结的 Run/费用上限；相同完成阶段的重放直接验证不可变
+receipt，不重复创建 Agent Run。通过 regression 后只生成 confirmation handoff，不读取
+`validation_confirm` 或 `locked_test`，也不自动发布 Skill v2。当前只完成无费用代码与 Fake
+Process 集成验收，尚未将其表述为真实 Skill 改进证据。

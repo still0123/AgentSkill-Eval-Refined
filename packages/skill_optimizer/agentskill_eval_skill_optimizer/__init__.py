@@ -63,6 +63,15 @@ from agentskill_eval_skill_optimizer.execution_plan import (
     SearchPlanSpec,
     StageBudgetCap,
 )
+from agentskill_eval_skill_optimizer.execution_runtime import (
+    AdaptiveStageReceipt,
+    BudgetedRealEvolutionExecutor,
+    EvolutionRuntimeError,
+    EvolutionRuntimeManifest,
+    EvolutionRuntimePreflight,
+    EvolutionRuntimeResult,
+    EvolutionRuntimeSpec,
+)
 from agentskill_eval_skill_optimizer.failure_bridge import (
     FailureBridgeError,
     FailureBridgeReport,
@@ -176,6 +185,13 @@ __all__ = [
     "EvolutionExecutionPlanManifest",
     "EvolutionExecutionPlanResult",
     "EvolutionExecutionPlanSpec",
+    "AdaptiveStageReceipt",
+    "BudgetedRealEvolutionExecutor",
+    "EvolutionRuntimeError",
+    "EvolutionRuntimeManifest",
+    "EvolutionRuntimePreflight",
+    "EvolutionRuntimeResult",
+    "EvolutionRuntimeSpec",
     "EvolutionDryRunError",
     "EvolutionDryRunManifest",
     "EvolutionDryRunOrchestrator",

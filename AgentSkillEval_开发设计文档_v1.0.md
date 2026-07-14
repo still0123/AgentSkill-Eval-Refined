@@ -1980,3 +1980,36 @@ validation_confirm 与 locked_test 只暴露数量和收据哈希。公开 Git �
 因此 locked 表示流程隔离，不表示私有隐藏题。该阶段执行 0 次模型调用、费用为 0，只证明数据
 重建、隔离和发布可信，不构成 Agent 或 Skill 性能证据。完整协议见
 [`docs/optimization-benchmark-split-v1.md`](./docs/optimization-benchmark-split-v1.md)。
+## 36. Stage 3C 预算化真实自适应执行实现状态
+
+当前实现已将真实 Skill 优化拆分为独立授权的 `validation_search` 与 `regression_dev` 两个
+自适应执行阶段。执行器消费已验证的 Stage 3A Execution Plan、Stage 3B Dry Run、Real LLM
+Proposal、Skill v1 与五段 DatasetVersion，不重新生成候选，也不读取 confirmation/locked
+内容。
+
+主要实现约束：
+
+- 每个付费阶段必须单独提供 `--confirm-real-run`、Run 上限和费用上限；
+- 授权不得低于冻结执行计划的预计消耗，也不得超过对应 Stage cap；
+- `validation_search` 复用 successive halving 和真实 Agent Candidate Evaluator；
+- `regression_dev` 只比较 Skill v1 与冻结 winner，并应用 loss/token overhead gate；
+- 完成阶段写入不可变结果、receipt 和内容哈希，幂等重放不重复创建 Agent Run；
+- 无合格候选保存为 `NO_WINNER`，回归失败保存为 `REGRESSION_REJECTED`，两者都不生成
+  confirmation handoff；
+- regression 通过后只生成 confirmation handoff，`validation_confirm` 与 `locked_test` 仍由
+  独立终评和 Promotion 流程处理；
+- 不支持真实执行失败后回退到 Mock 或 simulated evaluator。
+
+对应 CLI：
+
+```text
+agentskill-eval evolution execute preflight CONFIG
+agentskill-eval evolution execute search CONFIG --confirm-real-run ...
+agentskill-eval evolution execute regression CONFIG --confirm-real-run ...
+agentskill-eval evolution execute inspect EXECUTION_DIR
+agentskill-eval evolution execute verify EXECUTION_DIR
+```
+
+本阶段代码、Fake Process 集成、幂等和篡改检测属于工程验收，不自动构成 Skill v2 提升
+证据。只有后续真实 Agent search/regression、独立 confirmation、一次 locked test 和人工审核
+全部完成后，才能发布不可变 SkillVersion。
