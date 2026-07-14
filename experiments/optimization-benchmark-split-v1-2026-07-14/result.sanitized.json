@@ -1,0 +1,109 @@
+{
+  "schema_version": "ase/sanitized-optimization-benchmark-release/v1",
+  "generated_at": "2026-07-14",
+  "simulated": false,
+  "evidence_class": "offline_deterministic_benchmark_publication",
+  "model_calls": 0,
+  "paid_cost_microusd": 0,
+  "release": {
+    "name": "python-bug-fix-optimization-v1",
+    "version": "2026.07.14.1",
+    "content_sha256": "aa0b0ad1a38c8f6580cc0c962140565b5f4cba0db17441999df7e1e9cdf5b7ab",
+    "plan_sha256": "da1df63ef965fd5faef5baca1b5ae15e7169809b4b7d5abf81ac50157a88d75e",
+    "generator_version": "0.2.0",
+    "verifier_version": "0.2.0",
+    "case_count": 20,
+    "repository_count": 5,
+    "independence_group_count": 20,
+    "locked_policy": "withheld_until_one_shot_final_evaluation"
+  },
+  "verification_contract": {
+    "repeats_per_variant": 3,
+    "command_count": 240,
+    "expected_exit_codes": {
+      "before": [1, 1, 1],
+      "after": [0, 0, 0],
+      "mutation": [1, 1, 1],
+      "alternative": [0, 0, 0]
+    },
+    "selection_uses_agent_scores": false,
+    "network_required": false
+  },
+  "splits": [
+    {
+      "split": "train",
+      "repository": "https://github.com/more-itertools/more-itertools.git",
+      "license_spdx": "MIT",
+      "dataset_version_id": "23fff68d-8e73-585f-b2f5-49180015a3a7",
+      "dataset_content_sha256": "c505029ff7956a6b67fc50c56388e098cf7665839ecba06642dd3bc717f80543",
+      "command_evidence_count": 48,
+      "cases": [
+        "more-itertools-islice-release",
+        "more-itertools-split-after-empty-tail",
+        "more-itertools-last-reversed-none",
+        "more-itertools-sample-strict-counts"
+      ]
+    },
+    {
+      "split": "validation_search",
+      "repository": "https://github.com/tkem/cachetools.git",
+      "license_spdx": "MIT",
+      "dataset_version_id": "851a3a28-4e33-56fe-a2b1-1c6c0cbd3c6b",
+      "dataset_content_sha256": "723226949bf63e9ac3577c45190e4fe9e65189cdd3c450335dbe893644d1d910",
+      "command_evidence_count": 48,
+      "cases": [
+        "cachetools-cachedmethod-autospec",
+        "cachetools-hashkey-pickle",
+        "cachetools-cachedmethod-bound-key",
+        "cachetools-ttl-boundary-expiration"
+      ]
+    },
+    {
+      "split": "regression_dev",
+      "repository": "https://github.com/mahmoud/boltons.git",
+      "license_spdx": "BSD-3-Clause",
+      "dataset_version_id": "99fd667b-0657-5e3d-89d3-2411236ff258",
+      "dataset_content_sha256": "be9c622e0b22c839b0f995bd643b68d8e6e0610ad16224be17f7a38db8d4c262",
+      "command_evidence_count": 48,
+      "cases": [
+        "boltons-split-maxsplit-zero",
+        "boltons-bytes2human-boundary",
+        "boltons-truncated-traceback",
+        "boltons-lri-replacement"
+      ]
+    },
+    {
+      "split": "validation_confirm",
+      "repository": "https://github.com/python-humanize/humanize.git",
+      "license_spdx": "MIT",
+      "dataset_version_id": "c952da54-07da-5a78-bb25-efb5af66e331",
+      "dataset_content_sha256": "2c882a71305e78526786684db0aa0a6a9291b61e467289f3a18136809ed82ac5",
+      "command_evidence_count": 48,
+      "optimizer_visible": false,
+      "receipt_sha256": "b95454cc72bed6d820b0d100634305a03671de97d803965bd6d6b10353800705",
+      "cases": [
+        "humanize-intcomma-string-ndigits",
+        "humanize-scientific-negative-sign",
+        "humanize-intcomma-zero-precision",
+        "humanize-metric-precision-floor"
+      ]
+    },
+    {
+      "split": "locked_test",
+      "repository": "https://github.com/dgilland/pydash.git",
+      "license_spdx": "MIT",
+      "dataset_version_id": "7fd3a9ec-acad-5415-9228-faab75ed4d4f",
+      "dataset_content_sha256": "04017e1d22bf4b150ba132261e16529297ace156d4163df8443fe04fb6b4c3e2",
+      "command_evidence_count": 48,
+      "optimizer_visible": false,
+      "receipt_sha256": "0a4c6641057c16eaa18f4168b0afa6b6195783a58fed7d6637cef49e5efef67c",
+      "cases": [
+        "pydash-reversed-in-range",
+        "pydash-dict-to-list",
+        "pydash-empty-intersperse",
+        "pydash-false-math-operands"
+      ]
+    }
+  ],
+  "claim_limit": "Offline deterministic benchmark reconstruction, five-way split isolation, and immutable publication evidence only; public-history contamination risk remains high and no Agent or Skill gain is claimed."
+}

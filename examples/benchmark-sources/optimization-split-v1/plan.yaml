@@ -1,0 +1,75 @@
+schema_version: ase/optimization-benchmark-plan/v1
+name: python-bug-fix-optimization-v1
+version: "2026.07.14.1"
+description: >-
+  Twenty deterministic Python bug-fix cases from five isolated open-source repositories, frozen
+  for Skill v1-to-v2 search, regression, confirmation, and one-shot final evaluation.
+claim_limit: >-
+  This release proves offline reconstruction and split isolation for twenty selected public Git
+  histories. It is not Agent-performance evidence and does not establish population-level
+  generalization. Public-history contamination risk remains high.
+splits:
+  - split: train
+    source_spec: ../cross-repository-generation.example.yaml
+    candidate_keys:
+      - more-itertools-islice-release
+      - more-itertools-split-after-empty-tail
+      - more-itertools-last-reversed-none
+      - more-itertools-sample-strict-counts
+    bundles:
+      - source_key: more-itertools
+        path: ../more-itertools.bundle
+        sha256: 9e19644b0027cc11502b5ccc959abce2847b8cf94a3446b09d45a1cd716651bb
+    optimizer_visible: true
+
+  - split: validation_search
+    source_spec: ../cross-repository-generation.example.yaml
+    candidate_keys:
+      - cachetools-cachedmethod-autospec
+      - cachetools-hashkey-pickle
+      - cachetools-cachedmethod-bound-key
+      - cachetools-ttl-boundary-expiration
+    bundles:
+      - source_key: cachetools
+        path: ../cachetools.bundle
+        sha256: 9933f9067dbc4da476cdc2612625422251916d53d8945153b0795dca1371258c
+    optimizer_visible: true
+
+  - split: regression_dev
+    source_spec: boltons-regression-dev.yaml
+    candidate_keys:
+      - boltons-split-maxsplit-zero
+      - boltons-bytes2human-boundary
+      - boltons-truncated-traceback
+      - boltons-lri-replacement
+    bundles:
+      - source_key: primary
+        path: ../boltons.bundle
+        sha256: d561ac68fbb7568ee42314ce74a983d8732f527989e8ad4cc3450a0ec9e6c453
+    optimizer_visible: true
+
+  - split: validation_confirm
+    source_spec: humanize-validation-confirm.yaml
+    candidate_keys:
+      - humanize-intcomma-string-ndigits
+      - humanize-scientific-negative-sign
+      - humanize-intcomma-zero-precision
+      - humanize-metric-precision-floor
+    bundles:
+      - source_key: primary
+        path: ../humanize.bundle
+        sha256: 7f6e7eb68724bc4a3ab66ede0bd29da94225a00fcdba16d612fef51c6582534e
+    optimizer_visible: false
+
+  - split: locked_test
+    source_spec: pydash-locked-test.yaml
+    candidate_keys:
+      - pydash-reversed-in-range
+      - pydash-dict-to-list
+      - pydash-empty-intersperse
+      - pydash-false-math-operands
+    bundles:
+      - source_key: primary
+        path: ../pydash.bundle
+        sha256: 96ef9847c42e5408c4739feb23bfbb982afeece3b719f277202d99a639d264d4
+    optimizer_visible: false

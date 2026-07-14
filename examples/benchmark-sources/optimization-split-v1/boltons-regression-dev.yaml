@@ -1,0 +1,149 @@
+schema_version: ase/benchmark-generation/v1alpha1
+name: optimization-split-v1-boltons
+version: "2026.07.14.1"
+repository_path: /absolute/path/to/offline/boltons
+repository_url: https://github.com/mahmoud/boltons.git
+fork_lineage: github.com/mahmoud/boltons
+license_spdx: BSD-3-Clause
+license_path: LICENSE
+contamination_risk: high
+target_split: regression_dev
+generator_profile: local-git-history/v2
+verifier_profile: deterministic-subprocess/v2
+quality_gate:
+  repeat_count: 3
+  timeout_seconds: 30
+  mutation_required: true
+  alternative_required: true
+  prohibit_network_time_random: true
+  prohibit_patch_leakage: true
+  max_repository_files: 5000
+  max_repository_bytes: 50000000
+budget:
+  max_candidates: 4
+  max_commands: 48
+  wall_seconds: 1200
+candidates:
+  - key: boltons-split-maxsplit-zero
+    provenance_family: split-maxsplit-zero-materialization
+    before_commit: 3970a80f63807392e512340c25dc2db473bcba70
+    after_commit: 4aa77cddb5d06def130df6f09aefab4018fa487c
+    task: >-
+      Fix split with maxsplit=0 so it returns the original values as one materialized group for
+      both sequences and iterators, rather than nesting the iterator object itself.
+    issue_url: https://github.com/mahmoud/boltons/commit/4aa77cddb5d06def130df6f09aefab4018fa487c
+    production_paths: [boltons/iterutils.py]
+    regression_test_paths: [tests/test_iterutils.py]
+    test_command:
+      - "${PYTHON}"
+      - -m
+      - pytest
+      - -q
+      - tests/test_iterutils.py::TestSplit::test_maxsplit_zero_returns_unsplit_values
+    alternative_patch: |
+      diff --git a/boltons/iterutils.py b/boltons/iterutils.py
+      --- a/boltons/iterutils.py
+      +++ b/boltons/iterutils.py
+      @@ -159,5 +159,5 @@ def split_iter(src, sep=None, maxsplit=None):
+           if maxsplit is not None:
+               maxsplit = int(maxsplit)
+               if maxsplit == 0:
+      -            yield [src]
+      +            yield [*src]
+                   return
+    category: positive
+    tags: [python, regression, iterator]
+
+  - key: boltons-bytes2human-boundary
+    provenance_family: bytes2human-power-boundary
+    before_commit: 8a2a93d8213e1fa4da30c8167ab1a18caad17a17
+    after_commit: 766b5547392fe8d54c1e000098499dc556bb5cb7
+    task: >-
+      Fix bytes2human at exact powers of 1024 so values roll over to the next unit while values
+      immediately below the boundary remain in the smaller unit.
+    issue_url: https://github.com/mahmoud/boltons/commit/766b5547392fe8d54c1e000098499dc556bb5cb7
+    production_paths: [boltons/strutils.py]
+    regression_test_paths: [tests/test_strutils.py]
+    test_command:
+      - "${PYTHON}"
+      - -m
+      - pytest
+      - -q
+      - tests/test_strutils.py::test_bytes2human
+    alternative_patch: |
+      diff --git a/boltons/strutils.py b/boltons/strutils.py
+      --- a/boltons/strutils.py
+      +++ b/boltons/strutils.py
+      @@ -566,5 +566,5 @@ def bytes2human(nbytes, ndigits=0):
+           """
+           abs_bytes = abs(nbytes)
+           for (size, symbol), (next_size, next_symbol) in _SIZE_RANGES:
+      -        if abs_bytes <= next_size:
+      +        if not abs_bytes >= next_size:
+                   break
+    category: positive
+    tags: [python, regression, formatting, boundary]
+
+  - key: boltons-truncated-traceback
+    provenance_family: parsed-exception-truncated-frame
+    before_commit: 80f9eb4296daadad85db5ef6c0fd14e2f3602fa4
+    after_commit: 8a2a93d8213e1fa4da30c8167ab1a18caad17a17
+    task: >-
+      Fix ParsedException parsing for a traceback truncated after its final source line so parsing
+      returns the available frame instead of leaking an IndexError.
+    issue_url: https://github.com/mahmoud/boltons/commit/8a2a93d8213e1fa4da30c8167ab1a18caad17a17
+    production_paths: [boltons/tbutils.py]
+    regression_test_paths: [tests/test_tbutils_parsed_exc.py]
+    test_command:
+      - "${PYTHON}"
+      - -m
+      - pytest
+      - -q
+      - tests/test_tbutils_parsed_exc.py::test_parsed_exc_truncated
+    alternative_patch: |
+      diff --git a/boltons/tbutils.py b/boltons/tbutils.py
+      --- a/boltons/tbutils.py
+      +++ b/boltons/tbutils.py
+      @@ -753,5 +753,8 @@ class ParsedException:
+               if not isinstance(tb_str, str):
+                   tb_str = tb_str.decode('utf-8')
+               tb_lines = tb_str.lstrip().splitlines()
+      +        # A sentinel terminates the frame loop and makes look-ahead safe when
+      +        # the exception line was truncated.
+      +        tb_lines.extend(('', ''))
+      
+               # First off, handle some ignored exceptions. These can be the
+    category: robustness
+    tags: [python, regression, traceback, parser]
+
+  - key: boltons-lri-replacement
+    provenance_family: lri-existing-value-synchronization
+    before_commit: 46599bc0d498dd8adc3aea833ce1445feed349dd
+    after_commit: 4815fc8dd1768da5f2d903846d2ab994aa57b0cf
+    task: >-
+      Fix LRI replacement so updating an existing key keeps the linked-list value and underlying
+      dictionary value synchronized across direct lookup, values(), and dict conversion.
+    issue_url: https://github.com/mahmoud/boltons/issues/348
+    production_paths: [boltons/cacheutils.py]
+    regression_test_paths: [tests/test_cacheutils.py]
+    test_command:
+      - "${PYTHON}"
+      - -m
+      - pytest
+      - -q
+      - tests/test_cacheutils.py::test_lru_dict_replacement
+    alternative_patch: |
+      diff --git a/boltons/cacheutils.py b/boltons/cacheutils.py
+      index 27a19cb..be3f289 100644
+      --- a/boltons/cacheutils.py
+      +++ b/boltons/cacheutils.py
+      @@ -238,6 +238,7 @@ class LRI(dict):
+                       super(LRI, self).__setitem__(key, value)
+                   else:
+                       link[VALUE] = value
+      +                dict.__setitem__(self, key, value)
+      
+           def __getitem__(self, key):
+               with self._lock:
+    category: complex
+    tags: [python, regression, cache, consistency]
