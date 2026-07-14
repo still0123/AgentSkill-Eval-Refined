@@ -11,6 +11,7 @@ from typing import Iterator
 
 import pytest
 import yaml
+from click import unstyle
 from typer.testing import CliRunner
 
 from agentskill_eval_cli.main import app
@@ -19,6 +20,10 @@ from agentskill_eval_skill_optimizer import RealLLMProposalSpec
 ROOT = Path(__file__).resolve().parents[2]
 EXAMPLE = ROOT / "examples/optimizer/failure-guided/deepseek-proposal.example.yaml"
 runner = CliRunner()
+
+
+def _compact_cli_output(value: str) -> str:
+    return "".join(character for character in unstyle(value) if not character.isspace())
 
 
 class _ProposalAPIHandler(BaseHTTPRequestHandler):
@@ -151,7 +156,7 @@ def test_proposal_cli_is_budgeted_audited_idempotent_and_proposal_only(
             ],
         )
         assert denied.exit_code != 0
-        assert "--confirm-real-run" in denied.output
+        assert "--confirm-real-run" in _compact_cli_output(denied.output)
         assert _ProposalAPIHandler.requests == []
 
         no_budget = runner.invoke(
@@ -167,7 +172,7 @@ def test_proposal_cli_is_budgeted_audited_idempotent_and_proposal_only(
             ],
         )
         assert no_budget.exit_code != 0
-        assert "--max-cost-microusd/--max-calls" in no_budget.output.replace(" ", "")
+        assert "--max-cost-microusd/--max-calls" in _compact_cli_output(no_budget.output)
         assert _ProposalAPIHandler.requests == []
 
         workspace = tmp_path / "workspace"
