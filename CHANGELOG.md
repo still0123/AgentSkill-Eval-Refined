@@ -23,6 +23,8 @@ after the first stable release.
 - A leakage-safe Failure-Guided Skill Evolution controller that converts eligible train diagnoses
   into auditable hypotheses, reuses existing candidate search, applies an independent regression_dev
   gate and freezes a no-auto-publish handoff for Independent Final Evaluation.
+- A hash/version-pinned Process Skill Proposal Generator with sanitized train-only requests, minimal
+  environment inheritance, bounded JSON I/O, fail-closed validation and idempotent invocation evidence.
 
 ### Evidence boundary
 
@@ -36,6 +38,8 @@ after the first stable release.
   deterministic environment observations; it remains simulated tool/Memory/RAG evidence.
 - Failure-guided evolution currently uses deterministic hypotheses and simulated/Fake evaluators;
   it proves the optimization control loop, not that a real model-generated Skill is better.
+- The Process Generator example is a deterministic local fixture and does not authorize Provider
+  Secrets, paid calls or real-LLM optimization claims.
 
 ## [0.1.0-rc1] - 2026-07-13
 

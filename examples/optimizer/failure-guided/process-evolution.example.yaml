@@ -1,0 +1,38 @@
+schema_version: ase/failure-guided-evolution/v1alpha1
+name: python-review-audited-process-evolution-demo
+base_skill_path: ../../skills/python-review-v1
+manual_skill_path: ../python-review-search/manual
+failure_bundle_path: train-failures.yaml
+validation_search_path: ../python-review-search/validation-search.yaml
+regression_dev_path: regression-dev.yaml
+generator:
+  type: process
+  name: local-fake-skill-proposal-generator
+  version: "1.0.0"
+  max_hypotheses: 8
+  executable: fake-process-generator.py
+  expected_sha256: a6425ca25d3e120d05ec82d24d6dc1013265b8c63d56c79738101ed393ecc58d
+  version_args: ["--version"]
+  expected_version_output: ase-fake-process-generator 1.0.0
+  timeout_seconds: 5
+  max_request_bytes: 250000
+  max_response_bytes: 250000
+  max_json_depth: 20
+  max_json_fields: 1000
+  allowed_environment: [PATH, LANG, LC_ALL]
+search:
+  algorithm: successive_halving
+  subset_size: 4
+  promote_search_candidates: 3
+  random_seed: 2026
+constraints:
+  max_skill_bytes: 20000
+  max_loss_cases: 0
+  max_token_overhead_ratio: 0.25
+budget:
+  max_candidate_case_evaluations: 80
+  timeout_seconds: 60
+evaluator:
+  type: simulated_keyword
+  version: process-evolution-controller-demo-v1
+  simulated: true

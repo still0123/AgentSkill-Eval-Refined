@@ -1855,3 +1855,23 @@ CLI 新增 `optimize evolve run/status`，确定性演示必须显式传入 `--a
 非 simulated evaluator，尚未加入真实模型候选生成或付费搜索；因此现有结果只证明诊断、假设、
 搜索、回归和独立终评交接的控制链路。完整协议见
 [`docs/failure-guided-skill-evolution.md`](./docs/failure-guided-skill-evolution.md)。
+
+---
+
+## 32. Audited Process Skill Proposal Generator MVP 实现状态
+
+Failure-Guided Evolution 已支持 `generator.type=process`。Generator executable、版本输出和
+SHA-256 被固定；首次生成使用无 shell 参数数组、最小环境白名单、进程组超时、请求/响应字节限制
+和 JSON 深度/字段限制。请求只携带 base Skill 与脱敏 train eligibility，不包含 rationale、excluded
+failure、validation/locked Case、oracle 或 grader。响应只能返回结构化 hypothesis，证据引用由
+Controller 根据 train label 重建。
+
+系统原子保存 Generator name/version、executable/request/response/hypotheses hash、duration、exit code
+和继承环境变量名称，不保存原始请求、原始响应、stderr 或隐藏推理。相同 Evolution 幂等重放校验
+request hash 并复用已有提案，不再次启动进程。非法 JSON、超时、hash/version 不匹配、Secret-like
+环境变量、重复 ID、越权 label 与数量超限均 fail closed。
+
+当前示例 executable 是确定性 Fake Process，随后仍使用 simulated evaluator；它证明可审计的候选
+生成边界，不证明真实 LLM 能改善 Skill。真实 Provider 必须另行增加显式费用确认、调用数/预算门、
+Secret Gateway 和费用幂等。详细协议见
+[`docs/audited-process-skill-proposal-generator.md`](./docs/audited-process-skill-proposal-generator.md)。

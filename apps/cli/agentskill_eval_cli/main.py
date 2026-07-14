@@ -629,6 +629,8 @@ def evolve_run(
                 "evolution_id": str(result.report.evolution_id),
                 "optimization_job_id": str(result.report.optimization_job_id),
                 "hypothesis_count": len(result.report.hypotheses),
+                "generator_type": spec.generator.type,
+                "generator_evidence_present": result.report.generator_evidence is not None,
                 "candidate_count": result.report.candidate_count,
                 "winner_candidate_id": str(result.report.winner_candidate_id),
                 "winner_skill_sha256": result.report.winner_skill_sha256,

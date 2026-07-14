@@ -17,7 +17,8 @@ AgentSkill-Eval 是一个面向 Agent Skill 的**评测、诊断与迭代优化�
 **当前版本：[`v0.1.0-rc1`](https://github.com/ranmaoxia0123/AgentSkill-Eval/tree/v0.1.0-rc1)**
 
 当前开发版在 RC1 基础上增加了跨仓库 Benchmark、真实 Agent 证据、多场景统一评测、
-Process Agent 接入、交互式 Action/Observation 循环和 Failure-guided Skill Evolution；
+Process Agent 接入、交互式 Action/Observation 循环、Failure-guided Skill Evolution 和受审计的
+Process Skill Proposal Generator；
 未完成能力会在下文明确标记。
 
 ## 项目的核心方向
@@ -83,6 +84,7 @@ without-Skill       Skill v1         Skill v2
 | Interactive Agent Loop | Agent 根据每一步环境 Observation 决定下一步 Action | 已实现，兼容现有 `plan_once` |
 | Skill Version Regression | 比较 v1/v2 的改进、退化 Case 与成本变化 | 已有底层能力，统一工作流待完善 |
 | Failure-guided Optimization | 从 train 失败诊断生成假设，经搜索与 regression_dev 门冻结候选 | 已实现 simulated MVP，独立 locked 终评不自动触发 |
+| Process Skill Proposal | 哈希/版本固定的本地进程根据脱敏 train 失败生成候选变异 | 已实现 Fake Process MVP，不代表真实 LLM 优化 |
 | Dashboard | 查看已冻结的报告、Trace、W/T/L 和候选状态 | 本地只读版 |
 
 `simulated` 只证明评测管线可用，不能当作真实模型能力证据。
@@ -266,6 +268,7 @@ docs/                    模块级设计和操作文档
 | 自动生成 Benchmark | [Automatic Benchmark Generation](./docs/automatic-benchmark-generation.md) |
 | Skill 搜索与独立终评 | [Skill Search](./docs/benchmark-guided-skill-search.md) / [Final Evaluation](./docs/independent-final-evaluation.md) |
 | 失败驱动 Skill 演化 | [Failure-Guided Skill Evolution](./docs/failure-guided-skill-evolution.md) |
+| 受审计的 Process 候选生成 | [Process Skill Proposal Generator](./docs/audited-process-skill-proposal-generator.md) |
 | 真实 Agent 评测 | [Real Agent Evidence](./docs/real-agent-evidence.md) |
 | MCP / Memory-RAG 专项 Lab | [MCP Lab](./docs/mcp-tool-evaluation.md) / [Memory-RAG Lab](./docs/memory-rag-evaluation.md) |
 | 跨场景统一入口和结果协议 | [Unified Multi-Scenario Evaluation](./docs/unified-multi-scenario-evaluation.md) |
@@ -283,8 +286,8 @@ docs/                    模块级设计和操作文档
 - Dashboard 只读取本地冻结报告；
 - MCP 与 Memory/RAG 目前是离线、确定性 Lab；
 - Process Agent 支持兼容的 `plan_once` 和有界 `step_loop`；后者当前只连接确定性本地环境；
-- Failure-guided Evolution 已连通诊断、搜索和回归门，但当前仅有确定性假设生成器，尚未覆盖
-  所有 Skill 类型或真实模型候选生成；
+- Failure-guided Evolution 已连通诊断、Process 候选生成、搜索和回归门，但当前 Generator 仍是
+  确定性/Fake Process，尚未覆盖所有 Skill 类型或真实模型候选生成；
 - 真实 Agent 数据量很小，不支持泛化性能声明。
 
 ## 参与与安全

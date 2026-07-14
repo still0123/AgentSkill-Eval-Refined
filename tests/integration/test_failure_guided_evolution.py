@@ -16,10 +16,12 @@ from agentskill_eval_skill_optimizer import (
     EvolutionError,
     FailureGuidedEvolutionSpec,
     FailureGuidedSkillEvolution,
+    HypothesisGeneratorSpec,
 )
 
 ROOT = Path(__file__).resolve().parents[2]
 EXAMPLE = ROOT / "examples/optimizer/failure-guided/evolution.example.yaml"
+PROCESS_EXAMPLE = ROOT / "examples/optimizer/failure-guided/process-evolution.example.yaml"
 runner = CliRunner()
 
 
@@ -164,3 +166,110 @@ def test_evolution_service_cannot_bypass_real_evaluator_safety_gate(tmp_path: Pa
     )
     with pytest.raises(EvolutionError, match="confirmation and budget protocol"):
         FailureGuidedSkillEvolution(tmp_path / "workspace").run(unsafe)
+
+
+def test_process_generator_is_audited_and_idempotent(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    counter = tmp_path / "calls.txt"
+    monkeypatch.setenv("ASE_PROCESS_GENERATOR_COUNTER", str(counter))
+    spec = FailureGuidedEvolutionSpec.load(PROCESS_EXAMPLE)
+    generator = spec.generator.model_copy(
+        update={
+            "allowed_environment": (
+                "PATH",
+                "LANG",
+                "LC_ALL",
+                "ASE_PROCESS_GENERATOR_COUNTER",
+            )
+        }
+    )
+    spec = spec.model_copy(update={"generator": generator})
+    service = FailureGuidedSkillEvolution(tmp_path / "workspace")
+    result = service.run(spec)
+    replay = service.run(spec)
+
+    assert result.report == replay.report
+    assert counter.read_text(encoding="utf-8") == "1"
+    evidence = result.report.generator_evidence
+    assert evidence is not None
+    assert evidence.version_verified is True
+    assert evidence.hypothesis_count == 4
+    assert evidence.raw_request_stored is False
+    assert evidence.raw_response_stored is False
+    assert evidence.stderr_stored is False
+    assert evidence.hidden_reasoning_stored is False
+    assert result.report.generator_identity.startswith("process-hypothesis-generator:")
+    persisted = "\n".join(
+        path.read_text(encoding="utf-8", errors="replace")
+        for path in result.report_json.parent.rglob("*")
+        if path.is_file()
+    )
+    assert '"base_skill"' not in persisted
+    assert "The Agent compared values" not in persisted
+
+
+@pytest.mark.parametrize(
+    ("mode", "expected"),
+    [
+        ("invalid-json", "returned invalid JSON"),
+        ("ineligible", "ineligible failure label"),
+        ("timeout", "timed out"),
+    ],
+)
+def test_process_generator_fails_closed(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    mode: str,
+    expected: str,
+) -> None:
+    monkeypatch.setenv("ASE_FAKE_GENERATOR_MODE", mode)
+    spec = FailureGuidedEvolutionSpec.load(PROCESS_EXAMPLE)
+    generator = spec.generator.model_copy(
+        update={
+            "allowed_environment": ("PATH", "ASE_FAKE_GENERATOR_MODE"),
+            "timeout_seconds": 0.1,
+        }
+    )
+    spec = spec.model_copy(update={"generator": generator})
+    with pytest.raises(EvolutionError, match=expected):
+        FailureGuidedSkillEvolution(tmp_path / "workspace").run(spec)
+
+
+def test_process_generator_rejects_hash_mismatch_and_secret_environment(tmp_path: Path) -> None:
+    spec = FailureGuidedEvolutionSpec.load(PROCESS_EXAMPLE)
+    mismatched = spec.model_copy(
+        update={
+            "generator": spec.generator.model_copy(update={"expected_sha256": "0" * 64})
+        }
+    )
+    with pytest.raises(EvolutionError, match="SHA-256 mismatch"):
+        FailureGuidedSkillEvolution(tmp_path / "workspace").run(mismatched)
+
+    payload = spec.generator.model_dump(mode="python")
+    payload["allowed_environment"] = ("PATH", "OPENAI_API_KEY")
+    with pytest.raises(ValueError, match="Secret-like"):
+        HypothesisGeneratorSpec.model_validate(payload)
+
+    payload["allowed_environment"] = ("PATH", "HOME")
+    with pytest.raises(ValueError, match="minimal allowlist"):
+        HypothesisGeneratorSpec.model_validate(payload)
+
+
+@pytest.mark.parametrize(
+    ("update", "expected"),
+    [
+        ({"max_request_bytes": 10}, "request is too large"),
+        ({"max_response_bytes": 10}, "response is too large"),
+        ({"expected_version_output": "wrong-version"}, "version mismatch"),
+    ],
+)
+def test_process_generator_enforces_frozen_io_and_version_limits(
+    tmp_path: Path, update: dict[str, object], expected: str
+) -> None:
+    spec = FailureGuidedEvolutionSpec.load(PROCESS_EXAMPLE)
+    spec = spec.model_copy(
+        update={"generator": spec.generator.model_copy(update=update)}
+    )
+    with pytest.raises(EvolutionError, match=expected):
+        FailureGuidedSkillEvolution(tmp_path / "workspace").run(spec)

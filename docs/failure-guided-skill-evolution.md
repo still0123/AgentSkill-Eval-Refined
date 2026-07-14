@@ -55,7 +55,9 @@ existing Independent Final Evaluation
 - `diagnosis://run-id/rule-id` 证据引用；
 - 已知副作用风险。
 
-当前生成器不是 LLM。它证明诊断到候选的控制链路、谱系和隔离规则，不证明自动写作质量。
+默认生成器不是 LLM。系统也支持哈希固定的本地 Process Generator，完整信任边界见
+[Audited Process Skill Proposal Generator](./audited-process-skill-proposal-generator.md)；Fake Process
+示例仍只证明诊断到候选的控制链路、谱系和隔离规则，不证明真实模型的自动写作质量。
 
 ## 候选搜索和回归门
 
@@ -79,6 +81,7 @@ Case 数和 Token overhead 同时满足预注册阈值，才会生成 final-eval
 - `examples/optimizer/failure-guided/evolution.example.yaml`
 - `examples/optimizer/failure-guided/train-failures.yaml`
 - `examples/optimizer/failure-guided/regression-dev.yaml`
+- `examples/optimizer/failure-guided/process-evolution.example.yaml`
 
 运行确定性演示：
 

@@ -6,7 +6,7 @@ import hashlib
 import html
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Literal, Protocol, Tuple
+from typing import Dict, Literal, Optional, Protocol, Tuple
 from uuid import NAMESPACE_URL, UUID, uuid5
 
 import yaml
@@ -23,6 +23,12 @@ from agentskill_eval_contracts import (
 )
 from agentskill_eval_experiment.storage.atomic import AtomicFileWriter
 from agentskill_eval_skill_optimizer.evaluator import build_evaluator
+from agentskill_eval_skill_optimizer.process_generator import (
+    GeneratorInvocationEvidence,
+    HypothesisGeneratorSpec,
+    ProcessGeneratorError,
+    ProcessHypothesisGenerator,
+)
 from agentskill_eval_skill_optimizer.search import (
     BenchmarkGuidedSkillSearch,
     SkillSearchResult,
@@ -55,12 +61,6 @@ class FailureEvidenceBundle(FrozenModel):
             return cls.model_validate(yaml.safe_load(path.read_text(encoding="utf-8")))
         except (OSError, yaml.YAMLError, ValueError) as exc:
             raise EvolutionError(f"invalid train failure bundle {path}: {exc}") from exc
-
-
-class HypothesisGeneratorSpec(FrozenModel):
-    type: Literal["deterministic"] = "deterministic"
-    version: str = Field(min_length=1)
-    max_hypotheses: int = Field(default=8, ge=3, le=20)
 
 
 class FailureGuidedEvolutionSpec(FrozenModel):
@@ -103,6 +103,9 @@ class FailureGuidedEvolutionSpec(FrozenModel):
                 raise EvolutionError("symbolic-link evolution inputs are not allowed")
             return candidate.resolve(strict=True)
 
+        generator = spec.generator
+        if generator.executable is not None:
+            generator = generator.model_copy(update={"executable": resolved(generator.executable)})
         return spec.model_copy(
             update={
                 "base_skill_path": resolved(spec.base_skill_path),
@@ -110,6 +113,7 @@ class FailureGuidedEvolutionSpec(FrozenModel):
                 "failure_bundle_path": resolved(spec.failure_bundle_path),
                 "validation_search_path": resolved(spec.validation_search_path),
                 "regression_dev_path": resolved(spec.regression_dev_path),
+                "generator": generator,
             }
         )
 
@@ -156,6 +160,30 @@ class ImprovementHypothesis(FrozenModel):
     instruction: str = Field(min_length=10)
     evidence_refs: Tuple[str, ...] = Field(min_length=1)
     risks: Tuple[str, ...] = ()
+
+
+class HypothesisArtifact(FrozenModel):
+    schema_version: Literal["ase/improvement-hypotheses/v1alpha1"] = (
+        "ase/improvement-hypotheses/v1alpha1"
+    )
+    generator: str = Field(min_length=1)
+    hypotheses: Tuple[ImprovementHypothesis, ...] = Field(min_length=3)
+    invocation_evidence: Optional[GeneratorInvocationEvidence] = None
+
+    @model_validator(mode="after")
+    def ids_and_evidence_must_match(self) -> "HypothesisArtifact":
+        ids = [item.id for item in self.hypotheses]
+        if len(ids) != len(set(ids)):
+            raise ValueError("improvement hypothesis IDs must be unique")
+        if self.invocation_evidence is not None:
+            if self.invocation_evidence.hypothesis_count != len(self.hypotheses):
+                raise ValueError("generator evidence hypothesis count mismatch")
+            expected = stable_sha256(
+                [item.model_dump(mode="json") for item in self.hypotheses]
+            )
+            if self.invocation_evidence.hypotheses_sha256 != expected:
+                raise ValueError("generator evidence hypothesis hash mismatch")
+        return self
 
 
 class OptimizationContext(FrozenModel):
@@ -235,6 +263,7 @@ class EvolutionReport(FrozenModel):
     schema_version: Literal["ase/evolution-report/v1alpha1"] = "ase/evolution-report/v1alpha1"
     evolution_id: UUID
     name: str
+    generator_identity: str = Field(default="legacy-unrecorded", min_length=1)
     context_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     hypotheses: Tuple[ImprovementHypothesis, ...]
     optimization_job_id: UUID
@@ -242,6 +271,7 @@ class EvolutionReport(FrozenModel):
     winner_candidate_id: UUID
     winner_skill_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     regression_gate: RegressionGateResult
+    generator_evidence: Optional[GeneratorInvocationEvidence] = None
     simulated: bool
     locked_test_accessed: Literal[False] = False
     claim_limit: str = Field(min_length=1)
@@ -397,8 +427,17 @@ class FailureGuidedSkillEvolution:
             eligible=tuple(item for item in decisions if item.eligible),
             excluded=tuple(item for item in decisions if not item.eligible),
         )
-        generator = DeterministicHypothesisGenerator(spec.generator.version)
-        hypotheses = generator.generate(context, spec.generator.max_hypotheses)
+        deterministic_generator: Optional[DeterministicHypothesisGenerator] = None
+        process_generator: Optional[ProcessHypothesisGenerator] = None
+        if spec.generator.type == "process":
+            try:
+                process_generator = ProcessHypothesisGenerator(spec.generator)
+            except (OSError, ValueError) as exc:
+                raise EvolutionError(f"invalid Process Generator: {exc}") from exc
+            generator_identity = process_generator.identity
+        else:
+            deterministic_generator = DeterministicHypothesisGenerator(spec.generator.version)
+            generator_identity = deterministic_generator.identity
         semantic_spec = spec.model_dump(
             mode="json",
             exclude={
@@ -409,6 +448,9 @@ class FailureGuidedSkillEvolution:
                 "regression_dev_path",
             },
         )
+        generator_spec = semantic_spec.get("generator")
+        if isinstance(generator_spec, dict):
+            generator_spec.pop("executable", None)
         evolution_id = uuid5(
             NAMESPACE_URL,
             "agentskill-eval:evolution:"
@@ -420,12 +462,76 @@ class FailureGuidedSkillEvolution:
                     "bundle": bundle_sha,
                     "validation_search": validation_sha,
                     "regression_dev": regression_sha,
-                    "generator": generator.identity,
+                    "generator": generator_identity,
                 }
             ),
         )
         output = self.workspace / "evolution-jobs" / str(evolution_id)
+        hypotheses_path = output / "hypotheses.json"
         regression_path = output / "regression-gate.json"
+        if hypotheses_path.exists():
+            artifact = HypothesisArtifact.model_validate_json(hypotheses_path.read_bytes())
+            if artifact.generator != generator_identity:
+                raise EvolutionError("persisted hypothesis generator identity mismatch")
+            if process_generator is not None:
+                request = self._process_request(base, context, spec.generator.max_hypotheses)
+                if artifact.invocation_evidence is None:
+                    raise EvolutionError("persisted Process Generator evidence is missing")
+                expected_request_sha = self._sha(canonical_json(request))
+                if artifact.invocation_evidence.request_sha256 != expected_request_sha:
+                    raise EvolutionError("persisted Process Generator request hash mismatch")
+            hypotheses = artifact.hypotheses
+        elif process_generator is not None:
+            request = self._process_request(base, context, spec.generator.max_hypotheses)
+            try:
+                generated = process_generator.generate(
+                    request,
+                    tuple(sorted({item.label for item in context.eligible}, key=lambda x: x.value)),
+                )
+            except ProcessGeneratorError as exc:
+                raise EvolutionError(str(exc)) from exc
+            hypotheses = tuple(
+                ImprovementHypothesis(
+                    id=item.id,
+                    failure_label=item.failure_label,
+                    hypothesis=item.hypothesis,
+                    instruction=item.instruction,
+                    evidence_refs=self._evidence_refs(context, item.failure_label),
+                    risks=item.risks,
+                )
+                for item in generated.proposals
+            )
+            evidence = generated.evidence.model_copy(
+                update={
+                    "hypotheses_sha256": stable_sha256(
+                        [item.model_dump(mode="json") for item in hypotheses]
+                    )
+                }
+            )
+            artifact = HypothesisArtifact(
+                generator=generator_identity,
+                hypotheses=hypotheses,
+                invocation_evidence=evidence,
+            )
+            self._write(hypotheses_path, artifact.model_dump(mode="json"))
+        else:
+            if deterministic_generator is None:
+                raise AssertionError("deterministic generator was not initialized")
+            hypotheses = deterministic_generator.generate(context, spec.generator.max_hypotheses)
+            artifact = HypothesisArtifact(
+                generator=generator_identity,
+                hypotheses=hypotheses,
+            )
+            self._write(hypotheses_path, artifact.model_dump(mode="json"))
+        frozen_inputs = (
+            (base, base_sha),
+            (manual, manual_sha),
+            (spec.failure_bundle_path, bundle_sha),
+            (spec.validation_search_path, validation_sha),
+            (spec.regression_dev_path, regression_sha),
+        )
+        if any(self._sha(path.read_bytes()) != expected for path, expected in frozen_inputs):
+            raise EvolutionError("Process Generator mutated a frozen evolution input")
         search_spec = OptimizationSearchSpec(
             schema_version="ase/optimization-search/v1alpha1",
             name=f"{spec.name}-generated-search",
@@ -472,22 +578,14 @@ class FailureGuidedSkillEvolution:
             status="AWAITING_INDEPENDENT_FINAL_EVALUATION",
         )
         context_path = output / "optimization-context.json"
-        hypotheses_path = output / "hypotheses.json"
         handoff_path = output / "final-evaluation-handoff.json"
         self._write(context_path, context.model_dump(mode="json"))
-        self._write(
-            hypotheses_path,
-            {
-                "schema_version": "ase/improvement-hypotheses/v1alpha1",
-                "generator": generator.identity,
-                "hypotheses": [item.model_dump(mode="json") for item in hypotheses],
-            },
-        )
         self._write(handoff_path, handoff.model_dump(mode="json"))
         self._write(regression_path, regression.model_dump(mode="json"))
         report = EvolutionReport(
             evolution_id=evolution_id,
             name=spec.name,
+            generator_identity=generator_identity,
             context_sha256=stable_sha256(context.model_dump(mode="json")),
             hypotheses=hypotheses,
             optimization_job_id=search.job.id,
@@ -495,6 +593,7 @@ class FailureGuidedSkillEvolution:
             winner_candidate_id=search.winner.id,
             winner_skill_sha256=search.winner.content_sha256,
             regression_gate=regression,
+            generator_evidence=artifact.invocation_evidence,
             simulated=search.job.simulated,
             claim_limit=(
                 "Validation-search engineering evidence only. The frozen candidate is not a "
@@ -523,6 +622,41 @@ class FailureGuidedSkillEvolution:
     def load(self, evolution_id: UUID) -> EvolutionReport:
         path = self.workspace / "evolution-jobs" / str(evolution_id) / "evolution-report.json"
         return EvolutionReport.model_validate_json(path.read_bytes())
+
+    @staticmethod
+    def _process_request(
+        base_skill: Path, context: OptimizationContext, max_hypotheses: int
+    ) -> Dict[str, object]:
+        return {
+            "schema_version": "ase/process-hypothesis-request/v1alpha1",
+            "source_split": "train",
+            "base_skill": {
+                "sha256": context.base_skill_sha256,
+                "content": base_skill.read_text(encoding="utf-8"),
+            },
+            "eligible_failures": [
+                item.model_dump(mode="json") for item in context.eligible
+            ],
+            "max_hypotheses": max_hypotheses,
+            "output_contract": (
+                "structured_hypotheses_only_no_case_answers_no_hidden_reasoning"
+            ),
+        }
+
+    @staticmethod
+    def _evidence_refs(
+        context: OptimizationContext, label: FailureLabel
+    ) -> Tuple[str, ...]:
+        refs = tuple(
+            sorted(
+                f"diagnosis://{item.run_id}/{item.rule_id}"
+                for item in context.eligible
+                if item.label == label
+            )
+        )
+        if not refs:
+            raise EvolutionError("Process Generator proposal has no eligible evidence")
+        return refs
 
     @staticmethod
     def _regression_gate(
@@ -650,6 +784,8 @@ class FailureGuidedSkillEvolution:
 td,th{{border:1px solid #aaa;padding:6px}}table{{border-collapse:collapse}}</style></head><body>
 <h1>Failure-Guided Skill Evolution</h1>
 <p><strong>Claim limit:</strong> {esc(report.claim_limit)}</p>
+<p>Generator: <code>{esc(report.generator_identity)}</code> · audited Process evidence:
+<strong>{esc(report.generator_evidence is not None)}</strong></p>
 <p>Evolution: <code>{esc(report.evolution_id)}</code></p><p>Winner: <code>
 {esc(report.winner_candidate_id)}</code> · <code>{esc(report.winner_skill_sha256)}</code></p>
 <p>Regression gate: <strong>{esc(report.regression_gate.passed)}</strong> · losses:
