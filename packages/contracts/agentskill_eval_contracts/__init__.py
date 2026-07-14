@@ -67,6 +67,14 @@ from agentskill_eval_contracts.optimizer import (
     SkillCandidateTransition,
     SkillLintResult,
 )
+from agentskill_eval_contracts.promotion import (
+    ALLOWED_PROMOTION_TRANSITIONS,
+    PromotionEvidenceRef,
+    PromotionStatus,
+    PromotionTransition,
+    SkillVersionManifest,
+    SkillVersionPromotion,
+)
 from agentskill_eval_contracts.real_evidence import (
     ExecutableSnapshot,
     RealAttemptEvidence,
@@ -116,6 +124,7 @@ __all__ = [
     "ALLOWED_ATTEMPT_TRANSITIONS",
     "ALLOWED_RUN_TRANSITIONS",
     "ALLOWED_SKILL_CANDIDATE_TRANSITIONS",
+    "ALLOWED_PROMOTION_TRANSITIONS",
     "SCHEMA_VERSION",
     "AgentSnapshot",
     "ArtifactEntry",
@@ -161,6 +170,9 @@ __all__ = [
     "PairClassification",
     "PairTraceDiff",
     "PriceSnapshot",
+    "PromotionEvidenceRef",
+    "PromotionStatus",
+    "PromotionTransition",
     "PublishedCase",
     "QualityGateResult",
     "ReplayBundleManifest",
@@ -188,6 +200,8 @@ __all__ = [
     "SkillCandidateStatus",
     "SkillCandidateTransition",
     "SkillLintResult",
+    "SkillVersionManifest",
+    "SkillVersionPromotion",
     "ToolSnapshot",
     "TraceAvailability",
     "TraceCapability",

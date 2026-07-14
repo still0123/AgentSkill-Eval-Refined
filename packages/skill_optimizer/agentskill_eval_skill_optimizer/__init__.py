@@ -56,6 +56,12 @@ from agentskill_eval_skill_optimizer.process_generator import (
     ProcessHypothesisProposal,
     ProcessHypothesisResponse,
 )
+from agentskill_eval_skill_optimizer.promotion import (
+    PromotionError,
+    SkillVersionPromotionCore,
+    SkillVersionPromotionStore,
+    SkillVersionPublication,
+)
 from agentskill_eval_skill_optimizer.real_evaluator import (
     RealAgentCandidateEvaluator,
     RealCandidateEvaluationError,
@@ -129,6 +135,7 @@ __all__ = [
     "RealAgentCandidateEvaluator",
     "RealCandidateEvaluationError",
     "RealEvaluationAuthorization",
+    "PromotionError",
     "SearchAlgorithmSpec",
     "SearchBudgetSpec",
     "SearchCase",
@@ -138,6 +145,9 @@ __all__ = [
     "SimulatedFinalDataset",
     "SkillSearchError",
     "SkillSearchResult",
+    "SkillVersionPromotionCore",
+    "SkillVersionPromotionStore",
+    "SkillVersionPublication",
     "ValidationSearchDataset",
     "build_evaluator",
 ]
