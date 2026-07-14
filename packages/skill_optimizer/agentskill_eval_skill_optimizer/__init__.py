@@ -31,6 +31,12 @@ from agentskill_eval_skill_optimizer.evolution import (
     RegressionDevDataset,
     RegressionGateResult,
 )
+from agentskill_eval_skill_optimizer.evolution_release import (
+    EvolutionEvidenceReleasePreparer,
+    EvolutionReleaseConfig,
+    EvolutionReleaseError,
+    EvolutionReleaseResult,
+)
 from agentskill_eval_skill_optimizer.failure_bridge import (
     FailureBridgeError,
     FailureBridgeReport,
@@ -119,6 +125,10 @@ __all__ = [
     "EvolutionError",
     "EvolutionHandoff",
     "EvolutionReport",
+    "EvolutionEvidenceReleasePreparer",
+    "EvolutionReleaseConfig",
+    "EvolutionReleaseError",
+    "EvolutionReleaseResult",
     "EvaluatorSpec",
     "FinalEvaluationCase",
     "FinalEvaluationError",

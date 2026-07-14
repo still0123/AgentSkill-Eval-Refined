@@ -18,8 +18,8 @@ AgentSkill-Eval 是一个面向 Agent Skill 的**评测、诊断与迭代优化�
 
 当前开发版在 RC1 基础上增加了跨仓库 Benchmark、真实 Agent 证据、多场景统一评测、
 Process Agent 接入、交互式 Action/Observation 循环、Failure-guided Skill Evolution 和受审计的
-Process Skill Proposal Generator、预算受控的 DeepSeek Skill Proposal Generator，以及
-Fake-evidence SkillVersion Promotion Workflow；
+Process Skill Proposal Generator、预算受控的 DeepSeek Skill Proposal Generator、
+Fake-evidence SkillVersion Promotion Workflow，以及 Stage 5A.2 离线 Evolution Evidence Release CLI；
 未完成能力会在下文明确标记。
 
 ## 项目的核心方向
@@ -86,6 +86,7 @@ without-Skill       Skill v1         Skill v2
 | Skill Version Regression | 比较 v1/v2 的改进、退化 Case 与成本变化 | 已有底层能力，真实发布工作流待阶段 3 证据 |
 | SkillVersion Promotion | handoff→confirmation→locked test→人工审核→不可变版本 | Stage 4b Fake/fixture 集成已完成，真实 v2 待阶段 3 证据 |
 | Evidence Release Prep | 脱敏报告、审计包校验、v1/v2 对比和不可变发布目录 | Stage 5 前置开发已完成，不运行 Agent |
+| Evolution Evidence Release CLI | 将 Promotion、终评、SkillVersion 与 Evolution 谱系打包为离线可验证发布目录 | Stage 5A.2 Fake/fixture CLI 已完成，不调用模型 |
 | Failure-guided Optimization | 从 train 失败诊断生成假设，经搜索与 regression_dev 门冻结候选 | 已实现 simulated MVP，独立 locked 终评不自动触发 |
 | Process Skill Proposal | 哈希/版本固定的本地进程根据脱敏 train 失败生成候选变异 | 已实现 Fake Process MVP，不代表真实 LLM 优化 |
 | DeepSeek Skill Proposal | 单次授权调用从 train 失败生成 3～5 个结构化候选，并冻结 prompt/schema/token/费用证据 | 代码与 Fake API 已实现；首次真实 train smoke 证据不足，proposal 未调用 |

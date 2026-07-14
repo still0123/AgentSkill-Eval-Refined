@@ -1939,3 +1939,22 @@ Secret 与隐藏推理不落盘。相同 Evolution 幂等重放会校验 request
 代码完成并不等于 Skill 已优化。Provider-backed proposal smoke 必须另行授权；生成的候选仍需真实
 Agent validation、regression 和阶段 4 的独立确认才能发布为不可变 Skill v2。详细协议见
 [`docs/deepseek-skill-proposal.md`](./docs/deepseek-skill-proposal.md)。
+
+---
+
+## 34. Stage 5A.2 Evidence Release CLI 实现状态
+
+Stage 5A.2 已将阶段 5 的发布准备能力接入统一 CLI。`evolution release prepare` 读取冻结的
+PromotionReleaseManifest、Skill v1/v2 Manifest、confirmation、locked test、人工审核、Evolution/
+Search 报告和发布 diff，验证父版本、候选、报告、审核和内容哈希后，原子生成固定名称的
+`evolution-release/` 目录。相同输入重复执行只验证并复用已有产物，不覆盖不可变文件。
+
+目录包含 JSON/离线 HTML 报告、Skill diff、Evidence Index、确定性 audit tar、README 和带 SHA-256
+sidecar 的 Release Manifest。`evolution release verify` 校验外层 Manifest、全部成员、Skill v2 parent
+关系和 tar 内层成员；`inspect` 先验证再输出受 claim limit 约束的摘要。Manifest、成员、父版本或审计
+包发生篡改都会失败关闭。
+
+当前实现只接受 Stage 4B 的 Fake／fixture Promotion，固定 `simulated=true` 和
+`evidence_class=simulated`，不会调用 DeepSeek、真实 Agent 或真实 final evaluation，也不会自动上传
+GitHub Release。协议与配置见
+[`docs/evolution-evidence-release-cli.md`](./docs/evolution-evidence-release-cli.md)。
