@@ -54,7 +54,7 @@ commit: e2febda Add audited Process Skill proposal generator
 | 0 | Integration Baseline | 合并 PR、RC tag | 否 | 已完成 |
 | 1 | Observed Failure Evidence Bridge | 真实 train FailureEvidenceBundle | 可先不产生 | 已完成 |
 | 2 | Real Optimizer Evaluator | 真实候选选择信号 | smoke 已授权执行 | 已完成 |
-| 3 | DeepSeek Skill Proposal | 真实模型生成的 3～5 个候选 | 是，需授权 | 代码完成，真实 smoke 待授权 |
+| 3 | DeepSeek Skill Proposal | 真实模型生成的 3～5 个候选 | 是，需授权 | train smoke 证据不足，proposal 未调用 |
 | 4 | SkillVersion Promotion | Confirm、Locked、Skill v2 Manifest | 终评需授权 | 待执行 |
 | 5 | Real Evolution Evidence Release | 完整 v1→v2 实验报告 | 是，需授权 | 待执行 |
 | 6 | Second Skill Family | MCP Skill 真实实证 | 可选 | 暂缓 |
@@ -309,13 +309,18 @@ CI：本地 Ruff、mypy、185 pytest、wheel 全部通过；GitHub CI 待推送
 ### 8.4 完成记录
 
 ```text
-Branch：
-Commit：
-PR：
-Generator model：
-候选数：
-Generator 费用：
-CI：
+Branch：codex/deepseek-skill-proposal-mvp
+Code commit：c45813c
+CI fix commit：cf050d3
+PR：https://github.com/ranmaoxia0123/AgentSkill-Eval/pull/10（Draft）
+Generator model：deepseek-v4-pro
+Train Experiment：41ff1ca2-ab2e-5990-b05b-70b7aa1f274d
+Train Runs：4（2 completed，2 invalid）
+Train Agent 费用：101266 / 300000 microusd
+Failure Bridge：INSUFFICIENT（0 eligible，1 ENVIRONMENT excluded）
+候选数：0；证据不足，proposal 按协议未调用
+Generator 费用：0 / 100000 microusd
+CI：Python、Dashboard、Secret Scan 全部通过
 ```
 
 ---

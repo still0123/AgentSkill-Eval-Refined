@@ -51,6 +51,9 @@ after the first stable release.
   Provider-backed candidate-selection evidence requires a separately authorized smoke run.
 - DeepSeek Fake API tests prove the proposal boundary and budget controls without paid calls; a
   Provider-backed proposal smoke remains separate evidence and does not prove candidate quality.
+- The first Provider-backed Stage 3 train smoke produced no eligible treatment failure: one pair
+  passed and one pair was invalid in both arms. The bridge returned `INSUFFICIENT`, so the authorized
+  proposal call was deliberately not consumed; this negative result is retained rather than relabeled.
 
 ## [0.1.0-rc1] - 2026-07-13
 
