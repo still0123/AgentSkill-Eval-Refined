@@ -315,9 +315,9 @@ CI fix commit：cf050d3
 PR：https://github.com/ranmaoxia0123/AgentSkill-Eval/pull/10（Draft）
 Generator model：deepseek-v4-pro
 Train Experiment：41ff1ca2-ab2e-5990-b05b-70b7aa1f274d
-Train Runs：4（2 completed，2 invalid）
-Train Agent 费用：101266 / 300000 microusd
-Failure Bridge：INSUFFICIENT（0 eligible；原始通用 ENVIRONMENT 经离线重放更正为 BUDGET）
+Train Runs：首次 4（2 completed，2 invalid）；工具预算修正后复跑 4（2 completed，2 invalid）
+Train Agent 费用：首次 101266 / 300000；复跑 100941 / 220000 microusd
+Failure Bridge：两次均 INSUFFICIENT；复跑 treatment 因 turn_limit invalid，仍无 eligible task failure
 候选数：0；证据不足，proposal 按协议未调用
 Generator 费用：0 / 100000 microusd
 CI：Python、Dashboard、Secret Scan 全部通过

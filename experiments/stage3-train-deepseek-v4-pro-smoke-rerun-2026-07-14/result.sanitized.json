@@ -1,0 +1,54 @@
+{
+  "schema_version": "ase/sanitized-stage3-train-result/v1alpha1",
+  "experiment_id": "8120329e-5ec1-575d-8977-6295cd0398e5",
+  "simulated": false,
+  "evidence_class": "observed_agent",
+  "provider": "deepseek",
+  "model": "deepseek-v4-pro",
+  "planned_agent_runs": 4,
+  "completed_agent_runs": 2,
+  "invalid_agent_runs": 2,
+  "agent_cost_microusd": 100941,
+  "agent_cost_limit_microusd": 220000,
+  "cases": [
+    {
+      "case_id": "more-itertools-islice-release",
+      "evidence_status": "both_arms_invalid",
+      "baseline_terminal_reason": "loop_detected",
+      "baseline_failure_label": "PLANNING",
+      "treatment_terminal_reason": "turn_limit",
+      "treatment_failure_label": "BUDGET"
+    },
+    {
+      "case_id": "cachetools-lru-missing-item",
+      "evidence_status": "both_arms_passed",
+      "baseline_pass_rate": 1.0,
+      "treatment_pass_rate": 1.0
+    }
+  ],
+  "failure_bridge": {
+    "status": "INSUFFICIENT",
+    "treatment_runs": 2,
+    "task_failed_runs": 0,
+    "eligible_findings": 0,
+    "excluded_findings": 1,
+    "corrected_excluded_label": "BUDGET",
+    "reason": "no eligible task-failure findings were observed in the Skill treatment arm"
+  },
+  "proposal": {
+    "authorized_calls": 1,
+    "calls_consumed": 0,
+    "authorized_cost_microusd": 100000,
+    "cost_microusd": 0,
+    "status": "NOT_RUN_INSUFFICIENT_TRAIN_EVIDENCE"
+  },
+  "diagnosis_correction": {
+    "method": "offline replay of immutable Runner results with explicit terminal-reason parser",
+    "raw_evidence_rewritten": false
+  },
+  "security": {
+    "raw_secret_values_committed": false
+  },
+  "replay_bundle_sha256": "8f1010acc5540dda4f8fc57998df23b8908e46e5415dd87c92b6841010aea2b3",
+  "claim_limit": "Two-case train smoke with one fully invalid pair; validates evidence gating only."
+}

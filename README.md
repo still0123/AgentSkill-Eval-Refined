@@ -170,6 +170,7 @@ pnpm run build
 - [DeepSeek smoke 脱敏记录](./experiments/real-deepseek-v4-pro-smoke-2026-07-13/README.md)
 - [DeepSeek evidence 脱敏记录](./experiments/real-deepseek-v4-pro-evidence-2026-07-13/README.md)
 - [Stage 3 train smoke 负结果](./experiments/stage3-train-deepseek-v4-pro-smoke-2026-07-14/README.md)
+- [Stage 3 train smoke 工具预算修正后复跑](./experiments/stage3-train-deepseek-v4-pro-smoke-rerun-2026-07-14/README.md)
 
 ## 跨仓库 Benchmark 证据
 

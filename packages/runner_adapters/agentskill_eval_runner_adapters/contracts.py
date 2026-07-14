@@ -20,6 +20,8 @@ class ExitReason(str, Enum):
     CASE_FAILED = "case_failed"
     EXECUTION_ERROR = "execution_error"
     BUDGET_EXHAUSTED = "budget_exhausted"
+    TURN_LIMIT = "turn_limit"
+    LOOP_DETECTED = "loop_detected"
     CLI_ERROR = "cli_error"
     TIMEOUT = "timeout"
     CANCELLED = "cancelled"

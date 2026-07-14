@@ -244,6 +244,12 @@ class RuleFailureDiagnoser:
                 "rule.timeout_or_budget",
                 f"The platform recorded a timeout or budget terminal reason: {code}.",
             )
+        if code == "loop_detected":
+            return (
+                FailureLabel.PLANNING,
+                "rule.observable_action_stagnation",
+                "The Agent runtime stopped an observable repeated-action loop.",
+            )
         if "judge" in code or "grader" in code:
             return (
                 FailureLabel.JUDGE,

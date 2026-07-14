@@ -47,8 +47,9 @@ Qwen smoke 还应禁用不必要的 `agent` 子 Agent，并设置 `maxWallTimeSe
 首轮真实 smoke 显示 12 turns 会让较难 Bug Fix Case 的双臂同时 invalid，因此当前示例冻结为
 24 turns、600k 会话 Token，同时继续保留 240 秒墙钟和 48 次工具调用硬门。顶层
 `agent.max_tool_calls` 必须与 Qwen HOME 配置中的 `model.maxToolCalls` 相等，避免审计 Manifest
-与实际 Agent 预算不一致。工具调用预算耗尽会单独记录为 `budget_exhausted`/`BUDGET`，不再误报为
-普通环境故障。
+与实际 Agent 预算不一致。工具调用预算、session-turn 上限和 action-stagnation 循环终止分别记录为
+`budget_exhausted`、`turn_limit` 和 `loop_detected`；前两者归入 `BUDGET`，最后一类只在 Runner
+明确报告重复动作时归入 `PLANNING`，不再笼统记为环境故障。
 
 真实数据集必须由 Automatic Benchmark Generation 发布：fixture 来自修复前 commit，oracle 在
 修复前失败、修复后通过，包含许可证和 provenance，离线可复现且版本不可变。当前 smoke 使用两个

@@ -58,6 +58,10 @@ after the first stable release.
 - Tool-call-limit exits are now parsed as `budget_exhausted` with the observed call count instead of
   generic `execution_error`; real-evidence specs freeze a separate `max_tool_calls` value and require
   Qwen's effective HOME setting to match it.
+- A second authorized train smoke with a 48-call limit still produced insufficient optimization
+  evidence: the hard Case hit action-stagnation/turn limits and the easy Case passed in both arms.
+  The proposal call remained unused; terminal reasons are now preserved as `loop_detected` and
+  `turn_limit` instead of generic infrastructure errors.
 
 ## [0.1.0-rc1] - 2026-07-13
 

@@ -24,6 +24,8 @@ _TOOL_BUDGET = re.compile(
     r"tool-call budget of (?P<limit>\d+) exceeded .*? observed (?P<observed>\d+)",
     re.IGNORECASE | re.DOTALL,
 )
+_TURN_LIMIT = re.compile(r"reached max session turns", re.IGNORECASE)
+_LOOP_DETECTED = re.compile(r"loop detection halted the run", re.IGNORECASE)
 
 
 def _optional_int(value: object) -> Optional[int]:
@@ -84,6 +86,10 @@ def parse_skill_up_result(
         reason = ExitReason.CASE_FAILED
     elif budget_match is not None:
         reason = ExitReason.BUDGET_EXHAUSTED
+    elif _TURN_LIMIT.search(error_text) is not None:
+        reason = ExitReason.TURN_LIMIT
+    elif _LOOP_DETECTED.search(error_text) is not None:
+        reason = ExitReason.LOOP_DETECTED
     else:
         reason = ExitReason.EXECUTION_ERROR
     grading = case.get("grading")
