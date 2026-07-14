@@ -51,7 +51,7 @@ commit: e2febda Add audited Process Skill proposal generator
 
 | 阶段 | 名称 | 核心产物 | 是否产生模型费用 | 状态 |
 |---|---|---|---|---|
-| 0 | Integration Baseline | 合并 PR、RC tag | 否 | 待执行 |
+| 0 | Integration Baseline | 合并 PR、RC tag | 否 | 已完成 |
 | 1 | Observed Failure Evidence Bridge | 真实 train FailureEvidenceBundle | 可先不产生 | 待执行 |
 | 2 | Real Optimizer Evaluator | 真实候选选择信号 | smoke 需授权 | 待执行 |
 | 3 | DeepSeek Skill Proposal | 真实模型生成的 3～5 个候选 | 是，需授权 | 待执行 |
@@ -102,11 +102,11 @@ codex/audited-process-skill-proposal-mvp
 ### 5.4 完成记录
 
 ```text
-PR：
-Merge commit：
-Tag：
-CI：
-完成日期：
+PR：https://github.com/ranmaoxia0123/AgentSkill-Eval/pull/5
+Merge commit：a4552daa6473611a010456050e551b212d991d5a
+Tag：v0.2.0-rc1
+CI：Python、Dashboard、wheel、Secret Scan 全部通过
+完成日期：2026-07-14
 ```
 
 ---
