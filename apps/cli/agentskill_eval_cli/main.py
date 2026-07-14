@@ -54,11 +54,13 @@ from agentskill_eval_real_evidence import (
 from agentskill_eval_scenarios import UnifiedScenarioRunner, UnifiedScenarioSpec
 from agentskill_eval_skill_optimizer import (
     BenchmarkGuidedSkillSearch,
+    FailureBridgeError,
     FailureGuidedEvolutionSpec,
     FailureGuidedSkillEvolution,
     FinalEvaluationStore,
     IndependentFinalEvaluationSpec,
     IndependentFinalEvaluator,
+    ObservedFailureEvidenceBridge,
     OptimizationSearchSpec,
     OptimizationStore,
 )
@@ -580,6 +582,50 @@ def optimize_search(
                 "winner_id": str(result.winner.id),
                 "winner_name": result.winner.name,
             },
+            sort_keys=True,
+        )
+    )
+
+
+@optimize_app.command("prepare-failures")
+def optimize_prepare_failures(
+    workspace: Path = typer.Argument(  # noqa: B008
+        ..., exists=True, file_okay=False, help="Workspace containing an observed experiment."
+    ),
+    experiment_id: UUID = typer.Argument(  # noqa: B008
+        ..., help="Completed observed-Agent Skill v1 experiment UUID."
+    ),
+    output: Path = typer.Option(  # noqa: B008
+        ..., "--output", dir_okay=False, help="Destination train FailureEvidenceBundle YAML."
+    ),
+    review: Optional[Path] = typer.Option(  # noqa: B008
+        None,
+        "--review",
+        exists=True,
+        dir_okay=False,
+        help="Optional include/exclude and label-override YAML.",
+    ),
+) -> None:
+    """Export trace-linked Skill treatment failures for failure-guided evolution."""
+    try:
+        result = ObservedFailureEvidenceBridge(workspace).prepare(
+            experiment_id, output, review_path=review
+        )
+    except FailureBridgeError as exc:
+        raise typer.BadParameter(str(exc), param_hint="EXPERIMENT_ID") from exc
+    typer.echo(
+        json.dumps(
+            {
+                "audit_report": str(result.report_path),
+                "bundle": str(result.bundle_path) if result.bundle_path else None,
+                "cluster_count": len(result.report.clusters),
+                "eligible_findings": len(result.report.eligible),
+                "excluded_findings": len(result.report.excluded),
+                "experiment_id": str(result.report.experiment_id),
+                "insufficiency_reason": result.report.insufficiency_reason,
+                "status": result.report.status,
+            },
+            ensure_ascii=False,
             sort_keys=True,
         )
     )

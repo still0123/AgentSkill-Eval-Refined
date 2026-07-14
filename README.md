@@ -85,6 +85,7 @@ without-Skill       Skill v1         Skill v2
 | Skill Version Regression | 比较 v1/v2 的改进、退化 Case 与成本变化 | 已有底层能力，统一工作流待完善 |
 | Failure-guided Optimization | 从 train 失败诊断生成假设，经搜索与 regression_dev 门冻结候选 | 已实现 simulated MVP，独立 locked 终评不自动触发 |
 | Process Skill Proposal | 哈希/版本固定的本地进程根据脱敏 train 失败生成候选变异 | 已实现 Fake Process MVP，不代表真实 LLM 优化 |
+| Observed Failure Bridge | 从真实 Skill treatment Run 导出可追溯的 train failure bundle | 已实现，不调用模型 |
 | Dashboard | 查看已冻结的报告、Trace、W/T/L 和候选状态 | 本地只读版 |
 
 `simulated` 只证明评测管线可用，不能当作真实模型能力证据。
@@ -269,6 +270,7 @@ docs/                    模块级设计和操作文档
 | Skill 搜索与独立终评 | [Skill Search](./docs/benchmark-guided-skill-search.md) / [Final Evaluation](./docs/independent-final-evaluation.md) |
 | 失败驱动 Skill 演化 | [Failure-Guided Skill Evolution](./docs/failure-guided-skill-evolution.md) |
 | 受审计的 Process 候选生成 | [Process Skill Proposal Generator](./docs/audited-process-skill-proposal-generator.md) |
+| 真实失败证据桥接 | [Observed Failure Evidence Bridge](./docs/observed-failure-evidence-bridge.md) |
 | 真实 Agent 评测 | [Real Agent Evidence](./docs/real-agent-evidence.md) |
 | MCP / Memory-RAG 专项 Lab | [MCP Lab](./docs/mcp-tool-evaluation.md) / [Memory-RAG Lab](./docs/memory-rag-evaluation.md) |
 | 跨场景统一入口和结果协议 | [Unified Multi-Scenario Evaluation](./docs/unified-multi-scenario-evaluation.md) |
