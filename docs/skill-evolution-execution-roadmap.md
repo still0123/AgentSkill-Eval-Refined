@@ -52,7 +52,7 @@ commit: e2febda Add audited Process Skill proposal generator
 | 阶段 | 名称 | 核心产物 | 是否产生模型费用 | 状态 |
 |---|---|---|---|---|
 | 0 | Integration Baseline | 合并 PR、RC tag | 否 | 已完成 |
-| 1 | Observed Failure Evidence Bridge | 真实 train FailureEvidenceBundle | 可先不产生 | 待执行 |
+| 1 | Observed Failure Evidence Bridge | 真实 train FailureEvidenceBundle | 可先不产生 | 已完成 |
 | 2 | Real Optimizer Evaluator | 真实候选选择信号 | smoke 需授权 | 待执行 |
 | 3 | DeepSeek Skill Proposal | 真实模型生成的 3～5 个候选 | 是，需授权 | 待执行 |
 | 4 | SkillVersion Promotion | Confirm、Locked、Skill v2 Manifest | 终评需授权 | 待执行 |
@@ -164,12 +164,12 @@ agentskill-eval optimize prepare-failures WORKSPACE EXPERIMENT_ID \
 ### 6.4 完成记录
 
 ```text
-Branch：
-Commit：
-PR：
-真实 Experiment：
-Eligible findings/clusters：
-CI：
+Branch：codex/observed-failure-bridge-mvp
+Commit：8f55849 Add observed failure evidence bridge
+PR：https://github.com/ranmaoxia0123/AgentSkill-Eval/pull/7
+真实 Experiment：282b1e61-8045-56c8-8806-30054d747b18
+Eligible findings/clusters：真实实验 0/0（INSUFFICIENT）；observed fixture 3/3
+CI：Ruff、mypy、182 pytest、wheel、Dashboard、Secret Scan 全部通过
 ```
 
 ---
