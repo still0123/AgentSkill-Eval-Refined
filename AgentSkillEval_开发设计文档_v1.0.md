@@ -1168,6 +1168,27 @@ base 与唯一 winner 内容哈希，然后在单一 split DatasetVersion 上执
 缺陷组数量、退化门结果和明确 claim limit。模拟模式只能证明控制器工程闭环，不能成为
 Agent 性能证据。详细协议见 `docs/independent-final-evaluation.md`。
 
+### 10.10 SkillVersion Promotion Core 实现基线（阶段 4A，2026-07-14）
+
+在不接入阶段 3 真实 winner、不执行真实 confirmation／locked test 的前提下，阶段 4A 已完成
+可独立验证的 Promotion 前置框架：
+
+- 新增 `SkillVersionPromotion`、`PromotionEvidenceRef` 与不可变
+  `SkillVersionManifest` 契约；
+- 实现 `validation_confirm → locked_test → approve/reject → publish` 状态机；
+- 对证据顺序、重复 stage、base/winner hash 和 `CONFIRMED` 决策执行硬门禁；
+- 发布时冻结 `SKILL.md`、v1/v2 diff、Manifest 和 SHA-256 sidecar，禁止覆盖已发布版本；
+- 发布冲突或写入失败进入 `REJECTED`，同一 Promotion 的一致重放保持幂等；
+- Fake winner 单元和集成测试明确标记 `simulated_evidence=true`，只能证明控制器闭环。
+
+同时新增阶段 3～5 数据 split 隔离审计，按 Case ID、repository、fork lineage、patch
+family 和 independence group 拒绝 `train`、`regression_dev`、`validation_search`、
+`validation_confirm`、`locked_test` 之间的交叉污染。
+
+阶段 4A 不等于完整阶段 4。真实 v2 发布仍须等待阶段 3 冻结真实 winner，并依次取得独立
+`validation_confirm`、一次性 `locked_test` 和人工审批。详细协议见
+`docs/skill-version-promotion.md` 与 `docs/dataset-preparation-stage3-5.md`。
+
 ---
 
 ## 11. MCP 工具评测
