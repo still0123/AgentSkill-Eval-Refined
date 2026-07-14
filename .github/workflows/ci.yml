@@ -50,8 +50,8 @@ jobs:
               raise SystemExit("empty or duplicate public schema names")
           print(f"validated {len(schemas)} public schemas")
           PY
-      - name: Build wheel
-        run: python -m build --wheel
+      - name: Build release distributions
+        run: python -m build --wheel --sdist
       - name: Verify installed wheel layout
         run: |
           python -m venv /tmp/agentskill-eval-wheel
@@ -71,8 +71,10 @@ jobs:
           PY
       - uses: actions/upload-artifact@v4
         with:
-          name: python-wheel
-          path: dist/*.whl
+          name: python-distributions
+          path: |
+            dist/*.whl
+            dist/*.tar.gz
           if-no-files-found: error
 
   dashboard:
