@@ -90,6 +90,25 @@ class SearchCaseResult(FrozenModel):
     output_tokens: int = Field(ge=0)
     latency_ms: int = Field(ge=0)
     cost_microusd: Optional[int] = Field(default=None, ge=0)
+    outcome: Optional[Literal["pass", "fail", "invalid"]] = None
+    experiment_id: Optional[UUID] = None
+    run_id: Optional[UUID] = None
+    attempt_id: Optional[UUID] = None
+    trace_ref: Optional[str] = None
+    failure_diagnosis_ref: Optional[str] = None
+
+    @model_validator(mode="after")
+    def real_evidence_is_consistent(self) -> "SearchCaseResult":
+        if self.outcome == "pass" and not self.passed:
+            raise ValueError("pass outcome requires passed=true")
+        if self.outcome in {"fail", "invalid"} and self.passed:
+            raise ValueError(f"{self.outcome} outcome requires passed=false")
+        evidence_ids = (self.experiment_id, self.run_id, self.attempt_id)
+        if any(value is not None for value in evidence_ids) and not all(
+            value is not None for value in evidence_ids
+        ):
+            raise ValueError("real evaluator evidence IDs must be complete")
+        return self
 
 
 class CandidateEvaluation(FrozenModel):

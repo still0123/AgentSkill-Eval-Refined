@@ -42,8 +42,9 @@ class SearchBudgetSpec(StrictModel):
 
 
 class EvaluatorSpec(StrictModel):
-    type: Literal["simulated_keyword", "process"]
+    type: Literal["simulated_keyword", "process", "real_agent"]
     command: Tuple[str, ...] = ()
+    real_agent_config_path: Optional[Path] = None
     version: str = Field(min_length=1)
     simulated: bool
 
@@ -51,10 +52,16 @@ class EvaluatorSpec(StrictModel):
     def process_requires_command(self) -> "EvaluatorSpec":
         if self.type == "process" and not self.command:
             raise ValueError("process evaluator requires command")
-        if self.type == "simulated_keyword" and self.command:
-            raise ValueError("simulated evaluator cannot declare a command")
+        if self.type != "process" and self.command:
+            raise ValueError("only process evaluator may declare a command")
+        if self.type == "real_agent" and self.real_agent_config_path is None:
+            raise ValueError("real_agent evaluator requires real_agent_config_path")
+        if self.type != "real_agent" and self.real_agent_config_path is not None:
+            raise ValueError("only real_agent evaluator may declare real_agent_config_path")
         if self.type == "simulated_keyword" and not self.simulated:
             raise ValueError("simulated_keyword evaluator must declare simulated=true")
+        if self.type == "real_agent" and self.simulated:
+            raise ValueError("real_agent evaluator must declare simulated=false")
         return self
 
 
@@ -83,7 +90,24 @@ class OptimizationSearchSpec(StrictModel):
     def load(cls, path: Path) -> "OptimizationSearchSpec":
         try:
             payload = yaml.safe_load(path.read_text(encoding="utf-8"))
-            return cls.model_validate(payload)
+            spec = cls.model_validate(payload)
+            root = path.resolve(strict=True).parent
+
+            def resolved(value: Path) -> Path:
+                return value if value.is_absolute() else (root / value).resolve()
+
+            evaluator = spec.evaluator
+            if evaluator.real_agent_config_path is not None:
+                evaluator = evaluator.model_copy(
+                    update={
+                        "real_agent_config_path": resolved(evaluator.real_agent_config_path)
+                    }
+                )
+            return spec.model_copy(
+                update={
+                    "evaluator": evaluator,
+                }
+            )
         except (OSError, yaml.YAMLError, ValueError) as exc:
             raise SearchSpecError(f"invalid optimization spec {path}: {exc}") from exc
 

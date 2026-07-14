@@ -30,6 +30,10 @@ from agentskill_eval_contracts import (
 from agentskill_eval_experiment.storage.atomic import AtomicFileWriter
 from agentskill_eval_experiment.storage.manifests import load_model, model_bytes
 from agentskill_eval_skill_optimizer.evaluator import CandidateEvaluator, build_evaluator
+from agentskill_eval_skill_optimizer.real_evaluator import (
+    RealAgentCandidateEvaluator,
+    RealEvaluationAuthorization,
+)
 from agentskill_eval_skill_optimizer.spec import (
     MutationSpec,
     OptimizationSearchSpec,
@@ -109,9 +113,15 @@ class BenchmarkGuidedSkillSearch:
     """Generate candidates, halve on validation subsets, and freeze one Pareto winner."""
 
     def __init__(self, workspace: Path) -> None:
+        self.workspace = workspace.resolve()
         self.store = OptimizationStore(workspace)
 
-    def run(self, spec: OptimizationSearchSpec) -> SkillSearchResult:
+    def run(
+        self,
+        spec: OptimizationSearchSpec,
+        *,
+        real_authorization: Optional[RealEvaluationAuthorization] = None,
+    ) -> SkillSearchResult:
         base_content = self._read_markdown_skill(spec.base_skill_path)
         manual_content = self._read_markdown_skill(spec.manual_skill_path)
         validation_source = spec.validation_search_path.resolve(strict=True)
@@ -153,11 +163,21 @@ class BenchmarkGuidedSkillSearch:
             )
             dataset_sha = loaded.dataset_sha256
             curated_source = validation_source
-        evaluator = build_evaluator(spec.evaluator, dataset)
+        evaluator = build_evaluator(
+            spec.evaluator,
+            dataset,
+            workspace=self.workspace,
+            real_authorization=real_authorization,
+        )
         semantic_spec = spec.model_dump(
             mode="json",
             exclude={"base_skill_path", "manual_skill_path", "validation_search_path"},
         )
+        evaluator_spec = semantic_spec.get("evaluator")
+        if isinstance(evaluator_spec, dict) and evaluator_spec.get(
+            "real_agent_config_path"
+        ) is None:
+            evaluator_spec.pop("real_agent_config_path", None)
         spec_sha = stable_sha256(semantic_spec)
         identity = {
             "spec": spec_sha,
@@ -170,6 +190,19 @@ class BenchmarkGuidedSkillSearch:
         if self.store.job_dir(job_id).exists():
             return self._load_completed(job_id)
         definitions = self._candidate_definitions(spec, base_content, manual_content)
+        if isinstance(evaluator, RealAgentCandidateEvaluator):
+            if spec.search.subset_size % 2 or (
+                len(dataset.cases) - spec.search.subset_size
+            ) % 2:
+                raise SkillSearchError(
+                    "real Agent search requires even subset and remaining Case counts"
+                )
+            unique_candidate_cases = (
+                len(definitions) * spec.search.subset_size
+                + (3 + spec.search.promote_search_candidates)
+                * (len(dataset.cases) - spec.search.subset_size)
+            )
+            evaluator.authorize_plan(unique_candidate_cases)
         candidate_ids = tuple(
             uuid5(job_id, f"candidate:{origin.value}:{name}:{_sha256(content)}")
             for name, origin, _parent, _mutations, content in definitions
@@ -751,6 +784,20 @@ class BenchmarkGuidedSkillSearch:
                     "full_pass_rate": None if full is None else full.pass_rate,
                     "full_mean_score": None if full is None else full.mean_score,
                     "full_tokens": None if full is None else full.total_tokens,
+                    "full_latency_ms": None if full is None else full.total_latency_ms,
+                    "full_cost_microusd": (
+                        None if full is None else full.total_cost_microusd
+                    ),
+                    "invalid_cases": (
+                        []
+                        if full is None
+                        else [
+                            item.case_id for item in full.results if item.outcome == "invalid"
+                        ]
+                    ),
+                    "evaluations": [
+                        item.model_dump(mode="json") for item in candidate.evaluations
+                    ],
                     "pareto_dominated_by": [str(item) for item in candidate.pareto_dominated_by],
                     "elimination_reason": candidate.elimination_reason,
                 }

@@ -11,7 +11,11 @@ import pytest
 import yaml
 from typer.testing import CliRunner
 
-from agentskill_eval_benchmark_gen import AutomaticBenchmarkGenerator, BenchmarkGenerationSpec
+from agentskill_eval_benchmark_gen import (
+    AutomaticBenchmarkGenerator,
+    BenchmarkGenerationSpec,
+    DatasetLoader,
+)
 from agentskill_eval_cli.main import app
 from agentskill_eval_contracts import (
     RealAttemptEvidence,
@@ -19,6 +23,7 @@ from agentskill_eval_contracts import (
     RealEvidenceStatus,
     RealRunMode,
     ReviewDecision,
+    SearchEvaluationStage,
 )
 from agentskill_eval_experiment import LocalExperimentStore, ReplayBundleWriter
 from agentskill_eval_real_evidence import (
@@ -32,6 +37,12 @@ from agentskill_eval_real_evidence import (
     RealEvidenceReportWriter,
     RealPreflightError,
     RunnerSpec,
+)
+from agentskill_eval_skill_optimizer import (
+    RealAgentCandidateEvaluator,
+    RealCandidateEvaluationError,
+    RealEvaluationAuthorization,
+    SearchCase,
 )
 
 PROJECT = Path(__file__).resolve().parents[2]
@@ -391,3 +402,127 @@ def test_invalid_process_results_never_become_success_evidence(
     assert result.manifest.status == RealEvidenceStatus.COMPLETED
     assert result.manifest.invalid_runs == 4
     assert result.report is not None and result.report.invalid_runs == 4
+
+
+def test_real_candidate_evaluator_reuses_observed_runtime_and_case_cache(
+    published_dataset: Path, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    counter = tmp_path / "optimizer-calls.txt"
+    _set_fake_secrets(monkeypatch, counter)
+    observed = _spec(published_dataset).model_copy(
+        update={"evidence_class": RealEvidenceClass.OBSERVED_AGENT, "simulated": False}
+    )
+    config = tmp_path / "real-optimizer.yaml"
+    config.write_text(
+        yaml.safe_dump(observed.model_dump(mode="json"), sort_keys=False), encoding="utf-8"
+    )
+    authorization = RealEvaluationAuthorization(
+        confirm_real_run=True,
+        max_cost_microusd=1_000,
+        max_agent_runs=4,
+    )
+    evaluator = RealAgentCandidateEvaluator(config, tmp_path / "workspace", authorization)
+    cases = tuple(SearchCase(id=case_id) for case_id in CASE_IDS)
+    candidate = SKILL / "SKILL.md"
+
+    search_config = tmp_path / "real-search.yaml"
+    search_config.write_text(
+        yaml.safe_dump(
+            {
+                "schema_version": "ase/optimization-search/v1alpha1",
+                "name": "real optimizer gate test",
+                "base_skill_path": str(SKILL),
+                "manual_skill_path": str(SKILL),
+                "validation_search_path": str(published_dataset),
+                "mutations": [
+                    {
+                        "id": f"candidate-{index}",
+                        "hypothesis": f"Candidate hypothesis number {index} is explicit.",
+                        "instruction": f"Apply candidate instruction number {index} carefully.",
+                    }
+                    for index in range(1, 4)
+                ],
+                "search": {
+                    "algorithm": "successive_halving",
+                    "subset_size": 2,
+                    "promote_search_candidates": 1,
+                    "random_seed": 7,
+                },
+                "budget": {"max_candidate_case_evaluations": 20, "timeout_seconds": 30},
+                "evaluator": {
+                    "type": "real_agent",
+                    "real_agent_config_path": str(config),
+                    "version": "test-v1",
+                    "simulated": False,
+                },
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    refused_cli = CliRunner().invoke(
+        app,
+        ["optimize", "search", str(search_config), "--workspace", str(tmp_path / "cli")],
+    )
+    assert refused_cli.exit_code == 2
+    assert "--confirm-real-run" in refused_cli.output
+    assert not counter.exists()
+
+    refused = RealAgentCandidateEvaluator(
+        config,
+        tmp_path / "refused-workspace",
+        RealEvaluationAuthorization(
+            confirm_real_run=True,
+            max_cost_microusd=1_000,
+            max_agent_runs=2,
+        ),
+    )
+    with pytest.raises(RealCandidateEvaluationError, match="requires 4 Agent Runs"):
+        refused.authorize_plan(2)
+    assert not counter.exists()
+
+    first = evaluator.evaluate(
+        candidate,
+        published_dataset / "dataset.yaml",
+        DatasetLoader().load(published_dataset).dataset_sha256,
+        cases,
+        SearchEvaluationStage.SUBSET,
+        30,
+    )
+    replay = evaluator.evaluate(
+        candidate,
+        published_dataset / "dataset.yaml",
+        DatasetLoader().load(published_dataset).dataset_sha256,
+        cases,
+        SearchEvaluationStage.FULL,
+        30,
+    )
+
+    assert first.simulated is False
+    assert all(item.outcome == "pass" for item in first.results)
+    assert all(item.trace_ref and Path(item.trace_ref).is_file() for item in first.results)
+    assert all(item.experiment_id and item.run_id and item.attempt_id for item in first.results)
+    assert replay.results == first.results
+    assert counter.read_text(encoding="utf-8") == "4"
+    assert authorization.consumed_agent_runs == 4
+
+    search_run = CliRunner().invoke(
+        app,
+        [
+            "optimize",
+            "search",
+            str(search_config),
+            "--workspace",
+            str(tmp_path / "real-search-workspace"),
+            "--confirm-real-run",
+            "--max-cost-microusd",
+            "10000",
+            "--max-agent-runs",
+            "24",
+        ],
+        terminal_width=240,
+    )
+    assert search_run.exit_code == 1
+    assert isinstance(search_run.exception, Exception)
+    assert "no search-origin candidate" in str(search_run.exception)
+    assert counter.read_text(encoding="utf-8") == "24"

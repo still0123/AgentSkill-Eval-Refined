@@ -29,9 +29,9 @@ quality_gate:
   max_repository_files: 5000
   max_repository_bytes: 50000000
 budget:
-  max_candidates: 4
-  max_commands: 48
-  wall_seconds: 1200
+  max_candidates: 10
+  max_commands: 120
+  wall_seconds: 3000
 candidates:
   - key: more-itertools-last-reversed-none
     source_key: more-itertools
@@ -119,3 +119,302 @@ candidates:
     alternative_patch: "diff --git a/cachetools/keys.py b/cachetools/keys.py\nindex adb9dad..623ee3a 100644\n--- a/cachetools/keys.py\n+++ b/cachetools/keys.py\n@@ -2,6 +2,8 @@\n \n from __future__ import absolute_import\n \n+import enum\n+\n __all__ = ('hashkey', 'typedkey')\n \n \n@@ -21,8 +23,15 @@ class _HashedTuple(tuple):\n     def __radd__(self, other, add=tuple.__add__):\n         return _HashedTuple(add(other, self))\n \n+    def __reduce__(self):\n+        return (_HashedTuple, (tuple(self),))\n+\n+\n+class _KeywordMarker(enum.Enum):\n+    separator = 0\n+\n \n-_kwmark = (object(),)\n+_kwmark = (_KeywordMarker.separator,)\n \n \n def hashkey(*args, **kwargs):\n"
     category: positive
     tags: [python, regression, pickle, cache-key]
+  - key: more-itertools-islice-release
+    source_key: more-itertools
+    provenance_family: islice-negative-stop-lifetime
+    before_commit: 569e0ad654a85c77581b318305edc2eb7c4068ae
+    after_commit: a16e9c1c9b06747be55a7e301f279f8fac77693e
+    task: >-
+      Fix islice_extended with a negative stop and positive step so consumed objects are released
+      promptly instead of being retained for one extra generator step. Preserve slice output.
+    issue_url: https://github.com/more-itertools/more-itertools/commit/a16e9c1c9b06747be55a7e301f279f8fac77693e
+    production_paths: [more_itertools/more.py]
+    regression_test_paths: [tests/test_more.py]
+    test_command: ["${PYTHON}", -m, unittest, tests.test_more.IsliceExtendedTests.test_elements_lifecycle]
+    alternative_patch: |
+      diff --git a/more_itertools/more.py b/more_itertools/more.py
+      index 13574c1..f433c62 100755
+      --- a/more_itertools/more.py
+      +++ b/more_itertools/more.py
+      @@ -2633,7 +2633,7 @@ def _islice_helper(it, s):
+
+                   for index in range(n):
+                       if index % step == 0:
+      -                    # pop and yield the item.
+      +                    # Pop directly so the generator frame cannot retain the item.
+                           # We don't want to use an intermediate variable
+                           # it would extend the lifetime of the current item
+                           yield cache.popleft()[1]
+      @@ -2649,9 +2649,14 @@ def _islice_helper(it, s):
+                   cache = deque(islice(it, -stop), maxlen=-stop)
+
+                   for index, item in enumerate(it):
+      -                cached_item = cache.popleft()
+                       if index % step == 0:
+      -                    yield cached_item
+      +                    # Pop directly so the generator frame cannot retain the item.
+      +                    # We don't want to use an intermediate variable
+      +                    # it would extend the lifetime of the current item
+      +                    yield cache.popleft()
+      +                else:
+      +                    # just pop and discard the item
+      +                    cache.popleft()
+                       cache.append(item)
+               else:
+                   # When both start and stop are positive we have the normal case
+    category: robustness
+    tags: [python, regression, iterator, memory]
+  - key: cachetools-cachedmethod-bound-key
+    source_key: cachetools
+    provenance_family: cachedmethod-bound-cache-key
+    before_commit: 98ec79ff8be24ce1346d6a96602f11ccbda4f76f
+    after_commit: 18e5930ced2cf107c273b81d949dbab8ce3f48e1
+    task: >-
+      Fix cachedmethod cache_key introspection so the exposed callable is bound to the instance
+      and accepts the same arguments as the decorated method.
+    issue_url: https://github.com/tkem/cachetools/issues/218
+    production_paths: [src/cachetools/_cachedmethod.py]
+    regression_test_paths: [tests/test_cachedmethod.py]
+    test_command: ["${PYTHON}", -m, unittest, tests.test_cachedmethod.CacheMethodTest.test_decorator_attributes]
+    alternative_patch: |
+      diff --git a/src/cachetools/_cachedmethod.py b/src/cachetools/_cachedmethod.py
+      index 9a7a20d..185f1e6 100644
+      --- a/src/cachetools/_cachedmethod.py
+      +++ b/src/cachetools/_cachedmethod.py
+      @@ -48,7 +48,7 @@ class _WrapperBase:
+
+           @property
+           def cache_key(self):
+      -        return self.__key
+      +        return functools.partial(self.__key, self._obj)  # bound alternative
+
+           @property
+           def cache_lock(self):
+      @@ -153,7 +153,7 @@ def _condition_info(method, cache, key, lock, cond, info):
+                       cache = self.cache
+                       lock = self.cache_lock
+                       cond = self.cache_condition
+      -                key = self.cache_key(self._obj, *args, **kwargs)
+      +                key = self.cache_key(*args, **kwargs)
+
+                       with lock:
+                           cond.wait_for(lambda: key not in self.__pending)
+      @@ -199,7 +199,7 @@ def _locked_info(method, cache, key, lock, info):
+                   def __call__(self, *args, **kwargs):
+                       cache = self.cache
+                       lock = self.cache_lock
+      -                key = self.cache_key(self._obj, *args, **kwargs)
+      +                key = self.cache_key(*args, **kwargs)
+                       with lock:
+                           try:
+                               result = cache[key]
+      @@ -238,7 +238,7 @@ def _unlocked_info(method, cache, key, info):
+
+                   def __call__(self, *args, **kwargs):
+                       cache = self.cache
+      -                key = self.cache_key(self._obj, *args, **kwargs)
+      +                key = self.cache_key(*args, **kwargs)
+                       try:
+                           result = cache[key]
+                           self.__hits += 1
+    category: positive
+    tags: [python, regression, descriptor, introspection]
+  - key: cachetools-cachedmethod-self-key
+    source_key: cachetools
+    provenance_family: cachedmethod-custom-key-self
+    before_commit: 0e778e4410641af906930877c14f12f592d16fe2
+    after_commit: 9dda91f99b2adc5aec772bae24908dbb31fdb130
+    task: >-
+      Fix cachedmethod so custom key functions receive the instance while the default key remains
+      compatible with unhashable instances.
+    issue_url: https://github.com/tkem/cachetools/issues/159
+    production_paths: [src/cachetools/__init__.py]
+    regression_test_paths: [tests/test_method.py]
+    test_command: ["${PYTHON}", -m, unittest, tests.test_method.CachedMethodTest.test_unhashable]
+    alternative_patch: |
+      diff --git a/src/cachetools/__init__.py b/src/cachetools/__init__.py
+      index d8b4922..f0a3177 100644
+      --- a/src/cachetools/__init__.py
+      +++ b/src/cachetools/__init__.py
+      @@ -22,7 +22,11 @@ import heapq
+       import random
+       import time
+
+      -from .keys import hashkey
+      +from .keys import hashkey as _defaultkey
+      +
+      +
+      +def _methodkey(_instance, *args, **kwargs):
+      +    return _defaultkey(*args, **kwargs)
+
+
+       class _DefaultSize:
+      @@ -615,7 +619,7 @@ class TLRUCache(_TimedCache):
+               return value
+
+
+      -def cached(cache, key=hashkey, lock=None):
+      +def cached(cache, key=_defaultkey, lock=None):
+           """Decorator to wrap a function with a memoizing callable that saves
+           results in a cache.
+
+      @@ -664,7 +668,7 @@ def cached(cache, key=hashkey, lock=None):
+           return decorator
+
+
+      -def cachedmethod(cache, key=hashkey, lock=None):
+      +def cachedmethod(cache, key=_methodkey, lock=None):
+           """Decorator to wrap a class or instance method with a memoizing
+           callable that saves results in a cache.
+
+      @@ -677,7 +681,7 @@ def cachedmethod(cache, key=hashkey, lock=None):
+                       c = cache(self)
+                       if c is None:
+                           return method(self, *args, **kwargs)
+      -                k = key(*args, **kwargs)
+      +                k = key(self, *args, **kwargs)
+                       try:
+                           return c[k]
+                       except KeyError:
+      @@ -695,7 +699,7 @@ def cachedmethod(cache, key=hashkey, lock=None):
+                       c = cache(self)
+                       if c is None:
+                           return method(self, *args, **kwargs)
+      -                k = key(*args, **kwargs)
+      +                k = key(self, *args, **kwargs)
+                       try:
+                           with lock(self):
+                               return c[k]
+    category: positive
+    tags: [python, regression, caching, custom-key]
+  - key: cachetools-ttl-boundary-expiration
+    source_key: cachetools
+    provenance_family: ttl-exact-expiration-boundary
+    before_commit: 4d11ef92d57e9d838e9160cb5c023baff099c60a
+    after_commit: 91aa4c63f5716d8717ee2f898a01f40ce26986ae
+    task: >-
+      Fix TTLCache so an item is expired when the timer exactly equals its expiration boundary,
+      consistently across lookup, deletion, iteration, length and expire operations.
+    issue_url: https://github.com/tkem/cachetools/issues/221
+    production_paths: [src/cachetools/__init__.py]
+    regression_test_paths: [tests/test_ttl.py]
+    test_command: ["${PYTHON}", -m, unittest, tests.test_ttl.TTLCacheTest.test_ttl]
+    alternative_patch: |
+      diff --git a/src/cachetools/__init__.py b/src/cachetools/__init__.py
+      index 2100d09..2a029ef 100644
+      --- a/src/cachetools/__init__.py
+      +++ b/src/cachetools/__init__.py
+      @@ -358,7 +358,7 @@ class TTLCache(Cache):
+               except KeyError:
+                   return False
+               else:
+      -            return not (link.expire < self.__timer())
+      +            return self.__timer() < link.expire  # exact boundary
+
+           def __getitem__(self, key, cache_getitem=Cache.__getitem__):
+               try:
+      @@ -366,7 +366,7 @@ class TTLCache(Cache):
+               except KeyError:
+                   expired = False
+               else:
+      -            expired = link.expire < self.__timer()
+      +            expired = not (self.__timer() < link.expire)
+               if expired:
+                   return self.__missing__(key)
+               else:
+      @@ -391,7 +391,7 @@ class TTLCache(Cache):
+               cache_delitem(self, key)
+               link = self.__links.pop(key)
+               link.unlink()
+      -        if link.expire < self.__timer():
+      +        if not (self.__timer() < link.expire):
+                   raise KeyError(key)
+
+           def __iter__(self):
+      @@ -400,7 +400,7 @@ class TTLCache(Cache):
+               while curr is not root:
+                   # "freeze" time for iterator access
+                   with self.__timer as time:
+      -                if not (curr.expire < time):
+      +                if time < curr.expire:
+                           yield curr.key
+                   curr = curr.next
+
+      @@ -409,7 +409,7 @@ class TTLCache(Cache):
+               curr = root.next
+               time = self.__timer()
+               count = len(self.__links)
+      -        while curr is not root and curr.expire < time:
+      +        while curr is not root and not (time < curr.expire):
+                   count -= 1
+                   curr = curr.next
+               return count
+      @@ -453,7 +453,7 @@ class TTLCache(Cache):
+               curr = root.next
+               links = self.__links
+               cache_delitem = Cache.__delitem__
+      -        while curr is not root and curr.expire < time:
+      +        while curr is not root and not (time < curr.expire):
+                   cache_delitem(self, curr.key)
+                   del links[curr.key]
+                   next = curr.next
+    category: robustness
+    tags: [python, regression, cache, time-boundary]
+  - key: cachetools-lru-missing-item
+    source_key: cachetools
+    provenance_family: lru-missing-without-storage
+    before_commit: 5391d0990b53708836961fa19b772193a3af8188
+    after_commit: c1cb33811b3586be32217b9583307d4da66a66cf
+    task: >-
+      Fix LRUCache access when __missing__ returns a value without storing it, so recency tracking
+      does not raise KeyError for an absent key.
+    issue_url: https://github.com/tkem/cachetools/issues/200
+    production_paths: [cachetools/lru.py]
+    regression_test_paths: [tests/__init__.py, tests/test_lru.py]
+    test_command: ["${PYTHON}", -m, unittest, tests.test_lru.LRUCacheTest.test_missing_getsizeof]
+    alternative_patch: |
+      diff --git a/cachetools/lru.py b/cachetools/lru.py
+      index 2508e5d..4c479ba 100644
+      --- a/cachetools/lru.py
+      +++ b/cachetools/lru.py
+      @@ -12,7 +12,8 @@ class LRUCache(Cache):
+
+           def __getitem__(self, key, cache_getitem=Cache.__getitem__):
+               value = cache_getitem(self, key)
+      -        self.__update(key)
+      +        if key in self:  # alternate: update only stored keys
+      +            self.__update(key)
+               return value
+
+           def __setitem__(self, key, value, cache_setitem=Cache.__setitem__):
+    category: robustness
+    tags: [python, regression, cache, missing]
+  - key: cachetools-lru-popitem-context
+    source_key: cachetools
+    provenance_family: lru-empty-popitem-context
+    before_commit: 1e5fd784aaa6d61d649d8de46365fc9020e0a7f0
+    after_commit: d5b25b8e95dc8660011859a04c41e71a71de9ca7
+    task: >-
+      Fix empty LRUCache popitem errors so the internal StopIteration context is suppressed and
+      callers receive a clean KeyError.
+    issue_url: https://github.com/tkem/cachetools/issues/174
+    production_paths: [cachetools/lru.py]
+    regression_test_paths: [tests/__init__.py, tests/test_lru.py]
+    test_command: ["${PYTHON}", -m, unittest, tests.test_lru.LRUCacheTest.test_popitem_exception_context]
+    alternative_patch: |
+      diff --git a/cachetools/lru.py b/cachetools/lru.py
+      index b72b995..7203454 100644
+      --- a/cachetools/lru.py
+      +++ b/cachetools/lru.py
+      @@ -28,6 +28,7 @@ class LRUCache(Cache):
+               try:
+                   key = next(iter(self.__order))
+               except StopIteration:
+      -            raise KeyError('%s is empty' % self.__class__.__name__)
+      +            msg = '%s is empty' % self.__class__.__name__  # clean public error
+      +            raise KeyError(msg) from None
+               else:
+                   return (key, self.pop(key))
+
+    category: negative
+    tags: [python, regression, cache, exception]

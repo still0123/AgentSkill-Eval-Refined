@@ -105,9 +105,13 @@ class BenchmarkGenerationSpec(StrictModel):
     license_spdx: Optional[str] = Field(default=None, min_length=1)
     license_path: Optional[str] = Field(default=None, min_length=1)
     sources: Tuple[RepositorySourceSpec, ...] = ()
-    target_split: Literal["validation_search", "validation_confirm", "locked_test"] = (
-        "validation_search"
-    )
+    target_split: Literal[
+        "train",
+        "validation_search",
+        "regression_dev",
+        "validation_confirm",
+        "locked_test",
+    ] = "validation_search"
     generator_profile: str = "local-git-history/v1"
     verifier_profile: str = "deterministic-subprocess/v1"
     contamination_risk: Optional[Literal["low", "medium", "high", "unknown"]] = None

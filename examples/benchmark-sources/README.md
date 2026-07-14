@@ -35,13 +35,20 @@ then runs before, after, reverse-patch mutation, and an independently written al
 three times each under a controlled environment.
 
 `cachetools.bundle` is the second offline source. It freezes the MIT-licensed
-[`cachetools`](https://github.com/tkem/cachetools) history needed by two additional candidates.
+[`cachetools`](https://github.com/tkem/cachetools) history used by the cache-related candidates.
 
 - Bundle SHA-256: `9933f9067dbc4da476cdc2612625422251916d53d8945153b0795dca1371258c`
 - Pinned defects: cachedmethod class-level autospec (`57d2e481...`) and hash-key pickle
   restoration (`748d10de...`).
 
-Use `cross-repository-generation.example.yaml` to publish all four candidates into one immutable
-DatasetVersion. The v1alpha2 spec excludes machine-local clone paths from the semantic job hash,
-uses explicit provenance families as independence groups, and blocks a fork lineage from being
-published into another split in the same workspace.
+Use `cross-repository-generation.example.yaml` to reconstruct ten candidates from ten independent
+defect families and publish them into one immutable DatasetVersion. The v1alpha2 spec excludes
+machine-local clone paths from the semantic job hash, uses explicit provenance families as
+independence groups, and blocks a fork lineage from being published into another split in the same
+workspace.
+
+`real-bug-fix-split-plan.yaml` assigns every expanded candidate exactly once to `train`,
+`validation_search`, `regression_dev`, or `validation_confirm`. Search and regression splits use
+even Case counts because the current real optimizer reuses the two-Case paired evidence runner.
+Split isolation is by the explicit defect-family key; the ten families are distinct even though
+the compact MVP intentionally uses only two offline repositories.

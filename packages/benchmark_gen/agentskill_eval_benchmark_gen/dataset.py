@@ -24,6 +24,7 @@ class DatasetError(ValueError):
 
 
 class DatasetSplit(str, Enum):
+    TRAIN = "train"
     REGRESSION_DEV = "regression_dev"
     CHALLENGE = "challenge"
     VALIDATION_SEARCH = "validation_search"

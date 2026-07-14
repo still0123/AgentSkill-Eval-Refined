@@ -698,7 +698,8 @@ class AutomaticBenchmarkGenerator:
         if len(selector) < 2:
             raise BenchmarkGenerationError("test command must end with ClassName.method_name")
         class_name, method_name = selector[-2:]
-        selected = []
+        classes: Dict[str, ast.ClassDef] = {}
+        sources: Dict[str, str] = {}
         for path in item.regression_test_paths:
             source = (after_fixture / path).read_text(encoding="utf-8", errors="replace")
             try:
@@ -708,14 +709,27 @@ class AutomaticBenchmarkGenerator:
                     f"cannot parse regression test {path}: {exc}"
                 ) from exc
             for node in tree.body:
-                if isinstance(node, ast.ClassDef) and node.name == class_name:
-                    for child in node.body:
-                        if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)) and (
-                            child.name == method_name
-                        ):
-                            segment = ast.get_source_segment(source, child)
-                            if segment is not None:
-                                selected.append(segment)
+                if isinstance(node, ast.ClassDef):
+                    classes[node.name] = node
+                    sources[node.name] = source
+        target = classes.get(class_name)
+        candidates: list[ast.ClassDef] = []
+        if target is not None:
+            candidates.append(target)
+            for base in target.bases:
+                inherited = classes.get(base.id) if isinstance(base, ast.Name) else None
+                if inherited is not None:
+                    candidates.append(inherited)
+        selected = []
+        for candidate in candidates:
+            source = sources[candidate.name]
+            for child in candidate.body:
+                if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)) and (
+                    child.name == method_name
+                ):
+                    segment = ast.get_source_segment(source, child)
+                    if segment is not None:
+                        selected.append(segment)
         if not selected:
             raise BenchmarkGenerationError(
                 f"cannot locate selected test {class_name}.{method_name} in frozen test paths"

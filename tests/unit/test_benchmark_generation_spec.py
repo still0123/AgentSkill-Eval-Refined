@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import pytest
+import yaml
 from pydantic import ValidationError
 
 from agentskill_eval_benchmark_gen import BenchmarkGenerationSpec
@@ -49,3 +50,21 @@ def test_multi_source_spec_rejects_unknown_candidate_source() -> None:
 
     with pytest.raises(ValidationError, match="unknown candidate source_key"):
         BenchmarkGenerationSpec.model_validate(payload)
+
+
+def test_real_bug_fix_split_plan_covers_expanded_candidates_once() -> None:
+    spec = BenchmarkGenerationSpec.load(
+        ROOT / "examples/benchmark-sources/cross-repository-generation.example.yaml"
+    )
+    plan = yaml.safe_load(
+        (
+            ROOT / "examples/benchmark-sources/real-bug-fix-split-plan.yaml"
+        ).read_text(encoding="utf-8")
+    )
+    assigned = [case_id for case_ids in plan["splits"].values() for case_id in case_ids]
+
+    assert len(spec.candidates) == 10
+    assert len(assigned) == len(set(assigned)) == 10
+    assert set(assigned) == {item.key for item in spec.candidates}
+    assert len(plan["splits"]["validation_search"]) % 2 == 0
+    assert len(plan["splits"]["regression_dev"]) % 2 == 0

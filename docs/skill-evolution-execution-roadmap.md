@@ -53,7 +53,7 @@ commit: e2febda Add audited Process Skill proposal generator
 |---|---|---|---|---|
 | 0 | Integration Baseline | 合并 PR、RC tag | 否 | 已完成 |
 | 1 | Observed Failure Evidence Bridge | 真实 train FailureEvidenceBundle | 可先不产生 | 已完成 |
-| 2 | Real Optimizer Evaluator | 真实候选选择信号 | smoke 需授权 | 待执行 |
+| 2 | Real Optimizer Evaluator | 真实候选选择信号 | smoke 已授权执行 | 已完成 |
 | 3 | DeepSeek Skill Proposal | 真实模型生成的 3～5 个候选 | 是，需授权 | 待执行 |
 | 4 | SkillVersion Promotion | Confirm、Locked、Skill v2 Manifest | 终评需授权 | 待执行 |
 | 5 | Real Evolution Evidence Release | 完整 v1→v2 实验报告 | 是，需授权 | 待执行 |
@@ -244,13 +244,16 @@ Case 数：
 ### 7.5 完成记录
 
 ```text
-Branch：
-Commit：
-PR：
-Smoke Experiment：
-Run 数：
-费用：
-CI：
+Branch：codex/real-optimizer-evaluator-mvp
+Commit：待本阶段提交后填写
+PR：待推送后填写
+Smoke Job：8cbac6bf-ac4b-5d54-90fd-34f6f2725e8f（FROZEN）
+Frozen Candidate：search-protocol-boundaries
+Run 数：20 Attempt（18 completed，2 invalid；授权上限 24）
+费用：460,557 microusd（授权上限 1,300,000 microusd）
+证据：5 个 replay bundle、1,216 文件全部校验通过；Secret pattern scan 0 命中
+解释限制：两 Case adaptive validation，仅证明真实优化器链路，不是 locked-test 确认
+CI：本地 Ruff、mypy、185 pytest、wheel 全部通过；GitHub CI 待推送
 ```
 
 ---
