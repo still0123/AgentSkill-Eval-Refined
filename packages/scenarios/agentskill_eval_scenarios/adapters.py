@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, Protocol, Tuple, cast
@@ -24,6 +25,7 @@ from agentskill_eval_scenarios.contracts import (
     VariantDescriptor,
     file_sha256,
 )
+from agentskill_eval_scenarios.process_agent import ProcessScenarioAgentClient
 
 
 class ScenarioAdapter(Protocol):
@@ -59,21 +61,40 @@ class McpScenarioAdapter:
         dataset = McpDataset.load(config.dataset, allowed_root=config.dataset.parent)
         if spec.skill:
             spec.skill.verify()
-            if spec.skill.activation_mode != "precompiled_plan":
-                raise ValueError("MCP Lab Skill activation must be precompiled_plan")
+            expected_mode = "process_prompt" if spec.process_agent else "precompiled_plan"
+            if spec.skill.activation_mode != expected_mode:
+                raise ValueError(f"MCP Lab Skill activation must be {expected_mode}")
+        agent = spec.process_agent.name if spec.process_agent else config.agent
+        model = "process-json" if spec.process_agent else config.model
         return EvaluationPlan(
             name=spec.name,
             scenario=spec.scenario,
             comparison=spec.comparison,
             native_config_sha256=file_sha256(spec.native_config),
             dataset_name=dataset.name,
+            dataset_sha256=file_sha256(config.dataset),
             case_count=len(dataset.cases),
-            agent=config.agent,
-            model=config.model,
-            variants=_variants(spec, "without-skill", "with-skill"),
+            agent=agent,
+            model=model,
+            agent_version=spec.process_agent.version if spec.process_agent else None,
+            agent_executable_sha256=(
+                spec.process_agent.expected_sha256 if spec.process_agent else None
+            ),
+            skill_name=spec.skill.name if spec.skill else None,
+            skill_version=spec.skill.version if spec.skill else None,
+            skill_activation_mode=spec.skill.activation_mode if spec.skill else None,
+            variants=_variants(
+                spec, "without-skill", spec.skill.name if spec.skill else "treatment"
+            ),
             simulated=spec.simulated,
             evidence_class=spec.evidence_class,
-            trace_capabilities=("tool_selection", "tool_parameters", "recovery", "side_effects"),
+            trace_capabilities=(
+                "tool_selection",
+                "tool_parameters",
+                "recovery",
+                "side_effects",
+                *(("agent_decision",) if spec.process_agent else ()),
+            ),
             claim_limit=spec.claim_limit,
         )
 
@@ -81,7 +102,18 @@ class McpScenarioAdapter:
         self, spec: UnifiedScenarioSpec, plan: EvaluationPlan, workspace: Path
     ) -> UnifiedEvaluationResult:
         native_workspace = workspace / "native" / self.kind.value / plan.plan_sha256
-        artifacts = McpLabRunner(native_workspace).run(McpLabConfig.load(spec.native_config))
+        client = ProcessScenarioAgentClient(spec.process_agent) if spec.process_agent else None
+
+        def provide_plan(case, variant):  # type: ignore[no-untyped-def]
+            if client is None:
+                raise AssertionError("plan provider requires Process Scenario Agent")
+            skill = spec.skill if variant == "with_guidance" else None
+            return client.decide_mcp(case, variant, skill)
+
+        artifacts = McpLabRunner(native_workspace).run(
+            McpLabConfig.load(spec.native_config),
+            plan_provider=provide_plan if client else None,
+        )
         metrics = artifacts.report.paired_metrics
         primary: Dict[str, JsonValue] = {
             "control_success_rate": metrics.without_mcp_success_rate,
@@ -92,16 +124,19 @@ class McpScenarioAdapter:
             "losses": metrics.losses,
             "invalid": metrics.invalid,
         }
+        artifact_refs = [
+            _artifact("native_report_json", artifacts.report_json),
+            _artifact("native_report_html", artifacts.report_html),
+        ]
+        if client is not None:
+            artifact_refs.append(_write_decision_evidence(native_workspace, client))
         return UnifiedEvaluationResult(
             experiment_id=uuid5(NAMESPACE_URL, f"unified:{plan.plan_sha256}"),
             plan=plan,
             status="completed" if metrics.invalid == 0 else "invalid",
             primary_metrics=primary,
             scenario_metrics=cast(Dict[str, JsonValue], metrics.model_dump(mode="json")),
-            artifacts=(
-                _artifact("native_report_json", artifacts.report_json),
-                _artifact("native_report_html", artifacts.report_html),
-            ),
+            artifacts=tuple(artifact_refs),
             simulated=spec.simulated,
             evidence_class=spec.evidence_class,
             claim_limit=spec.claim_limit,
@@ -117,23 +152,40 @@ class MemoryRagScenarioAdapter:
         dataset = MemoryRagDataset.load(config.dataset, allowed_root=config.dataset.parent)
         if spec.skill:
             spec.skill.verify()
-            if spec.skill.activation_mode != "precompiled_plan":
-                raise ValueError("Memory/RAG Lab Skill activation must be precompiled_plan")
+            expected_mode = "process_prompt" if spec.process_agent else "precompiled_plan"
+            if spec.skill.activation_mode != expected_mode:
+                raise ValueError(f"Memory/RAG Lab Skill activation must be {expected_mode}")
+        agent = spec.process_agent.name if spec.process_agent else config.agent
+        model = "process-json" if spec.process_agent else config.model
         return EvaluationPlan(
             name=spec.name,
             scenario=spec.scenario,
             comparison=spec.comparison,
             native_config_sha256=file_sha256(spec.native_config),
             dataset_name=dataset.name,
+            dataset_sha256=file_sha256(config.dataset),
             case_count=(
                 len(config.selected_case_ids) if config.selected_case_ids else len(dataset.cases)
             ),
-            agent=config.agent,
-            model=config.model,
-            variants=_variants(spec, "control", "treatment"),
+            agent=agent,
+            model=model,
+            agent_version=spec.process_agent.version if spec.process_agent else None,
+            agent_executable_sha256=(
+                spec.process_agent.expected_sha256 if spec.process_agent else None
+            ),
+            skill_name=spec.skill.name if spec.skill else None,
+            skill_version=spec.skill.version if spec.skill else None,
+            skill_activation_mode=spec.skill.activation_mode if spec.skill else None,
+            variants=_variants(spec, "control", spec.skill.name if spec.skill else "treatment"),
             simulated=spec.simulated,
             evidence_class=spec.evidence_class,
-            trace_capabilities=("retrieval", "citations", "memory_lifecycle", "memory_safety"),
+            trace_capabilities=(
+                "retrieval",
+                "citations",
+                "memory_lifecycle",
+                "memory_safety",
+                *(("agent_decision",) if spec.process_agent else ()),
+            ),
             claim_limit=spec.claim_limit,
         )
 
@@ -141,8 +193,17 @@ class MemoryRagScenarioAdapter:
         self, spec: UnifiedScenarioSpec, plan: EvaluationPlan, workspace: Path
     ) -> UnifiedEvaluationResult:
         native_workspace = workspace / "native" / self.kind.value / plan.plan_sha256
+        client = ProcessScenarioAgentClient(spec.process_agent) if spec.process_agent else None
+
+        def provide_plan(case, pair_type, variant):  # type: ignore[no-untyped-def]
+            if client is None:
+                raise AssertionError("plan provider requires Process Scenario Agent")
+            skill = spec.skill if variant == "treatment" else None
+            return client.decide_memory_rag(case, pair_type, variant, skill)
+
         artifacts = MemoryRagLabRunner(native_workspace).run(
-            MemoryRagLabConfig.load(spec.native_config)
+            MemoryRagLabConfig.load(spec.native_config),
+            plan_provider=provide_plan if client else None,
         )
         controls = [item for item in artifacts.report.runs if item.run.variant == "control"]
         treatments = [item for item in artifacts.report.runs if item.run.variant == "treatment"]
@@ -176,16 +237,19 @@ class MemoryRagScenarioAdapter:
                 [item.model_dump(mode="json") for item in artifacts.report.paired_metrics],
             )
         }
+        artifact_refs = [
+            _artifact("native_report_json", artifacts.report_json),
+            _artifact("native_report_html", artifacts.report_html),
+        ]
+        if client is not None:
+            artifact_refs.append(_write_decision_evidence(native_workspace, client))
         return UnifiedEvaluationResult(
             experiment_id=uuid5(NAMESPACE_URL, f"unified:{plan.plan_sha256}"),
             plan=plan,
             status="completed" if len(valid_pairs) == len(valid) else "invalid",
             primary_metrics=primary,
             scenario_metrics=scenario_metrics,
-            artifacts=(
-                _artifact("native_report_json", artifacts.report_json),
-                _artifact("native_report_html", artifacts.report_html),
-            ),
+            artifacts=tuple(artifact_refs),
             simulated=spec.simulated,
             evidence_class=spec.evidence_class,
             claim_limit=spec.claim_limit,
@@ -202,6 +266,10 @@ class SoftwareEngineeringScenarioAdapter:
             raise ValueError("software engineering scenarios require a frozen Skill")
         skill.verify()
         _assert_simulation_boundary(spec, native_simulated=True)
+        if spec.process_agent is not None:
+            raise ValueError(
+                "software engineering Process Agent uses the existing real runner path"
+            )
         if skill.activation_mode != "native_install":
             raise ValueError("software engineering Skill activation must be native_install")
         dataset_root = _resolved_child(spec.native_config, str(config["dataset_root"]))
@@ -214,9 +282,13 @@ class SoftwareEngineeringScenarioAdapter:
             comparison=spec.comparison,
             native_config_sha256=file_sha256(spec.native_config),
             dataset_name=dataset.manifest.name,
+            dataset_sha256=dataset.dataset_sha256,
             case_count=len(dataset.cases),
             agent="deterministic-mock-agent",
             model="no-model",
+            skill_name=skill.name,
+            skill_version=skill.version,
+            skill_activation_mode=skill.activation_mode,
             variants=_variants(spec, "without-skill", skill.name),
             simulated=spec.simulated,
             evidence_class=spec.evidence_class,
@@ -306,6 +378,22 @@ def _config_int(config: Dict[str, object], key: str, default: int) -> int:
 def _assert_simulation_boundary(spec: UnifiedScenarioSpec, native_simulated: bool) -> None:
     if spec.simulated != native_simulated:
         raise ValueError("scenario evidence boundary does not match native runner")
+
+
+def _write_decision_evidence(
+    native_workspace: Path, client: ProcessScenarioAgentClient
+) -> ArtifactReference:
+    path = native_workspace / "process-agent-decisions.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "schema_version": "ase/process-agent-decisions/v1alpha1",
+        "decisions": [item.model_dump(mode="json") for item in client.evidence],
+    }
+    path.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    return _artifact("process_agent_decisions", path)
 
 
 ADAPTERS: Dict[ScenarioKind, ScenarioAdapter] = {

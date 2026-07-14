@@ -1793,3 +1793,23 @@ Case 子集，使能力对照与污染压力测试能够分开运行。
 本阶段没有新增 FastAPI、MQ、Redis 或远程调度，也没有触发付费模型。真实 Bug Fix 证据继续
 由 `real` 命令的预算门保护。详细协议、命令与限制见
 [`docs/unified-multi-scenario-evaluation.md`](./docs/unified-multi-scenario-evaluation.md)。
+
+---
+
+## 29. Process Agent Scenario Evaluation MVP 实现状态
+
+MCP 与 Memory/RAG 统一场景已支持 `activation_mode=process_prompt`。每个 Case 的 baseline 和
+treatment 分别启动哈希、版本固定的本地 Process Agent：baseline 请求中的 Skill 必须为空，
+treatment 请求携带已校验的 Skill 名称、版本、SHA-256 和正文。Agent 只能返回现有严格
+`AgentPlan`，计划再由原 MCP 或 Memory/RAG Controller、确定性环境和专项 Grader 执行。
+
+Process Agent 使用无 shell 参数数组、最小环境白名单、Secret-like 环境变量拒绝、响应大小与
+JSON 复杂度限制、进程组超时/取消终止和严格版本校验。请求只包含 Agent 可见任务与环境，不包含
+oracle、gold answer、expected tools、memory expectations 或参考补丁。系统不保存请求正文、Skill
+正文、stderr 或隐藏思维过程，只保存 executable/Skill/request/response 哈希、Variant、耗时与退出码。
+统一结果存在时执行幂等读取，不再次启动进程。
+
+当前证据等级固定为 `simulated=true, evidence_class=process_integration`：它证明真实本地进程参与了
+Skill 对照决策，但 Fake Agent、Mock MCP、Mock Retriever 和 Mock Memory 不能支持真实模型性能
+结论。协议和运行模板见
+[`docs/process-agent-scenario-evaluation.md`](./docs/process-agent-scenario-evaluation.md)。

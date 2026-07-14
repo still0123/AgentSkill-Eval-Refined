@@ -15,6 +15,8 @@ after the first stable release.
   evidence bundle whose DatasetVersion hash covers case, fixture, grader, provenance and metadata.
 - A unified multi-scenario facade for software engineering, MCP and Memory/RAG evaluations with
   frozen Skill hashes, explicit evidence classes, native metric preservation and immutable reports.
+- A hash-pinned Process Scenario Agent boundary for MCP and Memory/RAG with baseline cleanliness,
+  treatment Skill activation, oracle-free requests and hashed decision evidence.
 
 ### Evidence boundary
 
@@ -22,6 +24,8 @@ after the first stable release.
   reconstruction and publication controls; it is not Agent-performance evidence.
 - Unified MCP and Memory/RAG examples use precompiled deterministic plans; they validate the
   evaluation system but do not prove that a real Agent loaded or followed the example Skills.
+- Process integration proves that a local Agent process received or did not receive a Skill and
+  produced executable plans; deterministic tools and Fake Agents remain simulated evidence.
 
 ## [0.1.0-rc1] - 2026-07-13
 

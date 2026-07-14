@@ -48,6 +48,7 @@ without-Skill        with-Skill
 | MCP Evaluation Lab | 评测工具选择、参数、顺序、恢复和副作用 | 离线 simulated Lab |
 | Memory/RAG Lab | 评测检索、引用、污染、记忆更新和会话隔离 | 离线 simulated Lab |
 | Unified Scenario | 用同一协议运行软件工程、MCP、Memory/RAG 并保留专项指标 | 已实现，simulated MVP |
+| Process Scenario Agent | baseline/Skill 两臂由哈希固定进程生成 MCP/Memory-RAG 计划 | 已实现，process integration |
 | Dashboard | 查看已冻结的报告、Trace、W/T/L 和候选状态 | 本地只读版 |
 
 `simulated` 只证明评测管线可用，不能当作真实模型能力证据。
@@ -221,6 +222,7 @@ docs/                    模块级设计和操作文档
 | 真实 Agent 评测 | [Real Agent Evidence](./docs/real-agent-evidence.md) |
 | MCP / Memory-RAG 专项 Lab | [MCP Lab](./docs/mcp-tool-evaluation.md) / [Memory-RAG Lab](./docs/memory-rag-evaluation.md) |
 | 跨场景统一入口和结果协议 | [Unified Multi-Scenario Evaluation](./docs/unified-multi-scenario-evaluation.md) |
+| 本地 Process Agent Skill 激活 | [Process Agent Scenario Evaluation](./docs/process-agent-scenario-evaluation.md) |
 | Dashboard 启动和限制 | [Dashboard](./docs/dashboard-mvp.md) |
 
 完整文档索引见 [`docs/README.md`](./docs/README.md)。

@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import html
 from pathlib import Path
-from uuid import UUID
+from uuid import NAMESPACE_URL, UUID, uuid5
 
 from agentskill_eval_scenarios.adapters import ADAPTERS
 from agentskill_eval_scenarios.contracts import (
@@ -13,6 +13,7 @@ from agentskill_eval_scenarios.contracts import (
     UnifiedEvaluationResult,
     UnifiedScenarioSpec,
 )
+from agentskill_eval_scenarios.process_agent import ProcessScenarioAgentClient
 
 
 class UnifiedScenarioRunner:
@@ -22,13 +23,24 @@ class UnifiedScenarioRunner:
     def validate(self, spec: UnifiedScenarioSpec) -> EvaluationPlan:
         if spec.skill is not None:
             spec.skill.verify()
+        if spec.process_agent is not None:
+            ProcessScenarioAgentClient(spec.process_agent)
         return ADAPTERS[spec.scenario].build_plan(spec)
 
     def run(self, spec: UnifiedScenarioSpec, *, allow_simulation: bool) -> UnifiedEvaluationResult:
         if spec.simulated and not allow_simulation:
             raise ValueError("simulated scenarios require explicit allow_simulation")
         plan = self.validate(spec)
+        experiment_id = uuid5(NAMESPACE_URL, f"unified:{plan.plan_sha256}")
+        persisted = self.output_dir(experiment_id) / "unified-report.json"
+        if persisted.exists():
+            existing = self.load(experiment_id)
+            if existing.plan != plan:
+                raise ValueError("persisted unified result belongs to another frozen plan")
+            return existing
         result = ADAPTERS[spec.scenario].run(spec, plan, self.workspace)
+        if result.experiment_id != experiment_id:
+            raise ValueError("ScenarioAdapter returned an experiment ID outside the frozen plan")
         output = self.output_dir(result.experiment_id)
         output.mkdir(parents=True, exist_ok=True)
         json_path = output / "unified-report.json"
@@ -83,6 +95,9 @@ code{{overflow-wrap:anywhere}}</style>
 <dl><dt>Scenario</dt><dd>{esc(result.plan.scenario.value)}</dd><dt>Comparison</dt>
 <dd>{esc(result.plan.comparison.value)}</dd><dt>Evidence</dt><dd>{esc(result.evidence_class.value)}</dd>
 <dt>Simulated</dt><dd>{str(result.simulated).lower()}</dd><dt>Plan SHA-256</dt>
-<dd><code>{esc(result.plan.plan_sha256)}</code></dd></dl><h2>Primary metrics</h2>
+<dd><code>{esc(result.plan.plan_sha256)}</code></dd><dt>Agent</dt>
+<dd>{esc(result.plan.agent)} {esc(result.plan.agent_version or "")}</dd><dt>Skill</dt>
+<dd>{esc(result.plan.skill_name or "none")} {esc(result.plan.skill_version or "")} ·
+{esc(result.plan.skill_activation_mode or "none")}</dd></dl><h2>Primary metrics</h2>
 <table>{metric_rows}</table><h2>Native artifacts</h2><ul>{artifact_rows}</ul>
 <footer>No external resources or scripts. All dynamic content is escaped.</footer></body></html>"""

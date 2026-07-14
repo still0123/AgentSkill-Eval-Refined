@@ -23,6 +23,7 @@
 ## 专项 Lab 与界面
 
 - [Unified Multi-Scenario Evaluation MVP](./unified-multi-scenario-evaluation.md)
+- [Process Agent Scenario Evaluation MVP](./process-agent-scenario-evaluation.md)
 - [MCP Tool Evaluation MVP](./mcp-tool-evaluation.md)
 - [Memory/RAG Evaluation MVP](./memory-rag-evaluation.md)
 - [Read-only Evaluation Dashboard MVP](./dashboard-mvp.md)

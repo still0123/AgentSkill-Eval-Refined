@@ -5,7 +5,7 @@ from __future__ import annotations
 import html
 import json
 from pathlib import Path
-from typing import Dict, List, Literal, Tuple, cast
+from typing import Callable, Dict, List, Literal, Optional, Tuple, cast
 from uuid import NAMESPACE_URL, UUID, uuid5
 
 import yaml
@@ -18,6 +18,7 @@ from agentskill_eval_memory_rag_lab.adapters import (
 )
 from agentskill_eval_memory_rag_lab.contracts import (
     FailureKind,
+    MemoryRagCase,
     MemoryRagDataset,
     StrictModel,
     secure_input_path,
@@ -133,7 +134,13 @@ class MemoryRagLabRunner:
     def __init__(self, workspace: Path) -> None:
         self.workspace = workspace
 
-    def run(self, config: LabConfig) -> ExperimentArtifacts:
+    def run(
+        self,
+        config: LabConfig,
+        plan_provider: Optional[
+            Callable[[MemoryRagCase, PairType, Literal["control", "treatment"]], AgentPlan]
+        ] = None,
+    ) -> ExperimentArtifacts:
         dataset = MemoryRagDataset.load(config.dataset, allowed_root=config.dataset.parent)
         selected = set(config.selected_case_ids)
         cases = tuple(case for case in dataset.cases if not selected or case.case_id in selected)
@@ -165,6 +172,8 @@ class MemoryRagLabRunner:
                 ("treatment", pair.treatment),
             )
             for variant, plan in variants:
+                if plan_provider is not None:
+                    plan = plan_provider(case, pair.pair_type, variant)
                 if plan.token_count > config.token_budget or plan.cost_usd > config.cost_budget_usd:
                     raise ValueError(f"plan budget exceeded for {case.case_id}:{variant}")
                 retriever = MockRetrieverAdapter(case.documents, failures)

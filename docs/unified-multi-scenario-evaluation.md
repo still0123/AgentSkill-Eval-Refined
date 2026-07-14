@@ -39,7 +39,8 @@ simulation 自动升级为真实调用，也不会把预编译计划报告成真
 
 `comparison=skill_ab` 必须提供冻结的 Skill 名称、版本、`SKILL.md` SHA-256 和 activation
 mode。`native_install` 表示 Runner 实际加载 Skill；`precompiled_plan` 表示本地确定性计划只模拟
-Skill 指导后的行为，报告必须保留限制声明。
+Skill 指导后的行为；`process_prompt` 表示哈希固定的 Process Agent 在 treatment 中收到 Skill、
+baseline 中不收到 Skill。后两者都必须保留对应限制声明。
 
 ## CLI
 
@@ -94,9 +95,11 @@ memory safety，以及软件工程测试和 Trace 诊断都保存在 `scenario_m
 ## 当前限制与下一步
 
 - 三个统一示例均为 `simulated=true`；
-- MCP 与 Memory/RAG 使用 `precompiled_plan`，尚不是观察真实 Agent 加载 Skill 的证据；
+- MCP 与 Memory/RAG 同时支持 `precompiled_plan` 和本地 `process_prompt`；Process 集成仍不是
+  观察真实模型的性能证据；
 - 软件工程统一示例使用 Python Review Demo，真实 Bug Fix 证据继续通过 `real` 命令运行；
 - 本阶段没有 FastAPI、MQ、远程队列或多租户。
 
-下一步应为 MCP 与 Memory/RAG 增加 Process/真实 Agent 的 Skill 激活适配，同时保持相同的
-`EvaluationPlan` 和 `UnifiedEvaluationResult`，之后再把失败诊断接入 Skill v1→v2 优化闭环。
+Process Agent 的协议、安全门和使用方法见
+[`process-agent-scenario-evaluation.md`](./process-agent-scenario-evaluation.md)。后续可以增加逐工具
+交互和 observed Agent 适配，再把失败诊断接入 Skill v1→v2 优化闭环。

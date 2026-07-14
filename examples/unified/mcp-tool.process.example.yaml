@@ -1,0 +1,26 @@
+schema_version: ase/unified-scenario/v1alpha1
+name: mcp-tool-use-process-agent-example
+scenario: mcp_tool
+comparison: skill_ab
+native_config: ../mcp/lab-config.yaml
+skill:
+  name: mcp-tool-use-v1
+  version: 1.0.0
+  path: ../skills/mcp-tool-use-v1
+  expected_sha256: 00901ebf66ff5cce553de141525ffb6e0e714fba5a8a2624373963c2510d1ae2
+  activation_mode: process_prompt
+process_agent:
+  name: your-process-agent
+  version: 1.0.0
+  executable: /absolute/path/to/process-agent
+  expected_sha256: "0000000000000000000000000000000000000000000000000000000000000000"
+  expected_version_output: your-process-agent 1.0.0
+  version_args: [--version]
+  timeout_seconds: 30
+  max_response_bytes: 1000000
+  allowed_environment: [PATH, LANG, LC_ALL]
+simulated: true
+evidence_class: process_integration
+claim_limit: >-
+  Local Process Agent integration with deterministic simulated tools; not observed-model or
+  population-level Skill performance evidence.

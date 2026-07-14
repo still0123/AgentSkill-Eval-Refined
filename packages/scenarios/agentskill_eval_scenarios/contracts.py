@@ -43,7 +43,7 @@ class SkillUnderTest(FrozenModel):
     version: str = Field(min_length=1)
     path: Path
     expected_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
-    activation_mode: Literal["native_install", "precompiled_plan"]
+    activation_mode: Literal["native_install", "precompiled_plan", "process_prompt"]
 
     def verify(self) -> Path:
         expanded = self.path.expanduser()
@@ -68,6 +68,7 @@ class UnifiedScenarioSpec(FrozenModel):
     comparison: ComparisonKind
     native_config: Path
     skill: Optional[SkillUnderTest] = None
+    process_agent: Optional["ProcessScenarioAgentSpec"] = None
     simulated: bool
     evidence_class: EvidenceClass
     claim_limit: str = Field(min_length=1)
@@ -80,6 +81,17 @@ class UnifiedScenarioSpec(FrozenModel):
             raise ValueError("observed_agent evidence cannot be simulated")
         if self.evidence_class == EvidenceClass.SIMULATED_CONTROLLER and not self.simulated:
             raise ValueError("simulated_controller evidence requires simulated=true")
+        if self.evidence_class == EvidenceClass.PROCESS_INTEGRATION and (
+            not self.simulated or self.process_agent is None
+        ):
+            raise ValueError(
+                "process_integration requires simulated=true and a pinned process_agent"
+            )
+        if (
+            self.process_agent is not None
+            and self.evidence_class != EvidenceClass.PROCESS_INTEGRATION
+        ):
+            raise ValueError("process_agent is only valid for process_integration evidence")
         return self
 
     @classmethod
@@ -103,7 +115,40 @@ class UnifiedScenarioSpec(FrozenModel):
         skill = spec.skill
         if skill is not None and not skill.path.is_absolute():
             skill = skill.model_copy(update={"path": resolved.parent / skill.path})
-        return spec.model_copy(update={"native_config": native, "skill": skill})
+        process_agent = spec.process_agent
+        if process_agent is not None and not process_agent.executable.is_absolute():
+            process_agent = process_agent.model_copy(
+                update={"executable": resolved.parent / process_agent.executable}
+            )
+        return spec.model_copy(
+            update={"native_config": native, "skill": skill, "process_agent": process_agent}
+        )
+
+
+class ProcessScenarioAgentSpec(FrozenModel):
+    name: str = Field(min_length=1)
+    version: str = Field(min_length=1)
+    executable: Path
+    expected_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    argv: Tuple[str, ...] = ()
+    version_args: Tuple[str, ...] = ("--version",)
+    expected_version_output: str = Field(min_length=1)
+    timeout_seconds: float = Field(default=10, gt=0, le=600)
+    max_response_bytes: int = Field(default=1_000_000, ge=1, le=10_000_000)
+    allowed_environment: Tuple[str, ...] = ("PATH", "LANG", "LC_ALL")
+
+    @model_validator(mode="after")
+    def environment_must_not_include_secrets(self) -> "ProcessScenarioAgentSpec":
+        if len(set(self.allowed_environment)) != len(self.allowed_environment):
+            raise ValueError("allowed_environment values must be unique")
+        secret_markers = ("KEY", "TOKEN", "SECRET", "PASSWORD", "AUTH", "CREDENTIAL")
+        if any(
+            marker in name.upper()
+            for name in self.allowed_environment
+            for marker in secret_markers
+        ):
+            raise ValueError("Process Scenario Agent cannot inherit Secret-like environment names")
+        return self
 
 
 class EvaluationPlan(FrozenModel):
@@ -113,9 +158,17 @@ class EvaluationPlan(FrozenModel):
     comparison: ComparisonKind
     native_config_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     dataset_name: str = Field(min_length=1)
+    dataset_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     case_count: int = Field(ge=1)
     agent: str = Field(min_length=1)
     model: str = Field(min_length=1)
+    agent_version: Optional[str] = None
+    agent_executable_sha256: Optional[str] = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    skill_name: Optional[str] = None
+    skill_version: Optional[str] = None
+    skill_activation_mode: Optional[
+        Literal["native_install", "precompiled_plan", "process_prompt"]
+    ] = None
     variants: Tuple[VariantDescriptor, VariantDescriptor]
     simulated: bool
     evidence_class: EvidenceClass
