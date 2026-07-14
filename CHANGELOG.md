@@ -25,6 +25,10 @@ after the first stable release.
   gate and freezes a no-auto-publish handoff for Independent Final Evaluation.
 - A hash/version-pinned Process Skill Proposal Generator with sanitized train-only requests, minimal
   environment inheritance, bounded JSON I/O, fail-closed validation and idempotent invocation evidence.
+- A budget-gated Real Optimizer Evaluator that reuses paired observed-Agent execution, records
+  candidate/Case outcomes and Trace references, and caches completed candidate/Case combinations.
+- An expanded ten-case Python Bug Fix benchmark plan covering ten independent defect families and
+  explicit train, validation_search, regression_dev and validation_confirm assignments.
 
 ### Evidence boundary
 
@@ -40,6 +44,8 @@ after the first stable release.
   it proves the optimization control loop, not that a real model-generated Skill is better.
 - The Process Generator example is a deterministic local fixture and does not authorize Provider
   Secrets, paid calls or real-LLM optimization claims.
+- Real optimizer Fake Process tests validate the observed execution chain with `simulated=false`;
+  Provider-backed candidate-selection evidence requires a separately authorized smoke run.
 
 ## [0.1.0-rc1] - 2026-07-13
 

@@ -1,0 +1,46 @@
+schema_version: ase/sanitized-real-optimizer-config/v1alpha1
+mode: smoke
+simulated: false
+evidence_class: observed_agent
+claim_limit: adaptive validation result; not locked-test confirmation
+search:
+  name: stage2-real-python-bug-fix-search
+  algorithm: successive_halving
+  random_seed: 2026
+  subset_size: 2
+  promote_search_candidates: 1
+  candidate_count: 6
+  candidate_origins: [original, manual, random, search]
+dataset:
+  sha256: 7f173e954299b6b2054d174ee6bc6d22a1274cf5a4063723b48327428df5e764
+  case_ids:
+    - more-itertools-last-reversed-none
+    - cachetools-cachedmethod-autospec
+runner:
+  name: skill-up
+  version: 0.5.0
+  executable_sha256: b8473aad3fe997f3aa8de1e9bd9bc127e5254b25371567a0e07143afc809c359
+agent:
+  engine: qwen_code
+  version: 0.19.9
+  executable_sha256: b4c84c64de753147e765ed65411a3e7f767be0c491c4f6e202423879cad01f35
+  provider: deepseek
+  wire_protocol: openai
+  model: deepseek-v4-pro
+  base_url: https://api.deepseek.com
+  temperature: 0.0
+  max_turns: 24
+  max_wall_time_seconds: 240
+  max_tool_calls: 24
+  loop_detection: enabled
+  subagents: disabled
+  secret_environment_names: [OPENAI_API_KEY]
+pricing_microusd_per_million_tokens:
+  input_cache_miss: 435000
+  input_cache_hit: 3625
+  output: 870000
+authorization:
+  maximum_agent_runs: 24
+  maximum_cost_microusd: 1300000
+raw_secret_values_included: false
+absolute_local_paths_included: false

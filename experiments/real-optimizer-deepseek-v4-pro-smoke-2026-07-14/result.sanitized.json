@@ -1,0 +1,99 @@
+{
+  "schema_version": "ase/sanitized-real-optimizer-result/v1alpha1",
+  "optimization_job_id": "8cbac6bf-ac4b-5d54-90fd-34f6f2725e8f",
+  "status": "FROZEN",
+  "simulated": false,
+  "evidence_class": "observed_agent",
+  "provider": "deepseek",
+  "model": "deepseek-v4-pro",
+  "claim_limit": "adaptive validation result; not locked-test confirmation",
+  "dataset_sha256": "7f173e954299b6b2054d174ee6bc6d22a1274cf5a4063723b48327428df5e764",
+  "winner": {
+    "candidate_id": "2cbbae2b-22f8-587d-a5d2-7554097602c0",
+    "name": "search-protocol-boundaries",
+    "origin": "search",
+    "content_sha256": "899c7cc55cefd8b382ffe8db2fb5f9f0a6e0ff28edb1213e1d0bd4afaf2d9a82",
+    "treatment_pass_rate": 1.0,
+    "treatment_tokens": 915365,
+    "treatment_latency_ms": 84894,
+    "treatment_cost_microusd": 45486
+  },
+  "candidates": [
+    {
+      "name": "original",
+      "origin": "original",
+      "status": "ELIMINATED",
+      "content_sha256": "5ff780e023c00cd08232688ec013a47f51926b4e1c8a5171465085ee967bc5d6",
+      "treatment_pass_rate": 0.5
+    },
+    {
+      "name": "manual",
+      "origin": "manual",
+      "status": "ELIMINATED",
+      "content_sha256": "5ff780e023c00cd08232688ec013a47f51926b4e1c8a5171465085ee967bc5d6",
+      "treatment_pass_rate": 0.5
+    },
+    {
+      "name": "random",
+      "origin": "random",
+      "status": "ELIMINATED",
+      "content_sha256": "c99d948120c703481c3a987e2e287dd877c6efb96949dc46362c43989f755c29",
+      "treatment_pass_rate": 1.0,
+      "elimination_reason": "winner is restricted to search-origin candidates"
+    },
+    {
+      "name": "search-protocol-boundaries",
+      "origin": "search",
+      "status": "FROZEN",
+      "content_sha256": "899c7cc55cefd8b382ffe8db2fb5f9f0a6e0ff28edb1213e1d0bd4afaf2d9a82",
+      "treatment_pass_rate": 1.0
+    },
+    {
+      "name": "search-descriptor-binding",
+      "origin": "search",
+      "status": "ELIMINATED",
+      "elimination_reason": "eliminated after validation subset"
+    },
+    {
+      "name": "search-invariant-focused-verification",
+      "origin": "search",
+      "status": "ELIMINATED",
+      "elimination_reason": "eliminated after validation subset"
+    }
+  ],
+  "execution": {
+    "candidate_case_evaluations": 10,
+    "attempts_created": 20,
+    "completed_attempts": 18,
+    "invalid_attempts": 2,
+    "invalid_reasons": [
+      "tool-call budget of 24 exceeded",
+      "loop detection: action stagnation"
+    ],
+    "unique_skill_experiments": 5,
+    "baseline_passes": 9,
+    "treatment_passes": 8,
+    "paired_case_evaluations": 10
+  },
+  "usage": {
+    "observed_or_reserved_cost_microusd": 460557,
+    "authorized_max_microusd": 1300000
+  },
+  "security": {
+    "secret_pattern_matching_files": 0,
+    "raw_secret_values_committed": false
+  },
+  "audit": {
+    "bundles_valid": 5,
+    "bundle_file_count": 1216,
+    "bundle_sha256": {
+      "6bbf4083-a8b6-5563-a5d8-3bfd22d76b67": "d00e4a50a7a31699e1ad4fbfe325e8b69dc3651b6cf685bc49fde3ead875322f",
+      "7f23d586-404c-56c9-ab9c-eaa065e1ac67": "a63acfb92d5499c2a3f484b236ba97adf3cdef97616f0e8f289d9abf67213a2a",
+      "883d853b-08bb-5da8-a384-9fba7e01d57f": "d9dba440ab1627141a34b3054df652c12a3de17e790d187e0519c5ce51d579b7",
+      "c292220f-d225-51df-8d6a-11387bd5cf4a": "f0ea4c69535a6c5ff11fbb29f6a128c0529d9ec8c21ce42ccc7804db710d32b9",
+      "fcb72d48-7b77-54a9-ae83-77a1c0d70974": "67bd1b43c900564c0b9a0c9a928f4e3b43292c6d1f6475e5ae75fa4e5ab70e46"
+    },
+    "raw_artifacts_committed": false
+  },
+  "interpretation": "The smoke validates real optimizer execution and candidate freezing. The two-case adaptive search is descriptive only: a random candidate also achieved 100%, and the winner's paired baseline also passed both cases."
+}

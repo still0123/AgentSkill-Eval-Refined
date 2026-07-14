@@ -74,7 +74,7 @@ without-Skill       Skill v1         Skill v2
 | Skill 配对评测 | 比较 without/with Skill 的通过率、Token、时延和费用 | 已实现 |
 | Trace Intelligence | 保存规范化轨迹，定位超时、工具、环境或验证失败 | 已实现 |
 | Benchmark Generation | 从真实 Git 历史重建 before-fail / after-pass 评测 Case | 已实现 |
-| Skill Search | 在固定预算下生成、筛选和冻结 Skill 候选 | 已实现，离线演示为 simulated |
+| Skill Search | 在固定预算下生成、筛选和冻结 Skill 候选 | 已支持 simulated 与预算受控的真实 Agent evaluator |
 | Independent Final Evaluation | 用隔离的 locked test 检查搜索结果 | 已实现 |
 | Real Agent Evidence | 通过显式授权和预算门运行真实 Agent 实验 | 已实现 |
 | MCP Evaluation Lab | 评测工具选择、参数、顺序、恢复和副作用 | 离线 simulated Lab |
@@ -85,6 +85,7 @@ without-Skill       Skill v1         Skill v2
 | Skill Version Regression | 比较 v1/v2 的改进、退化 Case 与成本变化 | 已有底层能力，统一工作流待完善 |
 | Failure-guided Optimization | 从 train 失败诊断生成假设，经搜索与 regression_dev 门冻结候选 | 已实现 simulated MVP，独立 locked 终评不自动触发 |
 | Process Skill Proposal | 哈希/版本固定的本地进程根据脱敏 train 失败生成候选变异 | 已实现 Fake Process MVP，不代表真实 LLM 优化 |
+| Real Optimizer Evaluator | 用真实 Agent 的 Case 结果、成本和 Trace 选择候选并执行 regression_dev | 已实现，真实 smoke 需单独授权 |
 | Observed Failure Bridge | 从真实 Skill treatment Run 导出可追溯的 train failure bundle | 已实现，不调用模型 |
 | Dashboard | 查看已冻结的报告、Trace、W/T/L 和候选状态 | 本地只读版 |
 
@@ -172,8 +173,9 @@ pnpm run build
 
 Automatic Benchmark Generation v1alpha2 可在一个冻结 Job 中重建多个本地 Git source，
 使用显式 provenance family 分组和去重，并阻止同一 fork lineage 跨 split 发布。仓库内的
-`more-itertools` 与 `cachetools` 离线 bundle 共提供四个真实历史缺陷；每个候选都执行
-before、after、mutation 和 alternative repair 各三次，共 48 次确定性验证。
+`more-itertools` 与 `cachetools` 离线 bundle 的扩展配置共提供十个独立缺陷家族；每个候选
+都执行 before、after、mutation 和 alternative repair 各三次，共 120 次确定性验证。
+仓库中的首份跨仓库验收记录仍保留当时四 Case 的结果，便于审计演进历史。
 
 - [跨仓库离线验收说明](./experiments/cross-repository-benchmark-2026-07-14/README.md)
 - [脱敏哈希与聚合结果](./experiments/cross-repository-benchmark-2026-07-14/result.sanitized.json)

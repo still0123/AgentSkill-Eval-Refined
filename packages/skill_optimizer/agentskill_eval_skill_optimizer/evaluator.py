@@ -9,7 +9,7 @@ import subprocess
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Protocol, Sequence, Tuple
+from typing import TYPE_CHECKING, Optional, Protocol, Sequence, Tuple
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -24,6 +24,9 @@ from agentskill_eval_skill_optimizer.spec import (
     SearchCase,
     ValidationSearchDataset,
 )
+
+if TYPE_CHECKING:
+    from agentskill_eval_skill_optimizer.real_evaluator import RealEvaluationAuthorization
 
 
 class EvaluationError(RuntimeError):
@@ -214,8 +217,22 @@ class ProcessEvaluator:
 
 
 def build_evaluator(
-    spec: EvaluatorSpec, dataset: ValidationSearchDataset
+    spec: EvaluatorSpec,
+    dataset: ValidationSearchDataset,
+    *,
+    workspace: Optional[Path] = None,
+    real_authorization: Optional["RealEvaluationAuthorization"] = None,
 ) -> CandidateEvaluator:
     if spec.type == "simulated_keyword":
         return SimulatedKeywordEvaluator(dataset, spec.version)
-    return ProcessEvaluator(spec)
+    if spec.type == "process":
+        return ProcessEvaluator(spec)
+    if workspace is None or real_authorization is None or spec.real_agent_config_path is None:
+        raise EvaluationError(
+            "real_agent evaluator requires workspace and explicit real authorization"
+        )
+    from agentskill_eval_skill_optimizer.real_evaluator import RealAgentCandidateEvaluator
+
+    return RealAgentCandidateEvaluator(
+        spec.real_agent_config_path, workspace, real_authorization
+    )

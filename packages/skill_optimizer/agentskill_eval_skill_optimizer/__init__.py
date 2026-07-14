@@ -56,6 +56,11 @@ from agentskill_eval_skill_optimizer.process_generator import (
     ProcessHypothesisProposal,
     ProcessHypothesisResponse,
 )
+from agentskill_eval_skill_optimizer.real_evaluator import (
+    RealAgentCandidateEvaluator,
+    RealCandidateEvaluationError,
+    RealEvaluationAuthorization,
+)
 from agentskill_eval_skill_optimizer.search import (
     BenchmarkGuidedSkillSearch,
     OptimizationStore,
@@ -121,6 +126,9 @@ __all__ = [
     "ProcessHypothesisResponse",
     "RegressionDevDataset",
     "RegressionGateResult",
+    "RealAgentCandidateEvaluator",
+    "RealCandidateEvaluationError",
+    "RealEvaluationAuthorization",
     "SearchAlgorithmSpec",
     "SearchBudgetSpec",
     "SearchCase",

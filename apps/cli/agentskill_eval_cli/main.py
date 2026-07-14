@@ -63,6 +63,7 @@ from agentskill_eval_skill_optimizer import (
     ObservedFailureEvidenceBridge,
     OptimizationSearchSpec,
     OptimizationStore,
+    RealEvaluationAuthorization,
 )
 from agentskill_eval_trace_intelligence import compare_traces
 
@@ -559,6 +560,17 @@ def optimize_search(
         "--allow-simulation",
         help="Required for simulated evaluators; results are never performance evidence.",
     ),
+    confirm_real_run: bool = typer.Option(  # noqa: B008
+        False,
+        "--confirm-real-run",
+        help="Explicitly authorize observed-Agent calls for a real_agent evaluator.",
+    ),
+    max_cost_microusd: Optional[int] = typer.Option(  # noqa: B008
+        None, "--max-cost-microusd", min=1
+    ),
+    max_agent_runs: Optional[int] = typer.Option(  # noqa: B008
+        None, "--max-agent-runs", min=1
+    ),
 ) -> None:
     """Run successive halving and freeze one validation-only Pareto winner."""
     spec = OptimizationSearchSpec.load(spec_path)
@@ -567,7 +579,64 @@ def optimize_search(
             "simulated evaluator requires --allow-simulation",
             param_hint="--allow-simulation",
         )
-    result = BenchmarkGuidedSkillSearch(workspace).run(spec)
+    authorization = None
+    if spec.evaluator.type == "real_agent":
+        if not confirm_real_run:
+            raise typer.BadParameter(
+                "real_agent evaluator requires --confirm-real-run",
+                param_hint="--confirm-real-run",
+            )
+        if max_cost_microusd is None:
+            raise typer.BadParameter(
+                "real_agent evaluator requires --max-cost-microusd",
+                param_hint="--max-cost-microusd",
+            )
+        if max_agent_runs is None:
+            raise typer.BadParameter(
+                "real_agent evaluator requires --max-agent-runs",
+                param_hint="--max-agent-runs",
+            )
+        if spec.evaluator.real_agent_config_path is None:
+            raise typer.BadParameter("real_agent config path is missing", param_hint="SPEC")
+        real_spec = RealAgentEvidenceSpec.load(spec.evaluator.real_agent_config_path)
+        candidate_count = 3 + len(spec.mutations)
+        unique_candidate_case_evaluations = (
+            candidate_count * spec.search.subset_size
+            + (3 + spec.search.promote_search_candidates)
+            * (
+                len(DatasetLoader().load(spec.validation_search_path).cases)
+                - spec.search.subset_size
+            )
+        )
+        worst_case_runs = unique_candidate_case_evaluations * 2
+        estimated_cost = (
+            worst_case_runs * real_spec.pricing.estimated_cost_per_run_microusd
+        )
+        typer.echo(
+            json.dumps(
+                {
+                    "event": "real_optimizer_preflight",
+                    "provider": real_spec.agent.provider,
+                    "model": real_spec.agent.model,
+                    "candidate_count": candidate_count,
+                    "case_count": len(DatasetLoader().load(spec.validation_search_path).cases),
+                    "worst_case_agent_runs": worst_case_runs,
+                    "estimated_cost_microusd": estimated_cost,
+                    "authorized_agent_runs": max_agent_runs,
+                    "authorized_cost_microusd": max_cost_microusd,
+                },
+                sort_keys=True,
+            ),
+            err=True,
+        )
+        authorization = RealEvaluationAuthorization(
+            confirm_real_run=True,
+            max_cost_microusd=max_cost_microusd,
+            max_agent_runs=max_agent_runs,
+        )
+    result = BenchmarkGuidedSkillSearch(workspace).run(
+        spec, real_authorization=authorization
+    )
     typer.echo(
         json.dumps(
             {
@@ -581,6 +650,12 @@ def optimize_search(
                 "status": result.job.status.value,
                 "winner_id": str(result.winner.id),
                 "winner_name": result.winner.name,
+                "real_cost_consumed_microusd": (
+                    authorization.consumed_cost_microusd if authorization else None
+                ),
+                "real_agent_runs_consumed": (
+                    authorization.consumed_agent_runs if authorization else None
+                ),
             },
             sort_keys=True,
         )
@@ -660,6 +735,13 @@ def evolve_run(
         Path(".agentskill-eval-workspace"), "--workspace", file_okay=False
     ),
     allow_simulation: bool = typer.Option(False, "--allow-simulation"),  # noqa: B008
+    confirm_real_run: bool = typer.Option(False, "--confirm-real-run"),  # noqa: B008
+    max_cost_microusd: Optional[int] = typer.Option(  # noqa: B008
+        None, "--max-cost-microusd", min=1
+    ),
+    max_agent_runs: Optional[int] = typer.Option(  # noqa: B008
+        None, "--max-agent-runs", min=1
+    ),
 ) -> None:
     """Generate auditable hypotheses, run existing search, and freeze a final handoff."""
     spec = FailureGuidedEvolutionSpec.load(spec_path)
@@ -668,7 +750,26 @@ def evolve_run(
             "simulated evaluator requires --allow-simulation",
             param_hint="--allow-simulation",
         )
-    result = FailureGuidedSkillEvolution(workspace).run(spec)
+    authorization = None
+    if not spec.evaluator.simulated:
+        if not confirm_real_run:
+            raise typer.BadParameter(
+                "real evolution requires --confirm-real-run",
+                param_hint="--confirm-real-run",
+            )
+        if max_cost_microusd is None or max_agent_runs is None:
+            raise typer.BadParameter(
+                "real evolution requires cost and Agent Run limits",
+                param_hint="--max-cost-microusd/--max-agent-runs",
+            )
+        authorization = RealEvaluationAuthorization(
+            confirm_real_run=True,
+            max_cost_microusd=max_cost_microusd,
+            max_agent_runs=max_agent_runs,
+        )
+    result = FailureGuidedSkillEvolution(workspace).run(
+        spec, real_authorization=authorization
+    )
     typer.echo(
         json.dumps(
             {

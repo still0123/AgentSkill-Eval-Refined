@@ -115,6 +115,13 @@ class GitSource:
             capture_output=True,
             check=False,
             timeout=30,
+            env={
+                "GIT_CEILING_DIRECTORIES": str(fixture.parent.resolve()),
+                "HOME": os.environ.get("HOME", ""),
+                "LANG": "C.UTF-8",
+                "LC_ALL": "C.UTF-8",
+                "PATH": os.environ.get("PATH", ""),
+            },
         )
         if result.returncode != 0:
             detail = result.stderr.decode("utf-8", errors="replace").strip()

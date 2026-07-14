@@ -12,6 +12,7 @@ from uuid import NAMESPACE_URL, UUID, uuid5
 import yaml
 from pydantic import Field, model_validator
 
+from agentskill_eval_benchmark_gen import DatasetLoader, DatasetSplit
 from agentskill_eval_contracts import (
     CandidateEvaluation,
     FailureDiagnosis,
@@ -29,6 +30,7 @@ from agentskill_eval_skill_optimizer.process_generator import (
     ProcessGeneratorError,
     ProcessHypothesisGenerator,
 )
+from agentskill_eval_skill_optimizer.real_evaluator import RealEvaluationAuthorization
 from agentskill_eval_skill_optimizer.search import (
     BenchmarkGuidedSkillSearch,
     SkillSearchResult,
@@ -77,17 +79,6 @@ class FailureGuidedEvolutionSpec(FrozenModel):
     budget: SearchBudgetSpec
     evaluator: EvaluatorSpec
 
-    @model_validator(mode="after")
-    def real_evaluator_requires_a_future_budgeted_workflow(
-        self,
-    ) -> "FailureGuidedEvolutionSpec":
-        if not self.evaluator.simulated:
-            raise ValueError(
-                "failure-guided evolution MVP only accepts simulated/Fake evaluators; "
-                "real model search requires a separate confirmation and budget protocol"
-            )
-        return self
-
     @classmethod
     def load(cls, path: Path) -> "FailureGuidedEvolutionSpec":
         try:
@@ -106,6 +97,13 @@ class FailureGuidedEvolutionSpec(FrozenModel):
         generator = spec.generator
         if generator.executable is not None:
             generator = generator.model_copy(update={"executable": resolved(generator.executable)})
+        evaluator = spec.evaluator
+        if evaluator.real_agent_config_path is not None:
+            evaluator = evaluator.model_copy(
+                update={
+                    "real_agent_config_path": resolved(evaluator.real_agent_config_path)
+                }
+            )
         return spec.model_copy(
             update={
                 "base_skill_path": resolved(spec.base_skill_path),
@@ -114,6 +112,7 @@ class FailureGuidedEvolutionSpec(FrozenModel):
                 "validation_search_path": resolved(spec.validation_search_path),
                 "regression_dev_path": resolved(spec.regression_dev_path),
                 "generator": generator,
+                "evaluator": evaluator,
             }
         )
 
@@ -406,10 +405,15 @@ class FailureGuidedSkillEvolution:
         self.workspace = workspace.resolve()
         self.writer = AtomicFileWriter()
 
-    def run(self, spec: FailureGuidedEvolutionSpec) -> FailureGuidedEvolutionResult:
-        if not spec.evaluator.simulated:
+    def run(
+        self,
+        spec: FailureGuidedEvolutionSpec,
+        *,
+        real_authorization: Optional[RealEvaluationAuthorization] = None,
+    ) -> FailureGuidedEvolutionResult:
+        if not spec.evaluator.simulated and real_authorization is None:
             raise EvolutionError(
-                "real model evolution requires a separate confirmation and budget protocol"
+                "real model evolution requires a confirmation and budget protocol"
             )
         base = self._skill_file(spec.base_skill_path)
         manual = self._skill_file(spec.manual_skill_path)
@@ -557,12 +561,16 @@ class FailureGuidedSkillEvolution:
             budget=spec.budget,
             evaluator=spec.evaluator,
         )
-        search = BenchmarkGuidedSkillSearch(self.workspace).run(search_spec)
+        search = BenchmarkGuidedSkillSearch(self.workspace).run(
+            search_spec, real_authorization=real_authorization
+        )
         winner_path = BenchmarkGuidedSkillSearch(self.workspace).store.skill_path(search.winner)
         regression = (
             RegressionGateResult.model_validate_json(regression_path.read_bytes())
             if regression_path.exists()
-            else self._regression_gate(spec, base, winner_path)
+            else self._regression_gate(
+                spec, base, winner_path, real_authorization=real_authorization
+            )
         )
         if not regression.passed:
             raise EvolutionError(
@@ -658,36 +666,65 @@ class FailureGuidedSkillEvolution:
             raise EvolutionError("Process Generator proposal has no eligible evidence")
         return refs
 
-    @staticmethod
     def _regression_gate(
-        spec: FailureGuidedEvolutionSpec, base_skill: Path, winner_skill: Path
+        self,
+        spec: FailureGuidedEvolutionSpec,
+        base_skill: Path,
+        winner_skill: Path,
+        *,
+        real_authorization: Optional[RealEvaluationAuthorization],
     ) -> RegressionGateResult:
-        dataset = RegressionDevDataset.load(spec.regression_dev_path)
-        if dataset.simulated != spec.evaluator.simulated:
-            raise EvolutionError("regression_dev and evaluator simulated flags must match")
-        surrogate = ValidationSearchDataset(
-            schema_version="ase/optimizer-validation/v1alpha1",
-            name=dataset.name,
-            version=dataset.version,
-            split="validation_search",
-            simulated=dataset.simulated,
-            cases=dataset.cases,
+        if spec.evaluator.type == "real_agent":
+            loaded = DatasetLoader().load(spec.regression_dev_path)
+            if any(
+                item.metadata.split != DatasetSplit.REGRESSION_DEV for item in loaded.cases
+            ):
+                raise EvolutionError("real regression DatasetVersion must be regression_dev")
+            dataset_cases = tuple(SearchCase(id=item.metadata.case_id) for item in loaded.cases)
+            surrogate = ValidationSearchDataset(
+                schema_version="ase/optimizer-validation/v1alpha1",
+                name=loaded.manifest.name,
+                version=loaded.manifest.version,
+                split="validation_search",
+                simulated=False,
+                cases=dataset_cases,
+            )
+            dataset_file = spec.regression_dev_path / "dataset.yaml"
+            dataset_sha = loaded.dataset_sha256
+        else:
+            dataset = RegressionDevDataset.load(spec.regression_dev_path)
+            if dataset.simulated != spec.evaluator.simulated:
+                raise EvolutionError("regression_dev and evaluator simulated flags must match")
+            dataset_cases = dataset.cases
+            surrogate = ValidationSearchDataset(
+                schema_version="ase/optimizer-validation/v1alpha1",
+                name=dataset.name,
+                version=dataset.version,
+                split="validation_search",
+                simulated=dataset.simulated,
+                cases=dataset_cases,
+            )
+            dataset_file = spec.regression_dev_path
+            dataset_sha = hashlib.sha256(dataset_file.read_bytes()).hexdigest()
+        evaluator = build_evaluator(
+            spec.evaluator,
+            surrogate,
+            workspace=self.workspace,
+            real_authorization=real_authorization,
         )
-        evaluator = build_evaluator(spec.evaluator, surrogate)
-        dataset_sha = hashlib.sha256(spec.regression_dev_path.read_bytes()).hexdigest()
         base = evaluator.evaluate(
             base_skill,
-            spec.regression_dev_path,
+            dataset_file,
             dataset_sha,
-            dataset.cases,
+            dataset_cases,
             SearchEvaluationStage.REGRESSION_DEV,
             spec.budget.timeout_seconds,
         )
         winner = evaluator.evaluate(
             winner_skill,
-            spec.regression_dev_path,
+            dataset_file,
             dataset_sha,
-            dataset.cases,
+            dataset_cases,
             SearchEvaluationStage.REGRESSION_DEV,
             spec.budget.timeout_seconds,
         )

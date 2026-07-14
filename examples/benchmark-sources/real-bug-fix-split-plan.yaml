@@ -1,0 +1,23 @@
+schema_version: ase/benchmark-split-plan/v1alpha1
+name: real-python-bug-fix-small
+version: "2026.07.14"
+source_spec: cross-repository-generation.example.yaml
+isolation_key: provenance_family
+claim_limit: >-
+  Ten real Git-history cases from two repositories and ten independent defect families. This is
+  a small engineering benchmark and does not support general Agent performance claims.
+splits:
+  train:
+    - more-itertools-islice-release
+    - cachetools-lru-missing-item
+  validation_search:
+    - more-itertools-last-reversed-none
+    - cachetools-cachedmethod-autospec
+    - cachetools-cachedmethod-bound-key
+    - cachetools-ttl-boundary-expiration
+  regression_dev:
+    - more-itertools-sample-strict-counts
+    - cachetools-hashkey-pickle
+  validation_confirm:
+    - cachetools-cachedmethod-self-key
+    - cachetools-lru-popitem-context
