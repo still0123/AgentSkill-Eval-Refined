@@ -19,6 +19,8 @@ from agentskill_eval_benchmark_gen import (
     DemoExperimentRunner,
     DemoMode,
     DemoRunConfig,
+    OptimizationBenchmarkPlan,
+    OptimizationBenchmarkPublisher,
 )
 from agentskill_eval_cli import __version__
 from agentskill_eval_contracts import (
@@ -101,6 +103,10 @@ trace_app = typer.Typer(help="Inspect normalized traces and rule-based diagnoses
 app.add_typer(trace_app, name="trace")
 benchmark_app = typer.Typer(help="Generate, review, and publish audited benchmark candidates.")
 app.add_typer(benchmark_app, name="benchmark")
+benchmark_split_app = typer.Typer(
+    help="Validate and publish the immutable five-way optimization benchmark."
+)
+benchmark_app.add_typer(benchmark_split_app, name="split")
 optimize_app = typer.Typer(help="Search validation data for a frozen Skill candidate.")
 app.add_typer(optimize_app, name="optimize")
 evolution_app = typer.Typer(help="Package and inspect frozen Skill evolution evidence.")
@@ -1466,6 +1472,121 @@ def publish_benchmark(
             sort_keys=True,
         )
     )
+
+
+@benchmark_split_app.command("validate")
+def validate_optimization_benchmark_split(
+    plan_path: Path = typer.Argument(  # noqa: B008
+        ..., exists=True, dir_okay=False, help="Five-way optimization benchmark plan."
+    ),
+    workspace: Path = typer.Option(  # noqa: B008
+        Path(".agentskill-eval-workspace"), "--workspace", file_okay=False
+    ),
+) -> None:
+    """Validate counts, source catalogs, bundle identities, and split isolation."""
+    plan = OptimizationBenchmarkPlan.load(plan_path)
+    publisher = OptimizationBenchmarkPublisher(workspace)
+    specs = publisher.validate_plan(plan, plan_path)
+    typer.echo(
+        json.dumps(
+            {
+                "name": plan.name,
+                "version": plan.version,
+                "case_count": sum(len(spec.candidates) for spec in specs),
+                "splits": {
+                    item.split.value: {
+                        "case_count": len(spec.candidates),
+                        "repositories": [
+                            source.repository_url for source in spec.repository_sources()
+                        ],
+                        "optimizer_visible": item.optimizer_visible,
+                    }
+                    for item, spec in zip(plan.splits, specs)
+                },
+            },
+            ensure_ascii=False,
+            sort_keys=True,
+        )
+    )
+
+
+@benchmark_split_app.command("publish")
+def publish_optimization_benchmark_split(
+    plan_path: Path = typer.Argument(  # noqa: B008
+        ..., exists=True, dir_okay=False, help="Five-way optimization benchmark plan."
+    ),
+    workspace: Path = typer.Option(  # noqa: B008
+        Path(".agentskill-eval-workspace"), "--workspace", file_okay=False
+    ),
+    reviewer: str = typer.Option(..., "--reviewer"),  # noqa: B008
+    publisher_name: str = typer.Option(..., "--publisher"),  # noqa: B008
+    confirm: bool = typer.Option(False, "--confirm-offline-publication"),  # noqa: B008
+) -> None:
+    """Run 240 offline verifier commands and publish five immutable DatasetVersions."""
+    if not confirm:
+        raise typer.BadParameter(
+            "publication requires --confirm-offline-publication (no model calls or fees)"
+        )
+    plan = OptimizationBenchmarkPlan.load(plan_path)
+    release, directory = OptimizationBenchmarkPublisher(workspace).publish(
+        plan,
+        plan_path,
+        reviewer=reviewer,
+        publisher=publisher_name,
+    )
+    typer.echo(
+        json.dumps(
+            {
+                "release": str(directory / "release-manifest.json"),
+                "content_sha256": release.content_sha256,
+                "case_count": release.total_case_count,
+                "repository_count": release.repository_count,
+                "independence_group_count": release.independence_group_count,
+                "split_counts": {
+                    item.split.value: item.case_count for item in release.splits
+                },
+                "locked_policy": release.locked_policy,
+            },
+            ensure_ascii=False,
+            sort_keys=True,
+        )
+    )
+
+
+@benchmark_split_app.command("verify")
+def verify_optimization_benchmark_split(
+    release_path: Path = typer.Argument(  # noqa: B008
+        ..., exists=True, dir_okay=False, help="Immutable release-manifest.json."
+    ),
+    workspace: Path = typer.Option(  # noqa: B008
+        ..., "--workspace", exists=True, file_okay=False
+    ),
+) -> None:
+    """Re-hash every DatasetVersion and rerun the cross-split leakage audit."""
+    publisher = OptimizationBenchmarkPublisher(workspace)
+    release = publisher.load_release(release_path)
+    publisher.verify(release)
+    typer.echo(
+        json.dumps(
+            {
+                "verified": True,
+                "content_sha256": release.content_sha256,
+                "case_count": release.total_case_count,
+            },
+            sort_keys=True,
+        )
+    )
+
+
+@benchmark_split_app.command("inspect")
+def inspect_optimization_benchmark_split(
+    release_path: Path = typer.Argument(  # noqa: B008
+        ..., exists=True, dir_okay=False, help="Immutable release-manifest.json."
+    ),
+) -> None:
+    """Print the immutable release without opening withheld DatasetVersion paths."""
+    release = OptimizationBenchmarkPublisher.load_release(release_path)
+    typer.echo(release.model_dump_json(indent=2))
 
 
 @dataset_app.command("validate")

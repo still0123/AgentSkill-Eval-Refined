@@ -190,6 +190,8 @@ Automatic Benchmark Generation v1alpha2 可在一个冻结 Job 中重建多个�
 - [跨仓库离线验收说明](./experiments/cross-repository-benchmark-2026-07-14/README.md)
 - [脱敏哈希与聚合结果](./experiments/cross-repository-benchmark-2026-07-14/result.sanitized.json)
 - [Stage 3 四 Case train DatasetVersion 证据](./experiments/train-benchmark-expansion-2026-07-14/README.md)
+- [Optimization Benchmark Split v1：20 Case / 5 repositories / 5 immutable DatasetVersions](./docs/optimization-benchmark-split-v1.md)
+- [Stage 2 离线发布证据](./experiments/optimization-benchmark-split-v1-2026-07-14/README.md)
 
 ## 真实 Agent 运行安全门
 

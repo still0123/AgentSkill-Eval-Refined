@@ -32,6 +32,7 @@
 - [Independent Final Evaluation MVP](./independent-final-evaluation.md)
 - [Real Agent Evaluation Evidence MVP](./real-agent-evidence.md)
 - [阶段 3～5 数据准备与隔离](./dataset-preparation-stage3-5.md)
+- [阶段 2：Optimization Benchmark Split v1](./optimization-benchmark-split-v1.md)
 - [阶段 4A：SkillVersion Promotion Core](./skill-version-promotion.md)
 - [阶段 4B：Promotion Workflow Integration](./promotion-workflow-integration.md)
 - [Stage 5 Evidence Release Prep](./evidence-release-prep.md)

@@ -1,0 +1,192 @@
+schema_version: ase/benchmark-generation/v1alpha1
+name: optimization-split-v1-humanize
+version: "2026.07.14.1"
+repository_path: /absolute/path/to/offline/humanize
+repository_url: https://github.com/python-humanize/humanize.git
+fork_lineage: github.com/python-humanize/humanize
+license_spdx: MIT
+license_path: LICENCE
+contamination_risk: high
+target_split: validation_confirm
+generator_profile: local-git-history/v2
+verifier_profile: deterministic-subprocess/v2
+quality_gate:
+  repeat_count: 3
+  timeout_seconds: 30
+  mutation_required: true
+  alternative_required: true
+  prohibit_network_time_random: true
+  prohibit_patch_leakage: true
+  max_repository_files: 5000
+  max_repository_bytes: 50000000
+budget:
+  max_candidates: 4
+  max_commands: 48
+  wall_seconds: 1200
+candidates:
+  - key: humanize-intcomma-string-ndigits
+    provenance_family: intcomma-string-rounding
+    before_commit: e0a0ef00767fa2c0dffb34ff782cf21f0f2862dd
+    after_commit: 33005e5abf19a5a1f0dd33441d73ff43fa906ca5
+    task: >-
+      Fix intcomma so numeric strings can be rounded with ndigits and still receive thousands
+      separators, without changing invalid-string handling.
+    issue_url: https://github.com/python-humanize/humanize/commit/33005e5abf19a5a1f0dd33441d73ff43fa906ca5
+    production_paths: [src/humanize/number.py]
+    regression_test_paths: [tests/test_number.py]
+    test_command:
+      - "${PYTHON}"
+      - -m
+      - pytest
+      - -q
+      - tests/test_number.py::test_intcomma
+    alternative_patch: |
+      diff --git a/src/humanize/number.py b/src/humanize/number.py
+      index e1fcaf4..f817a1a 100644
+      --- a/src/humanize/number.py
+      +++ b/src/humanize/number.py
+      @@ -131,22 +131,22 @@ def intcomma(value: NumberOrString, ndigits: int | None = None) -> str:
+           sep = thousands_separator()
+           try:
+               if isinstance(value, str):
+      -            float(value.replace(sep, ""))
+      +            value = value.replace(sep, "")
+      +            value = float(value) if "." in value else int(value)
+               else:
+                   float(value)
+           except (TypeError, ValueError):
+               return str(value)
+      
+           if ndigits is not None:
+      -        orig = "{0:.{1}f}".format(value, ndigits)
+      +        orig = "{0:.{1}f}".format(float(value), ndigits)
+           else:
+               orig = str(value)
+      
+           new = re.sub(r"^(-?\d+)(\d{3})", rf"\g<1>{sep}\g<2>", orig)
+      -    if orig == new:
+      -        return new
+      -
+      -    return intcomma(new)
+      +    while orig != new:
+      +        orig, new = new, re.sub(r"^(-?\d+)(\d{3})", rf"\g<1>{sep}\g<2>", new)
+      +    return new
+      
+      
+       powers = [10**x for x in (3, 6, 9, 12, 15, 18, 21, 24, 27, 30, 33, 100)]
+    category: positive
+    tags: [python, regression, formatting, string]
+
+  - key: humanize-scientific-negative-sign
+    provenance_family: scientific-negative-mantissa
+    before_commit: 7688f204a994e55f8e607675363178e5d8424523
+    after_commit: 43ebe21b5f55f0218a75074227020fb63dd45e4d
+    task: >-
+      Fix scientific formatting so negative values keep their sign on the mantissa while the
+      exponent sign continues to represent magnitude, including very small negative values.
+    issue_url: https://github.com/python-humanize/humanize/commit/43ebe21b5f55f0218a75074227020fb63dd45e4d
+    production_paths: [src/humanize/number.py]
+    regression_test_paths: [tests/test_number.py]
+    test_command:
+      - "${PYTHON}"
+      - -m
+      - pytest
+      - -q
+      - tests/test_number.py::test_scientific
+    alternative_patch: |
+      diff --git a/src/humanize/number.py b/src/humanize/number.py
+      --- a/src/humanize/number.py
+      +++ b/src/humanize/number.py
+      @@ -374,13 +374,6 @@ def scientific(value: NumberOrString, precision: int = 2) -> str:
+      -    negative = False
+           try:
+      -        if "-" in str(value):
+      -            value = str(value).replace("-", "")
+      -            negative = True
+      -
+      -        if isinstance(value, str):
+      -            value = float(value)
+      -
+      +        numeric_value = float(value)
+               fmt = "{:.%se}" % str(int(precision))
+      -        n = fmt.format(value)
+      +        n = fmt.format(numeric_value)
+      
+           except (ValueError, TypeError):
+      @@ -393,9 +386,7 @@ def scientific(value: NumberOrString, precision: int = 2) -> str:
+           if "+0" in part2:
+               part2 = part2.replace("+0", "")
+      +    part2 = part2.replace("+", "")
+      
+           new_part2 = []
+      -    if negative:
+      -        new_part2.append(exponents["-"])
+      -
+           for char in part2:
+               new_part2.append(exponents[char])
+    category: positive
+    tags: [python, regression, formatting, numeric]
+
+  - key: humanize-intcomma-zero-precision
+    provenance_family: intcomma-zero-precision
+    before_commit: 29d37fb15945433d295b942bd839ae152770eca0
+    after_commit: 03863fed6c2ba02cfd13d5b1e0b161f680c7b966
+    task: >-
+      Fix intcomma so ndigits=0 is treated as an explicit rounding request rather than as an
+      absent precision value.
+    issue_url: https://github.com/python-humanize/humanize/commit/03863fed6c2ba02cfd13d5b1e0b161f680c7b966
+    production_paths: [src/humanize/number.py]
+    regression_test_paths: [tests/test_number.py]
+    test_command:
+      - "${PYTHON}"
+      - -m
+      - pytest
+      - -q
+      - tests/test_number.py::test_intcomma
+    alternative_patch: |
+      diff --git a/src/humanize/number.py b/src/humanize/number.py
+      --- a/src/humanize/number.py
+      +++ b/src/humanize/number.py
+      @@ -137,6 +137,6 @@ def intcomma(value: NumberOrString, ndigits: int | None = None) -> str:
+           except (TypeError, ValueError):
+               return str(value)
+      
+      -    if ndigits:
+      +    if ndigits or ndigits == 0:
+               orig = "{0:.{1}f}".format(value, ndigits)
+           else:
+    category: positive
+    tags: [python, regression, formatting, boundary]
+
+  - key: humanize-metric-precision-floor
+    provenance_family: metric-negative-format-precision
+    before_commit: 5cb0323fa93ea9b70da385f521da8df70861963a
+    after_commit: e5a3976c5a053ae681ec388308d95065e4e35498
+    task: >-
+      Fix metric formatting when requested precision would produce a negative number of decimal
+      places, clamping the decimal count while preserving SI prefixes.
+    issue_url: https://github.com/python-humanize/humanize/commit/e5a3976c5a053ae681ec388308d95065e4e35498
+    production_paths: [src/humanize/number.py]
+    regression_test_paths: [tests/test_number.py]
+    test_command:
+      - "${PYTHON}"
+      - -m
+      - pytest
+      - -q
+      - tests/test_number.py::test_metric
+    alternative_patch: |
+      diff --git a/src/humanize/number.py b/src/humanize/number.py
+      --- a/src/humanize/number.py
+      +++ b/src/humanize/number.py
+      @@ -562,5 +562,8 @@ def metric(value: float, unit: str = "", precision: int = 3) -> str:
+               ordinal_ = "mμnpfazyrq"[(-exponent - 1) // 3]
+           else:
+               ordinal_ = ""
+      -    value_ = format(value, ".%if" % (precision - (exponent % 3) - 1))
+      +    decimal_places = precision - (exponent % 3) - 1
+      +    if decimal_places < 0:
+      +        decimal_places = 0
+      +    value_ = format(value, ".%if" % decimal_places)
+           if not (unit or ordinal_) or unit in ("°", "′", "″"):
+    category: robustness
+    tags: [python, regression, formatting, precision]

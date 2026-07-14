@@ -69,3 +69,21 @@ agentskill-eval benchmark generate-split \
   examples/benchmark-sources/real-bug-fix-split-plan.yaml locked_test \
   --workspace .agentskill-eval/benchmark
 ```
+
+## Optimization Benchmark Split v1
+
+`optimization-split-v1/plan.yaml` supersedes the twelve-Case demonstration plan for real Skill
+optimization. It does not relabel old Cases: it freezes 20 verified histories from five repositories
+and assigns one whole repository to each split.
+
+| Bundle | License | SHA-256 | Split |
+|---|---|---|---|
+| `more-itertools.bundle` | MIT | `9e19644b0027cc11502b5ccc959abce2847b8cf94a3446b09d45a1cd716651bb` | train |
+| `cachetools.bundle` | MIT | `9933f9067dbc4da476cdc2612625422251916d53d8945153b0795dca1371258c` | validation_search |
+| `boltons.bundle` | BSD-3-Clause | `d561ac68fbb7568ee42314ce74a983d8732f527989e8ad4cc3450a0ec9e6c453` | regression_dev |
+| `humanize.bundle` | MIT | `7f6e7eb68724bc4a3ab66ede0bd29da94225a00fcdba16d612fef51c6582534e` | validation_confirm |
+| `pydash.bundle` | MIT | `96ef9847c42e5408c4739feb23bfbb982afeece3b719f277202d99a639d264d4` | locked_test |
+
+The source catalogs remain non-executable until the complete five-way plan passes the strict
+repository/fork/patch-family audit. See `docs/optimization-benchmark-split-v1.md` for publication and
+replay commands.
