@@ -63,10 +63,29 @@ from agentskill_eval_skill_optimizer.process_generator import (
     ProcessHypothesisProposal,
     ProcessHypothesisResponse,
 )
+from agentskill_eval_skill_optimizer.promotion import (
+    PromotionError,
+    SkillVersionPromotionCore,
+    SkillVersionPromotionStore,
+    SkillVersionPublication,
+)
+from agentskill_eval_skill_optimizer.promotion_workflow import (
+    PromotionWorkflow,
+    PromotionWorkflowError,
+    PromotionWorkflowResult,
+    PromotionWorkflowStore,
+)
 from agentskill_eval_skill_optimizer.real_evaluator import (
     RealAgentCandidateEvaluator,
     RealCandidateEvaluationError,
     RealEvaluationAuthorization,
+)
+from agentskill_eval_skill_optimizer.release_evidence import (
+    EvidenceReleaseError,
+    EvidenceReleasePreparer,
+    EvidenceReleaseResult,
+    EvidenceReleaseSpec,
+    ReleaseArtifact,
 )
 from agentskill_eval_skill_optimizer.search import (
     BenchmarkGuidedSkillSearch,
@@ -141,6 +160,16 @@ __all__ = [
     "RealAgentCandidateEvaluator",
     "RealCandidateEvaluationError",
     "RealEvaluationAuthorization",
+    "EvidenceReleaseError",
+    "EvidenceReleasePreparer",
+    "EvidenceReleaseResult",
+    "EvidenceReleaseSpec",
+    "ReleaseArtifact",
+    "PromotionError",
+    "PromotionWorkflow",
+    "PromotionWorkflowError",
+    "PromotionWorkflowResult",
+    "PromotionWorkflowStore",
     "SearchAlgorithmSpec",
     "SearchBudgetSpec",
     "SearchCase",
@@ -150,6 +179,9 @@ __all__ = [
     "SimulatedFinalDataset",
     "SkillSearchError",
     "SkillSearchResult",
+    "SkillVersionPromotionCore",
+    "SkillVersionPromotionStore",
+    "SkillVersionPublication",
     "ValidationSearchDataset",
     "build_evaluator",
 ]

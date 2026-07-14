@@ -10,6 +10,10 @@ describe('synthetic demo fixtures', () => {
       'trace-diagnosis.json',
       'benchmark-generation.json',
       'skill-search.json',
+      'promotion.json',
+      'skill-version.json',
+      'promotion-workflow.json',
+      'promotion-release.json',
     ]
     const reports = names.map((name) =>
       parseReportText(
@@ -22,6 +26,10 @@ describe('synthetic demo fixtures', () => {
       'diagnosis',
       'benchmark',
       'skill-search',
+      'promotion',
+      'promotion',
+      'promotion',
+      'promotion',
     ])
     expect(reports.every((item) => item.synthetic || item.simulated)).toBe(true)
   })

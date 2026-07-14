@@ -32,6 +32,16 @@ from agentskill_eval_benchmark_gen.spec import (
     RepositorySourceSpec,
     SpecError,
 )
+from agentskill_eval_benchmark_gen.split_audit import (
+    PROTECTED_SPLITS,
+    SplitAuditEntry,
+    SplitAuditError,
+    SplitAuditReport,
+    SplitLeakage,
+    audit_loaded_datasets,
+    audit_split_entries,
+    split_inventory,
+)
 
 __all__ = [
     "AutomaticBenchmarkGenerator",
@@ -56,6 +66,14 @@ __all__ = [
     "LoadedDataset",
     "GenerationResult",
     "QualityGateSpec",
+    "PROTECTED_SPLITS",
     "RepositorySourceSpec",
     "SpecError",
+    "SplitAuditEntry",
+    "SplitAuditError",
+    "SplitAuditReport",
+    "SplitLeakage",
+    "audit_loaded_datasets",
+    "audit_split_entries",
+    "split_inventory",
 ]

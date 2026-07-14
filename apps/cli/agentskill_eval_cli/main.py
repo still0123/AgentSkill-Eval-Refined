@@ -64,6 +64,8 @@ from agentskill_eval_skill_optimizer import (
     ObservedFailureEvidenceBridge,
     OptimizationSearchSpec,
     OptimizationStore,
+    PromotionWorkflow,
+    PromotionWorkflowResult,
     RealEvaluationAuthorization,
 )
 from agentskill_eval_trace_intelligence import compare_traces
@@ -96,6 +98,10 @@ evolve_app = typer.Typer(help="Generate Skill candidates from train failure diag
 optimize_app.add_typer(evolve_app, name="evolve")
 final_app = typer.Typer(help="Evaluate a frozen base/winner pair on an independent split.")
 app.add_typer(final_app, name="final")
+skill_app = typer.Typer(help="Inspect and promote immutable Agent Skill versions.")
+app.add_typer(skill_app, name="skill")
+skill_promote_app = typer.Typer(help="Run the Fake-evidence Stage 4b promotion workflow.")
+skill_app.add_typer(skill_promote_app, name="promote")
 real_app = typer.Typer(help="Preflight and run budgeted observed-Agent evidence experiments.")
 app.add_typer(real_app, name="real")
 scenario_app = typer.Typer(
@@ -542,6 +548,186 @@ def final_status(
     typer.echo(
         json.dumps(
             {"job": job.model_dump(mode="json"), "report": report.model_dump(mode="json")},
+            ensure_ascii=False,
+            sort_keys=True,
+        )
+    )
+
+
+def _promotion_summary(result: PromotionWorkflowResult) -> dict[str, object]:
+    workflow = result.workflow
+    release = result.release_manifest
+    publication = result.publication
+    return {
+        "workflow_id": str(workflow.id),
+        "promotion_id": str(workflow.promotion_id),
+        "status": workflow.status.value,
+        "simulated": workflow.simulated,
+        "claim_limit": workflow.claim_limit,
+        "release_decision": release.decision if release is not None else None,
+        "skill_version_manifest": (
+            str(publication.manifest_path) if publication is not None else None
+        ),
+        "release_manifest_sha256": workflow.release_manifest_sha256,
+    }
+
+
+@skill_promote_app.command("begin")
+def skill_promote_begin(
+    handoff_path: Path = typer.Argument(..., exists=True, dir_okay=False),  # noqa: B008
+    skill_name: str = typer.Option(..., "--skill-name"),  # noqa: B008
+    target_version: str = typer.Option(..., "--target-version"),  # noqa: B008
+    actor: str = typer.Option("fixture-evolution", "--actor"),  # noqa: B008
+    workspace: Path = typer.Option(  # noqa: B008
+        Path(".agentskill-eval-workspace"), "--workspace", file_okay=False
+    ),
+) -> None:
+    """Accept one Fake AWAITING_INDEPENDENT_FINAL_EVALUATION handoff."""
+    try:
+        workflow = PromotionWorkflow(workspace).begin(
+            handoff_path,
+            skill_name=skill_name,
+            target_version=target_version,
+            actor=actor,
+        )
+    except (OSError, ValueError, RuntimeError) as exc:
+        raise typer.BadParameter(str(exc), param_hint="HANDOFF") from exc
+    typer.echo(
+        json.dumps(
+            {
+                "workflow_id": str(workflow.id),
+                "promotion_id": str(workflow.promotion_id),
+                "status": workflow.status.value,
+                "simulated": workflow.simulated,
+                "claim_limit": workflow.claim_limit,
+            },
+            sort_keys=True,
+        )
+    )
+
+
+def _run_promotion_final_step(
+    workflow_id: UUID,
+    spec_path: Path,
+    workspace: Path,
+    *,
+    locked: bool,
+    allow_simulation: bool,
+) -> None:
+    spec = IndependentFinalEvaluationSpec.load(spec_path)
+    if not allow_simulation:
+        raise typer.BadParameter(
+            "Stage 4b requires --allow-simulation and cannot run real evidence",
+            param_hint="--allow-simulation",
+        )
+    service = PromotionWorkflow(workspace)
+    try:
+        result = (
+            service.locked_test(workflow_id, spec) if locked else service.confirm(workflow_id, spec)
+        )
+    except (OSError, ValueError, RuntimeError) as exc:
+        raise typer.BadParameter(str(exc), param_hint="CONFIG") from exc
+    typer.echo(json.dumps(_promotion_summary(result), sort_keys=True))
+
+
+@skill_promote_app.command("confirm")
+def skill_promote_confirm(
+    workflow_id: UUID = typer.Argument(...),  # noqa: B008
+    spec_path: Path = typer.Argument(..., exists=True, dir_okay=False),  # noqa: B008
+    workspace: Path = typer.Option(  # noqa: B008
+        Path(".agentskill-eval-workspace"), "--workspace", file_okay=False
+    ),
+    allow_simulation: bool = typer.Option(False, "--allow-simulation"),  # noqa: B008
+) -> None:
+    """Run Fake validation_confirm through IndependentFinalEvaluator."""
+    _run_promotion_final_step(
+        workflow_id, spec_path, workspace, locked=False, allow_simulation=allow_simulation
+    )
+
+
+@skill_promote_app.command("locked")
+def skill_promote_locked(
+    workflow_id: UUID = typer.Argument(...),  # noqa: B008
+    spec_path: Path = typer.Argument(..., exists=True, dir_okay=False),  # noqa: B008
+    workspace: Path = typer.Option(  # noqa: B008
+        Path(".agentskill-eval-workspace"), "--workspace", file_okay=False
+    ),
+    allow_simulation: bool = typer.Option(False, "--allow-simulation"),  # noqa: B008
+) -> None:
+    """Consume the one-shot Fake locked test through IndependentFinalEvaluator."""
+    _run_promotion_final_step(
+        workflow_id, spec_path, workspace, locked=True, allow_simulation=allow_simulation
+    )
+
+
+@skill_promote_app.command("approve")
+def skill_promote_approve(
+    workflow_id: UUID = typer.Argument(...),  # noqa: B008
+    reviewer: str = typer.Option(..., "--reviewer"),  # noqa: B008
+    reason: str = typer.Option(..., "--reason"),  # noqa: B008
+    confirm_human_review: bool = typer.Option(False, "--confirm-human-review"),  # noqa: B008
+    allow_simulation: bool = typer.Option(False, "--allow-simulation"),  # noqa: B008
+    workspace: Path = typer.Option(  # noqa: B008
+        Path(".agentskill-eval-workspace"), "--workspace", file_okay=False
+    ),
+) -> None:
+    """Approve and locally publish a Fake-only immutable SkillVersion fixture."""
+    if not confirm_human_review or not allow_simulation:
+        raise typer.BadParameter(
+            "approval requires --confirm-human-review and --allow-simulation",
+            param_hint="--confirm-human-review/--allow-simulation",
+        )
+    try:
+        result = PromotionWorkflow(workspace).approve(workflow_id, reviewer=reviewer, reason=reason)
+    except (OSError, ValueError, RuntimeError) as exc:
+        raise typer.BadParameter(str(exc), param_hint="WORKFLOW_ID") from exc
+    typer.echo(json.dumps(_promotion_summary(result), sort_keys=True))
+
+
+@skill_promote_app.command("reject")
+def skill_promote_reject(
+    workflow_id: UUID = typer.Argument(...),  # noqa: B008
+    reviewer: str = typer.Option(..., "--reviewer"),  # noqa: B008
+    reason: str = typer.Option(..., "--reason"),  # noqa: B008
+    confirm_human_review: bool = typer.Option(False, "--confirm-human-review"),  # noqa: B008
+    allow_simulation: bool = typer.Option(False, "--allow-simulation"),  # noqa: B008
+    workspace: Path = typer.Option(  # noqa: B008
+        Path(".agentskill-eval-workspace"), "--workspace", file_okay=False
+    ),
+) -> None:
+    """Reject a Fake promotion after locked-test completion."""
+    if not confirm_human_review or not allow_simulation:
+        raise typer.BadParameter(
+            "rejection requires --confirm-human-review and --allow-simulation",
+            param_hint="--confirm-human-review/--allow-simulation",
+        )
+    try:
+        result = PromotionWorkflow(workspace).reject(workflow_id, reviewer=reviewer, reason=reason)
+    except (OSError, ValueError, RuntimeError) as exc:
+        raise typer.BadParameter(str(exc), param_hint="WORKFLOW_ID") from exc
+    typer.echo(json.dumps(_promotion_summary(result), sort_keys=True))
+
+
+@skill_promote_app.command("status")
+def skill_promote_status(
+    workspace: Path = typer.Argument(..., exists=True, file_okay=False),  # noqa: B008
+    workflow_id: UUID = typer.Argument(...),  # noqa: B008
+) -> None:
+    """Read the current workflow and immutable terminal release decision."""
+    try:
+        result = PromotionWorkflow(workspace).status(workflow_id)
+    except (OSError, ValueError, RuntimeError) as exc:
+        raise typer.BadParameter(str(exc), param_hint="WORKFLOW_ID") from exc
+    typer.echo(
+        json.dumps(
+            {
+                "workflow": result.workflow.model_dump(mode="json"),
+                "release": (
+                    result.release_manifest.model_dump(mode="json")
+                    if result.release_manifest is not None
+                    else None
+                ),
+            },
             ensure_ascii=False,
             sort_keys=True,
         )

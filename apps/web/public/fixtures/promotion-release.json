@@ -1,0 +1,72 @@
+{
+  "schema_version": "ase/promotion-release/v1alpha1",
+  "workflow_id": "71000000-0000-4000-8000-000000000001",
+  "promotion_id": "10000000-0000-4000-8000-000000000001",
+  "decision": "APPROVED",
+  "evolution_id": "72000000-0000-4000-8000-000000000002",
+  "optimization_job_id": "20000000-0000-4000-8000-000000000002",
+  "winner_candidate_id": "30000000-0000-4000-8000-000000000003",
+  "parent_skill_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "winner_skill_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "lineage_sha256": "1010101010101010101010101010101010101010101010101010101010101010",
+  "lineage": [
+    {
+      "role": "handoff",
+      "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "size_bytes": 810
+    },
+    {
+      "role": "evolution_report",
+      "sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "size_bytes": 1320
+    },
+    {
+      "role": "regression_gate",
+      "sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "size_bytes": 640
+    },
+    {
+      "role": "hypotheses",
+      "sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "size_bytes": 920
+    },
+    {
+      "role": "search_report",
+      "sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "size_bytes": 1840
+    }
+  ],
+  "confirmation": {
+    "stage": "validation_confirm",
+    "final_evaluation_job_id": "40000000-0000-4000-8000-000000000004",
+    "report_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "decision": "CONFIRMED",
+    "base_skill_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "winner_skill_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "simulated": true,
+    "validator_version": "fixture-validator/1.0",
+    "recorded_at": "2026-07-14T09:10:00Z"
+  },
+  "locked_test": {
+    "stage": "locked_test",
+    "final_evaluation_job_id": "50000000-0000-4000-8000-000000000005",
+    "report_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "decision": "CONFIRMED",
+    "base_skill_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "winner_skill_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "simulated": true,
+    "validator_version": "fixture-validator/1.0",
+    "recorded_at": "2026-07-14T09:20:00Z"
+  },
+  "human_review": {
+    "decision": "APPROVED",
+    "reviewer": "fixture-human-reviewer",
+    "reason": "Fake evidence accepted for integration testing only",
+    "reviewed_at": "2026-07-14T09:30:00Z"
+  },
+  "skill_version_manifest_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+  "diff_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+  "simulated": true,
+  "released_at": "2026-07-14T09:40:00Z",
+  "claim_limit": "Fake release evidence validates immutable release rendering only."
+}

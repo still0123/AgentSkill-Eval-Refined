@@ -345,8 +345,8 @@ CI：Python、Dashboard、Secret Scan 全部通过
 Frozen winner
 → validation_confirm
 → regression/final decision
-→ human approve/reject
 → one locked_test
+→ human approve/reject
 → publish Skill v2 or REJECTED
 
 目标：
@@ -383,6 +383,21 @@ agentskill-eval skill promote reject PROMOTION_ID --reason "..."
 - 发布后的 v2 内容不可修改；
 - Dashboard 可只读展示失败→假设→候选→确认→locked→v2；
 - Ruff、mypy、pytest、wheel、Dashboard 和 GitHub CI 通过；
+
+### 9.4 Stage 4b 前置集成完成记录（Fake Evidence Only）
+
+Stage 4b 已在不接入阶段 3 真实 winner 的条件下完成 Promotion Workflow 前置集成：
+
+- 接收并复验 `AWAITING_INDEPENDENT_FINAL_EVALUATION` fixture handoff；
+- 复用 IndependentFinalEvaluator 串联 simulated confirmation 和一次性 locked test；
+- 要求显式人工 approve/reject，输出 `APPROVED` 或 `REJECTED`；
+- 发布不可变 fixture SkillVersion、v1/v2 diff 和完整 release lineage manifest；
+- 提供 `agentskill-eval skill promote` CLI 和 Fake 端到端测试；
+- Dashboard 只读展示 proposal lineage、confirmation、locked test、人工决定和版本状态；
+- Stage 5 Evidence Release Prep 已提供脱敏、审计包校验和发布目录模板。
+
+该完成记录不代表真实阶段 4 完成，不得把 fixture SkillVersion 表述为真实 v2。真实 winner、
+confirmation、locked test 和发布仍等待阶段 3 结束后另行执行。
 - 独立提交并推送分支。
 
 ### 9.4 完成记录
