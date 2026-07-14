@@ -7,6 +7,9 @@ after the first stable release.
 
 ### Added
 
+- Stage 3B Real Evolution Dry-Run Orchestration, which binds the Stage 2 five-way release to the
+  Stage 3A plan, integrity-checks only adaptive DatasetVersions, rehearses a hash-pinned local
+  Process, and retains confirmation/locked inputs as path-free receipts.
 - A proposal-only real LLM job and CLI that reuse the DeepSeek OpenAI-compatible Generator without
   constructing search, regression, confirmation, or locked-test work.
 - Immutable proposal manifests and offline reports freezing provider/model parameters, prompt,

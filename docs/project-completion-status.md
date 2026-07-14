@@ -29,8 +29,9 @@ Skill 缺陷，也没有消费已授权但不满足前提的 proposal 调用。
 | 配对评测 | without/with Skill、v1/v2、PairBlock、重复实验、W/T/L | 支持 simulated 与 observed-Agent 严格隔离 |
 | 执行证据 | 不可变 Manifest、Trace、工具/命令/文件事件、审计包 | 不保存模型隐藏思维过程 |
 | 失败诊断 | 规则诊断、terminal reason、FailureEvidenceBundle | invalid 不进入 Skill 优化输入 |
-| Benchmark | 12 个真实 Git 历史缺陷家族、暴露域隔离、非空 locked split、provenance、mutation 与替代修复验证 | locked Case 公开且高污染，仅覆盖首个 Python Bug Fix family |
+| Benchmark | 20 个真实 Git 历史缺陷 Case、5 个独立仓库、五段 DatasetVersion、provenance、mutation 与替代修复验证 | locked Case 公开且高污染，仅覆盖首个 Python Bug Fix family |
 | Skill Search | 候选生成、真实/模拟 evaluator、successive halving、regression_dev | adaptive search 结果不等同 locked-test 结论 |
+| Real Evolution Dry Run | Stage 2/3A 绑定、adaptive Process 演练、confirm/locked 收据隔离 | simulated Process 集成证据；未调用模型或 Agent |
 | 独立终评 | confirmation、一次性 locked test、burn rule | 工程链路已完成 |
 | Promotion | 人工审核、父版本哈希、不可变 SkillVersion、回滚指针 | 当前真实 v2 未发布；Fake fixture 只证明流程 |
 | Evidence Release | `prepare`、`verify`、`inspect` CLI，离线 HTML、diff、索引和审计包 | Stage 5A.2 已用 Fake Promotion fixture 完成端到端验收 |
@@ -126,3 +127,11 @@ Release、Proposal、Search、Final Evaluation、Promotion 和 SkillVersion 证�
 `NOT_STARTED / RUNNING / PASSED / FAILED / REJECTED / UNAVAILABLE` 展示阶段状态；缺失 locked
 或人工审核证据时不会显示 Published，null 指标不会显示为 0。默认 Fake fixture 与 Stage 1
 脱敏 Proposal 仅用于展示协议和边界，不构成真实 Skill v2 改进结论。
+
+## 10. Stage 3B 执行准备状态
+
+Stage 3B 将 Stage 2 五段不可变 DatasetVersion 与 Stage 3A 真实执行计划进行一致性绑定。它只
+打开并校验 `validation_search`、`regression_dev`，通过哈希和版本固定的本地 Process 演练
+自适应阶段；`validation_confirm`、`locked_test` 只保留不含路径和 Case key 的收据。输出状态
+为 `AWAITING_REAL_AUTHORIZATION`，明确标记 `simulated=true`，不产生模型费用、不运行 Agent，
+也不声称 Skill 改进。
