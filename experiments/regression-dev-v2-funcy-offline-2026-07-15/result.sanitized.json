@@ -1,0 +1,28 @@
+{
+  "schema_version": "agentskill-eval/regression-dev-v2-offline-result/v1",
+  "experiment_class": "offline_dataset_publication",
+  "simulated": false,
+  "evidence_class": "deterministic_dataset_evidence",
+  "model_calls": 0,
+  "agent_runs": 0,
+  "paid_cost_microusd": 0,
+  "base_optimization_release_sha256": "aa0b0ad1a38c8f6580cc0c962140565b5f4cba0db17441999df7e1e9cdf5b7ab",
+  "funcy_bundle_sha256": "3da2875f00495bb523447ec1ade7bc121e7329ec4bcfc663637ae1a7b6e291fa",
+  "dataset_version_id": "7909bad9-171e-59ac-a32b-58a19ee2f271",
+  "dataset_content_sha256": "4f0fb6273b64326ab96d29b1c297b0bfacb1260f9ea850b3f5b048c6c34ac7c3",
+  "release_content_sha256": "079ba1f5f07ae28553d5101ace913e1924c09f3097518421daedbd5d21553ba8",
+  "status": "AWAITING_OBSERVED_BASELINE_SCREENING",
+  "repository_isolation": {
+    "funcy_lineage": "github.com/Suor/funcy",
+    "overlaps_existing_optimization_release": false,
+    "independence_groups": 4
+  },
+  "cases": [
+    {"case_id": "funcy-throttle-timedelta", "before": "FAIL", "after": "PASS", "mutation": "FAIL", "alternative": "PASS"},
+    {"case_id": "funcy-cache-invalidate-idempotent", "before": "FAIL", "after": "PASS", "mutation": "FAIL", "alternative": "PASS"},
+    {"case_id": "funcy-retry-list-errors", "before": "FAIL", "after": "PASS", "mutation": "FAIL", "alternative": "PASS"},
+    {"case_id": "funcy-cache-mixed-arguments", "before": "FAIL", "after": "PASS", "mutation": "FAIL", "alternative": "PASS"}
+  ],
+  "offline_command_count": 48,
+  "claim_limit": "Dataset construction only; observed Skill v1 baseline is still required before optimization evidence."
+}

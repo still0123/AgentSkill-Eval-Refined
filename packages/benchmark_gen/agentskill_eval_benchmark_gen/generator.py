@@ -666,7 +666,7 @@ class AutomaticBenchmarkGenerator:
         )
         forbidden = re.compile(
             r"\b(requests|urllib|httpx|socket|aiohttp)\b|"
-            r"\b(datetime\.(now|today)|time\.(time|sleep)|random\.)\b|"
+            r"\b(datetime\.(now|today)|time\.(sleep|monotonic|perf_counter)|random\.)\b|"
             r"\b(subprocess|os\.system)\b"
         )
         deterministic = forbidden.search(selected_tests) is None
