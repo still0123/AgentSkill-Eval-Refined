@@ -347,8 +347,11 @@ class RealAgentCandidateEvaluator:
     ) -> Tuple[Dict[str, SearchCaseResult], Dict[str, SearchCaseResult]]:
         store = LocalExperimentStore(self.workspace)
         loaded = DatasetLoader().load(dataset_root)
+        dataset_identity = (
+            loaded.dataset_version.id if loaded.dataset_version else loaded.dataset_id
+        )
         case_by_uuid = {
-            uuid5(loaded.dataset_id, f"case:{item.metadata.case_id}"): item.metadata.case_id
+            uuid5(dataset_identity, f"case:{item.metadata.case_id}"): item.metadata.case_id
             for item in loaded.cases
         }
         baseline_ids = {

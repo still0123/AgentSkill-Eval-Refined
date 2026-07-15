@@ -30,6 +30,12 @@ class RealEvidencePreflight:
             if spec.baseline_skill_path is not None
             else None
         )
+        version = dataset.dataset_version
+        if version is None:
+            raise RealPreflightError(
+                "real Agent execution requires an immutable DatasetVersion"
+            )
+        dataset_identity = version.id
         runner = self._probe("runner", spec.runner)
         agent = self._probe("agent", spec.agent)
         self._require_secret_environment(spec.agent.secret_env_names)
@@ -37,7 +43,7 @@ class RealEvidencePreflight:
         per_run = spec.pricing.estimated_cost_per_run_microusd
         report = RealPreflightReport(
             config_sha256=config_sha,
-            dataset_version_id=dataset.dataset_id,
+            dataset_version_id=dataset_identity,
             dataset_name=dataset.manifest.name,
             dataset_version=dataset.manifest.version,
             dataset_sha256=dataset.dataset_sha256,
