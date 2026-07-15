@@ -345,7 +345,7 @@ def real_smoke(
     max_cost_microusd: int = typer.Option(..., "--max-cost-microusd", min=1),  # noqa: B008
     max_agent_runs: int = typer.Option(..., "--max-agent-runs", min=1),  # noqa: B008
 ) -> None:
-    """Run two cases once per arm after explicit budget authorization."""
+    """Run each configured case once per arm after explicit budget authorization."""
     _run_observed_evidence(
         spec_path,
         workspace,

@@ -99,9 +99,10 @@ Qwen Code 的 Runner 适配器会汇总隔离 HOME 下本 Run 的本地 usage �
 而不能只信任 skill-up 主会话中的 Token。用户中断会递归终止嵌套进程组，并将 Run/Experiment 标记为
 `CANCELLED`；取消的付费实验仍禁止自动恢复。
 
-`smoke` 使用 2 Case × 2 臂 × 1 次，共 4 Run，只验证真实链路。`run` 使用 2 Case × 2 臂 ×
-3 次，共 12 Run，PairBlock 顺序按冻结 seed 随机化。唯一实验变量是是否加载 Skill。由于只有两个
-Case 且来自同一仓库，报告只能作为 descriptive evidence，不能声称普遍提升。
+`smoke` 使用每个配置 Case × 2 臂 × 1 次；`run` 使用每个配置 Case × 2 臂 × 3 次，PairBlock
+顺序按冻结 seed 随机化。当前配置允许 2～4 个 Case，因此 Funcy 四 Case baseline smoke 是 8
+Run，稳定证据是 24 Run。唯一实验变量是是否加载 Skill。Funcy 四个 Case 来自同一仓库，报告只能
+作为 descriptive evidence，不能声称普遍提升。
 
 ## 证据边界、报告与审计
 

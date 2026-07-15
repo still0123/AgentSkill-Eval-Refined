@@ -159,6 +159,23 @@ def _set_fake_secrets(monkeypatch: pytest.MonkeyPatch, counter: Path) -> str:
     return secret
 
 
+def test_real_evidence_spec_accepts_four_case_regression_inventory(
+    published_dataset: Path,
+) -> None:
+    spec = _spec(published_dataset)
+    expanded = spec.model_copy(
+        update={
+            "case_ids": (
+                *CASE_IDS,
+                "funcy-cache-mixed-arguments",
+                "funcy-retry-list-errors",
+            )
+        }
+    )
+
+    assert len(expanded.case_ids) == 4
+
+
 def test_spec_rejects_literal_secret_in_agent_home_config(published_dataset: Path) -> None:
     payload = _spec(published_dataset).model_dump(mode="python")
     payload["agent"]["home_config_files"] = {
