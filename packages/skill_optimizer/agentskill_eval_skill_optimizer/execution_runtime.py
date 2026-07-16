@@ -235,8 +235,14 @@ class BudgetedRealEvolutionExecutor:
             plan.agent.model,
         ):
             raise EvolutionRuntimeError("real Agent provider/model does not match execution plan")
-        search_root = self._dataset_root(spec, dry.report, "validation_search")
-        regression_root = self._dataset_root(spec, dry.report, "regression_dev")
+        self._dataset_root(spec, dry.report, "validation_search")
+        self._dataset_root(spec, dry.report, "regression_dev")
+        search_binding = next(
+            item for item in dry.report.adaptive_bindings if item.split == "validation_search"
+        )
+        regression_binding = next(
+            item for item in dry.report.adaptive_bindings if item.split == "regression_dev"
+        )
         search_stage = self._stage(plan, "validation_search")
         regression_stage = self._stage(plan, "regression_dev")
         self._validate_search_plan(plan, spec.search)
@@ -261,8 +267,8 @@ class BudgetedRealEvolutionExecutor:
             proposal_job_id=proposal.manifest.proposal_job_id,
             provider=plan.agent.provider,
             model=plan.agent.model,
-            validation_search_dataset_sha256=DatasetLoader().load(search_root).dataset_sha256,
-            regression_dev_dataset_sha256=DatasetLoader().load(regression_root).dataset_sha256,
+            validation_search_dataset_sha256=search_binding.dataset_version_sha256,
+            regression_dev_dataset_sha256=regression_binding.dataset_version_sha256,
             search_agent_runs=search_stage.agent_runs,
             search_max_cost_microusd=search_stage.budget_cap.max_cost_microusd,
             regression_agent_runs=regression_stage.agent_runs,
@@ -633,7 +639,17 @@ class BudgetedRealEvolutionExecutor:
         if not root.is_relative_to(spec.benchmark_workspace):
             raise EvolutionRuntimeError("adaptive DatasetVersion path escapes benchmark workspace")
         loaded = DatasetLoader().load(root)
-        if loaded.dataset_sha256 != binding.dataset_version_sha256:
+        # Published split bindings use BenchmarkDatasetVersion.content_sha256, while
+        # DatasetLoader.dataset_sha256 is the loader's metadata digest.  They are
+        # deliberately different identifiers; compare the immutable published
+        # content hash when available and retain the loader digest for fixtures.
+        published_version = getattr(loaded, "dataset_version", None)
+        observed_digest = (
+            published_version.content_sha256
+            if published_version is not None
+            else loaded.dataset_sha256
+        )
+        if observed_digest != binding.dataset_version_sha256:
             raise EvolutionRuntimeError(f"adaptive DatasetVersion digest mismatch: {split}")
         expected = DatasetSplit(split)
         if any(item.metadata.split != expected for item in loaded.cases):

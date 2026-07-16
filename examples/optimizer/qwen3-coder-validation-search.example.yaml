@@ -1,0 +1,38 @@
+schema_version: ase/optimization-search/v1alpha1
+name: qwen3-coder-python-bug-fix-validation-search
+base_skill_path: /Users/bytedance/Documents/skill/examples/skills/python-bug-fix-v1
+manual_skill_path: /Users/bytedance/Documents/skill/examples/skills/python-bug-fix-v1
+validation_search_path: /Users/bytedance/Documents/skill/.agentskill-eval/real-optimizer-smoke-prep/dataset-versions/28f81b31-8de7-5e74-88c4-5b8e09055417
+mutations:
+  - id: protocol-boundaries
+    hypothesis: Boundary protocol defects require checking disabled methods and exact comparisons.
+    instruction: >-
+      When reproducing a boundary failure, inspect explicitly disabled protocols, equality at
+      expiration boundaries, and the difference between missing, false, and None values.
+  - id: descriptor-binding
+    hypothesis: Descriptor and decorator defects require preserving instance binding semantics.
+    instruction: >-
+      For descriptors and decorators, trace class-level versus instance-level access and verify
+      that exposed helper callables receive exactly the arguments promised by the public API.
+  - id: invariant-focused-verification
+    hypothesis: Small fixes are safer when the affected invariant is stated before editing.
+    instruction: >-
+      State the violated invariant before editing, implement the smallest general repair, and run
+      both the targeted test and one adjacent invariant-focused check when the budget permits.
+search:
+  algorithm: successive_halving
+  subset_size: 2
+  promote_search_candidates: 1
+  random_seed: 2026
+constraints:
+  max_skill_bytes: 20000
+  max_loss_cases: 0
+  max_token_overhead_ratio: 0.5
+budget:
+  max_candidate_case_evaluations: 20
+  timeout_seconds: 1800
+evaluator:
+  type: real_agent
+  real_agent_config_path: /Users/bytedance/Documents/skill/examples/real-agent-evidence/qwen3-coder-validation-search.yaml
+  version: qwen3-coder-real-agent-v1
+  simulated: false

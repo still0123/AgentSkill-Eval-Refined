@@ -1,0 +1,15 @@
+schema_version: ase/evolution-dry-run-spec/v1alpha1
+name: qwen3-coder-python-bug-fix-evolution-dry-run-v1
+execution_plan_directory: /Users/bytedance/Documents/skill/.agentskill-eval/qwen3-evolution-plan/evolution-execution-plans/f885c151-30cd-53c8-8625-74baa0053ae5
+benchmark_workspace: /Users/bytedance/.codex/worktrees/fb0a/stage3b-offline-evidence/.agentskill-eval/stage2-reproduction
+release_manifest: /Users/bytedance/.codex/worktrees/fb0a/stage3b-offline-evidence/.agentskill-eval/stage2-reproduction/optimization-benchmark-releases/python-bug-fix-optimization-v1/2026.07.14.1/release-manifest.json
+optimizer_view: /Users/bytedance/.codex/worktrees/fb0a/stage3b-offline-evidence/.agentskill-eval/stage2-reproduction/optimization-benchmark-releases/python-bug-fix-optimization-v1/2026.07.14.1/optimizer-view.json
+process:
+  executable: /Users/bytedance/Documents/skill/examples/optimizer/evolution-plan/fake-evolution-dry-run-process.py
+  expected_sha256: 1e39794d99ea6fa5f52be8873f545d59aae8abb261f75b698bc268033d517055
+  expected_version_output: agentskill-eval-fake-evolution-dry-run 1.0
+  timeout_seconds: 10
+  allowed_environment: [PATH, LANG, LC_ALL]
+claim_limit: >-
+  Process integration only. This dry run never invokes Qwen3-Coder, preserves validation_confirm
+  and locked_test as withheld, and supports no Skill improvement claim.
