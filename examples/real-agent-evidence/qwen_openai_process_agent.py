@@ -256,6 +256,30 @@ def run(session: Mapping[str, Any], base_url: str, model: str) -> Dict[str, Any]
             "tests/test_lru.py. Read at most three focused snippets, then edit the source "
             "file; do not create a temporary test file."
         )
+    elif "boltons-split" in case_id:
+        case_hint = (
+            " The source file is boltons/iterutils.py and the regression test is in "
+            "tests/test_iterutils.py. Read at most three focused snippets, then edit the "
+            "source file; do not create a temporary test file."
+        )
+    elif "boltons-bytes2human" in case_id:
+        case_hint = (
+            " The source file is boltons/strutils.py and the regression test is in "
+            "tests/test_strutils.py. Read at most three focused snippets, then edit the "
+            "source file; do not create a temporary test file."
+        )
+    elif "boltons-truncated-traceback" in case_id:
+        case_hint = (
+            " The source file is boltons/tbutils.py and the regression test is in "
+            "tests/test_tbutils_parsed_exc.py. Read at most three focused snippets, then "
+            "edit the source file; do not create a temporary test file."
+        )
+    elif "boltons-lri" in case_id:
+        case_hint = (
+            " The source file is boltons/dictutils.py and the regression test is in "
+            "tests/test_dictutils.py. Read at most three focused snippets, then edit the "
+            "source file; do not create a temporary test file."
+        )
     messages: List[Dict[str, Any]] = [
         {
             "role": "system",
