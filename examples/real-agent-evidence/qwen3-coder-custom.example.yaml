@@ -17,10 +17,10 @@ runner:
 agent:
   path: /absolute/path/to/examples/real-agent-evidence/qwen_openai_process_agent.py
   expected_sha256: 0000000000000000000000000000000000000000000000000000000000000000
-  expected_version: qwen-openai-process-agent version 0.1.0
+  expected_version: qwen-openai-process-agent version 0.1.1
   version_args: [--version]
   engine: qwen_openai_process
-  engine_version: 0.1.0
+  engine_version: 0.1.1
   provider: qwen-local
   engine_provider: openai
   model: qwen3-coder-local

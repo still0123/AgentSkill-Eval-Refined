@@ -23,6 +23,7 @@ from typing import Any, Dict, List, Mapping
 MAX_READ_BYTES = 12_000
 MAX_TOOL_OUTPUT_BYTES = 12_000
 MAX_DIFF_BYTES = 30_000
+MAX_REPLACEMENT_BYTES = 16_000
 
 
 def _json_request(url: str, payload: Mapping[str, Any], api_key: str) -> Mapping[str, Any]:
@@ -63,11 +64,41 @@ def _run_tool(workspace: Path, name: str, arguments: Mapping[str, Any]) -> str:
     if name == "write_file":
         path = _workspace_path(workspace, str(arguments.get("path", "")))
         content = str(arguments.get("content", ""))
-        if len(content.encode("utf-8")) > 16_000:
-            return "ERROR: write_file content exceeds 16KB; edit a focused file region instead"
+        if path.exists():
+            return (
+                "ERROR: refusing to rewrite an existing file with write_file; "
+                "use replace_in_file for a focused edit"
+            )
+        if len(content.encode("utf-8")) > MAX_REPLACEMENT_BYTES:
+            return (
+                "ERROR: write_file content exceeds 16KB; create a smaller file or "
+                "use a focused edit"
+            )
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(content, encoding="utf-8")
         return "OK: wrote " + path.relative_to(workspace.resolve()).as_posix()
+    if name == "replace_in_file":
+        path = _workspace_path(workspace, str(arguments.get("path", "")))
+        if not path.is_file():
+            return "ERROR: file does not exist"
+        old = str(arguments.get("old", ""))
+        new = str(arguments.get("new", ""))
+        if not old:
+            return "ERROR: old text must be non-empty"
+        if len(old.encode("utf-8")) > MAX_REPLACEMENT_BYTES or len(
+            new.encode("utf-8")
+        ) > MAX_REPLACEMENT_BYTES:
+            return "ERROR: replacement text exceeds 16KB"
+        content = path.read_text(encoding="utf-8", errors="replace")
+        occurrences = content.count(old)
+        if occurrences == 0:
+            return "ERROR: exact old text was not found; reread a focused region"
+        if occurrences > 1:
+            return "ERROR: old text matched multiple locations; include more surrounding context"
+        path.write_text(content.replace(old, new, 1), encoding="utf-8")
+        return "OK: replaced one focused region in " + path.relative_to(
+            workspace.resolve()
+        ).as_posix()
     if name == "run_command":
         command = str(arguments.get("command", ""))
         if not command.strip():
@@ -116,6 +147,26 @@ TOOLS: List[Dict[str, Any]] = [
                     "content": {"type": "string"},
                 },
                 "required": ["path", "content"],
+                "additionalProperties": False,
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "replace_in_file",
+            "description": (
+                "Replace exactly one focused text region in an existing UTF-8 file. "
+                "Use this instead of rewriting an existing source file."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string"},
+                    "old": {"type": "string"},
+                    "new": {"type": "string"},
+                },
+                "required": ["path", "old", "new"],
                 "additionalProperties": False,
             },
         },
@@ -215,8 +266,12 @@ def run(session: Mapping[str, Any], base_url: str, model: str) -> Dict[str, Any]
                 + ". Use relative paths such as cachetools/lru.py; never use /workspace. "
                 "Inspect the relevant files, implement the requested bug fix, and run "
                 "the relevant tests with python3 -m pytest. Use tools instead of guessing. "
-                "After locating the relevant function, make a minimal focused edit; do not "
-                "rewrite an entire source file or spend turns rereading unrelated code. "
+                "After locating the relevant function, make a minimal focused edit with "
+                "replace_in_file; never rewrite an existing source file with write_file, "
+                "because file reads can be truncated. Before finishing, run python3 -m "
+                "py_compile on each changed Python file and then the narrowest available "
+                "validation command. Do not "
+                "spend turns rereading unrelated code. "
                 "Do not create a temporary reproduction test: the benchmark grader already "
                 "contains the regression oracle. If test dependencies are unavailable, still "
                 "apply the source edit before reporting that limitation. "
@@ -310,9 +365,10 @@ def run(session: Mapping[str, Any], base_url: str, model: str) -> Dict[str, Any]
                 {
                     "role": "user",
                     "content": (
-                        "You have inspected enough. You must call write_file now and apply "
-                        "the minimal focused fix; do not only describe a patch. Then run "
-                        "the most relevant direct validation command and finish."
+                        "You have inspected enough. You must call replace_in_file now and "
+                        "apply the minimal focused fix; do not only describe a patch or "
+                        "rewrite the whole file. Then run python3 -m py_compile on changed "
+                        "Python files and the most relevant direct validation command."
                     ),
                 }
             )
@@ -373,7 +429,7 @@ def run(session: Mapping[str, Any], base_url: str, model: str) -> Dict[str, Any]
 
 def main() -> int:
     if "--version" in sys.argv[1:]:
-        print("qwen-openai-process-agent version 0.1.0")
+        print("qwen-openai-process-agent version 0.1.1")
         return 0
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", required=True)
