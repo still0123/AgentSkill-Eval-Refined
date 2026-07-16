@@ -367,8 +367,8 @@ def test_budgeted_search_then_regression_is_idempotent_and_tamper_evident(
     monkeypatch.setattr(executor, "_regression_gate", fake_regression)
     preflight = executor.preflight(spec)
     assert preflight.search_agent_runs == 40
-    assert preflight.validation_search_dataset_sha256 == "1" * 64
-    assert preflight.regression_dev_dataset_sha256 == "2" * 64
+    assert preflight.validation_search_dataset_sha256 == "3" * 64
+    assert preflight.regression_dev_dataset_sha256 == "3" * 64
     with pytest.raises(EvolutionRuntimeError, match="below planned Agent Runs"):
         executor.run_search(
             spec,

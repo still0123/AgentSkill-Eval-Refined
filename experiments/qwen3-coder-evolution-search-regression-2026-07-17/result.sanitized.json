@@ -1,0 +1,39 @@
+{
+  "schema_version": "ase/qwen3-coder-evolution-search-regression/v1alpha1",
+  "execution_id": "3619a365-54a1-5757-85be-1222ff8fa081",
+  "provider": "qwen-local",
+  "model": "qwen3-coder-local",
+  "agent_engine": "qwen_openai_process",
+  "runner": "skill-up version 0.5.0",
+  "dataset_version_id": "851a3a28-4e33-56fe-a2b1-1c6c0cbd3c6b",
+  "dataset_version_content_sha256": "723226949bf63e9ac3577c45190e4fe9e65189cdd3c450335dbe893644d1d910",
+  "dataset_loader_sha256": "6fcf9e8ebaf4c5851ad09a82e7586830895629fa16c965f90bc62abe6a2c4be1",
+  "regression_dataset_version_content_sha256": "be9c622e0b22c839b0f995bd643b68d8e6e0610ad16224be17f7a38db8d4c262",
+  "base_skill_sha256": "5ff780e023c00cd08232688ec013a47f51926b4e1c8a5171465085ee967bc5d6",
+  "winner_candidate_id": "dcf2cd3c-9e74-53a9-b1ae-2728753b3249",
+  "winner_skill_sha256": "ede790a86217077a0d808f8bec9414babb0fb48f5b09efcc42bbd07ec591f1f2",
+  "search": {
+    "planned_runs": 48,
+    "consumed_runs": 40,
+    "candidate_count": 7,
+    "all_candidate_pass_rate": 0.0,
+    "invalid_runs": 2,
+    "observed_cost_microusd": 0
+  },
+  "regression": {
+    "planned_runs": 16,
+    "consumed_runs": 16,
+    "base_pass_rate": 0.0,
+    "winner_pass_rate": 0.0,
+    "wtl": {"win": 0, "tie_negative": 4, "tie_positive": 0, "loss": 0},
+    "loss_cases": [],
+    "token_overhead_ratio": 0.05655870009684709,
+    "gate_status": "COMPLETED",
+    "observed_cost_microusd": 0
+  },
+  "simulated": false,
+  "real_run_confirmed": true,
+  "validation_confirm_accessed": false,
+  "locked_test_accessed": false,
+  "claim_limit": "Observed-Agent adaptive evidence only; no Skill improvement claim, no confirmation/locked evidence, no Skill v2 publication."
+}
