@@ -1,0 +1,18 @@
+schema_version: ase/real-agent-evidence/v1alpha1
+name: qwen3-coder-custom-process-smoke
+provider: qwen-local
+model: qwen3-coder-local
+agent_engine: qwen_openai_process
+runner: skill-up version 0.5.0
+dataset_version_id: 4bc234b5-7531-59cc-8ecb-325b9dc288e9
+skill: python-bug-fix-v1
+cases:
+  - more-itertools-islice-release
+  - cachetools-lru-missing-item
+simulated: false
+evidence_class: observed_agent
+real_run_confirmed: true
+secret_env_names: []
+max_agent_runs: 4
+max_cost_microusd: 4
+network_policy: local_provider_only

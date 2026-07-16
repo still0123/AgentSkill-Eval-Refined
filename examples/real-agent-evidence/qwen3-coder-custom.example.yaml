@@ -1,0 +1,61 @@
+# Local Qwen3-Coder through skill-up's Custom Engine.  This avoids Qwen Code's
+# large built-in tool catalog when the served model is limited to a 32K window.
+schema_version: ase/real-agent-evidence/v1alpha1
+name: qwen3-coder-local-observed
+dataset_path: /absolute/path/to/published-dataset-version
+skill_path: /absolute/path/to/examples/skills/python-bug-fix-v1
+case_ids: [case-a, case-b]
+evidence_class: observed_agent
+simulated: false
+runner:
+  type: skill_up
+  name: skill-up
+  path: /absolute/path/to/skill-up
+  expected_sha256: 0000000000000000000000000000000000000000000000000000000000000000
+  expected_version: skill-up version 0.5.0
+  version_args: [--version]
+agent:
+  path: /absolute/path/to/examples/real-agent-evidence/qwen_openai_process_agent.py
+  expected_sha256: 0000000000000000000000000000000000000000000000000000000000000000
+  expected_version: qwen-openai-process-agent version 0.1.0
+  version_args: [--version]
+  engine: qwen_openai_process
+  engine_version: 0.1.0
+  provider: qwen-local
+  engine_provider: openai
+  model: qwen3-coder-local
+  temperature: 0.0
+  seed: null
+  max_turns: 12
+  max_tool_calls: 32
+  timeout_seconds: 900
+  tool_capabilities: [filesystem, shell, tests]
+  # Empty for the local unauthenticated vLLM endpoint.  Use a Secret name only
+  # when the selected OpenAI-compatible provider actually requires one.
+  secret_env_names: []
+  max_input_tokens: 32768
+  max_output_tokens: 1024
+  engine_custom:
+    transport: local
+    response_format: session_result
+    timeout_seconds: 900
+    local:
+      command: /absolute/path/to/examples/real-agent-evidence/qwen_openai_process_agent.py
+      args: [--input, '${input_file}', --output, '${output_file}', --base-url,
+             'http://127.0.0.1:18002/v1', --model, qwen3-coder-local]
+      input_file: '${input_file}'
+      output_file: '${output_file}'
+pricing:
+  input_microusd_per_million_tokens: 0
+  input_cache_hit_microusd_per_million_tokens: 0
+  output_microusd_per_million_tokens: 0
+  estimated_input_tokens_per_run: 6000
+  estimated_cache_hit_tokens_per_run: 0
+  estimated_output_tokens_per_run: 1024
+protocol:
+  evidence_repeats: 3
+  random_seed: 2026
+  bootstrap_resamples: 2000
+  min_independent_groups: 1
+sandbox_profile: runner_default
+network_policy: local_provider_only

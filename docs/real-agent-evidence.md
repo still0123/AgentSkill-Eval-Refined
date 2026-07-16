@@ -13,9 +13,17 @@ Codex/skill-up 当前支持的 Engine，或 OpenAI-compatible Process Agent；Pr
 seed、max turns、max tool calls、timeout、工具能力、Skill/DatasetVersion 哈希、价格表和环境指纹。Runner 不提供
 的 request id、区域或镜像 digest 会明确记为 `capability unavailable`。
 
-已验证的首个真实组合是 `skill-up v0.5.0 + Qwen Code 0.19.9 + DeepSeek V4 Pro`。Qwen Code
-作为 OpenAI-compatible Process Agent 接入；实验中的证据 Provider 仍记录为 `deepseek`，而
-`engine_provider: openai` 只描述线协议，二者不会混淆。
+已验证的真实组合包括 `skill-up v0.5.0 + Qwen Code 0.19.9 + DeepSeek V4 Pro`，以及本地
+`skill-up v0.5.0 + qwen-openai-process-agent + Qwen3-Coder`。后者使用 skill-up Custom Engine
+协议，由轻量本地 Agent 注册 filesystem、shell、tests 三类工具，再调用 OpenAI-compatible
+服务；它不加载 Qwen Code 的完整工具目录。
+
+这是有意的工程取舍：Qwen Code 0.19.9 的内置工具定义在首轮就可能产生约 33K tokens 的输入，
+而部分本地 Qwen3-Coder 服务只开放 32K context，直接使用 Qwen Code 会得到 vLLM context
+overflow。Custom Engine 仍使用同一个模型、同一个 GPU 服务和同一套 with/without Skill Runner，
+只是把 Agent 工具面冻结为更小、可审计的集合。配置示例见
+[`qwen3-coder-custom.example.yaml`](../examples/real-agent-evidence/qwen3-coder-custom.example.yaml)，
+脚本为 [`qwen_openai_process_agent.py`](../examples/real-agent-evidence/qwen_openai_process_agent.py)。
 
 ## 安装、Secret 与真实 Benchmark
 
@@ -44,7 +52,7 @@ OPENAI_API_KEY="$(security find-generic-password \
 `generationConfig.reasoning: false`，使 V4 明确发送 `thinking: {type: disabled}`，避免持久化隐藏推理。
 Qwen smoke 还应禁用不必要的 `agent` 子 Agent，并设置 `maxWallTimeSeconds`、`maxToolCalls`、
 `sessionTokenLimit` 和循环检测；这些限制属于冻结 Agent 配置，不能在双臂间变化。
-首轮真实 smoke 显示 12 turns 会让较难 Bug Fix Case 的双臂同时 invalid，因此当前示例冻结为
+首轮真实 smoke 显示 12 turns 会让较难 Bug Fix Case 的双臂同时 invalid，因此 Qwen Code 示例冻结为
 24 turns、600k 会话 Token，同时继续保留 240 秒墙钟和 48 次工具调用硬门。顶层
 `agent.max_tool_calls` 必须与 Qwen HOME 配置中的 `model.maxToolCalls` 相等，避免审计 Manifest
 与实际 Agent 预算不一致。工具调用预算、session-turn 上限和 action-stagnation 循环终止分别记录为
@@ -127,6 +135,22 @@ agentskill-eval experiment verify-bundle WORKSPACE/real-evidence-bundles/EXPERIM
 - `invalid`：基础设施、超时、取消或 Runner 结果错误，不计为成功。
 
 Fake Process 测试只验证接口、预算、Trace、Secret、报告和幂等语义，不产生费用，也不构成性能证据。
+
+## 本地 Qwen3-Coder Custom Engine smoke
+
+在 GPU3 上启动本地 vLLM 后，先确认代理和模型端点可用：
+
+```bash
+curl -fsS http://127.0.0.1:18002/v1/models
+.venv/bin/agentskill-eval real preflight qwen3-coder-custom.yaml
+.venv/bin/agentskill-eval real smoke qwen3-coder-custom.yaml \
+  --workspace .agentskill-eval/qwen3-coder-smoke \
+  --confirm-real-run --max-cost-microusd 4 --max-agent-runs 4
+```
+
+本地无认证的 vLLM 代理不需要 `OPENAI_API_KEY`；配置中的 `secret_env_names` 为空。真实报告仍必须
+标记 `simulated=false`、`evidence_class=observed_agent` 和 `real_run_confirmed=true`。smoke
+只证明 Agent→Runner→Trace→Grader 链路，不消费 validation_confirm 或 locked_test。
 
 ## 首个完整真实 smoke
 

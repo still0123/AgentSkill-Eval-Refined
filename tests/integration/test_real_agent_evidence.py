@@ -157,6 +157,19 @@ def test_spec_rejects_literal_secret_in_agent_home_config(published_dataset: Pat
         RealAgentEvidenceSpec.model_validate(payload)
 
 
+def test_local_agent_can_declare_no_secret_environment(published_dataset: Path) -> None:
+    payload = _spec(published_dataset).model_dump(mode="python")
+    payload["agent"].update(
+        {
+            "provider": "qwen-local",
+            "engine": "qwen_openai_process",
+            "secret_env_names": (),
+        }
+    )
+    spec = RealAgentEvidenceSpec.model_validate(payload)
+    assert spec.agent.secret_env_names == ()
+
+
 def test_qwen_spec_requires_frozen_tool_budget(published_dataset: Path) -> None:
     payload = _spec(published_dataset).model_dump(mode="python")
     payload["agent"].update(

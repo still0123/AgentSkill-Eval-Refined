@@ -1,0 +1,29 @@
+{
+  "schema_version": "ase/real-qwen3-coder-smoke/v1alpha1",
+  "experiment_id": "92fda91e-978b-5521-bfcf-a852df0897c6",
+  "provider": "qwen-local",
+  "model": "qwen3-coder-local",
+  "agent_engine": "qwen_openai_process",
+  "runner": "skill-up version 0.5.0",
+  "dataset_version_id": "4bc234b5-7531-59cc-8ecb-325b9dc288e9",
+  "cases": [
+    "more-itertools-islice-release",
+    "cachetools-lru-missing-item"
+  ],
+  "planned_runs": 4,
+  "completed_runs": 4,
+  "invalid_runs": 0,
+  "baseline_pass_rate": 0.0,
+  "treatment_pass_rate": 0.0,
+  "wtl": {"win": 0, "tie_negative": 2, "tie_positive": 0, "loss": 0},
+  "simulated": false,
+  "evidence_class": "observed_agent",
+  "real_run_confirmed": true,
+  "observed_cost_microusd": 0,
+  "authorized_max_cost_microusd": 4,
+  "agent_executable_sha256": "38729b897f0a3751c6b2cd1a558d6c8848a9a20753b6036e52ce42071c38202d",
+  "runner_executable_sha256": "b8473aad3fe997f3aa8de1e9bd9bc127e5254b25371567a0e07143afc809c359",
+  "claim_limit": "Observed-Agent smoke evidence for two cases; validates the chain only.",
+  "replay_bundle_sha256": "REDACTED_LOCAL_BUNDLE_HASH"
+}
+

@@ -446,6 +446,7 @@ class RealAgentEvidenceRunner:
             "max_turns": spec.agent.max_turns,
             "max_tool_calls": spec.agent.max_tool_calls,
             "timeout_seconds": spec.agent.timeout_seconds,
+            "engine_custom_sha256": stable_sha256(spec.agent.engine_custom),
         }
         agent = AgentSnapshot(
             engine=spec.agent.engine,
@@ -519,6 +520,8 @@ class RealAgentEvidenceRunner:
         if spec.agent.seed is not None:
             engine_model["seed"] = spec.agent.seed
         engine = {"name": spec.agent.engine, "model": engine_model}
+        if spec.agent.engine_custom:
+            engine["custom"] = spec.agent.engine_custom
         secrets = RealEvidencePreflight.secret_values(spec.agent.secret_env_names)
         runtimes = (
             VariantRuntimeSpec(

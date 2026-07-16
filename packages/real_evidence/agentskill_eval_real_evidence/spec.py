@@ -44,10 +44,16 @@ class AgentSpec(ExecutableSpec):
     max_tool_calls: int = Field(ge=1, le=1000)
     timeout_seconds: int = Field(ge=1, le=7200)
     tool_capabilities: Tuple[str, ...] = Field(min_length=1)
-    secret_env_names: Tuple[str, ...] = Field(min_length=1)
+    # Local, unauthenticated OpenAI-compatible endpoints do not need a Secret.
+    # Keep the list explicit so preflight still requires every declared name.
+    secret_env_names: Tuple[str, ...] = Field(default_factory=tuple)
     max_input_tokens: int = Field(ge=1)
     max_output_tokens: int = Field(ge=1)
     home_config_files: Dict[str, Dict[str, object]] = Field(default_factory=dict)
+    # Optional skill-up Custom Engine block.  Keeping it beside the pinned
+    # executable lets a real local Agent wrapper be audited without adding a
+    # second runner path.
+    engine_custom: Dict[str, object] = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def names_are_unique(self) -> "AgentSpec":
