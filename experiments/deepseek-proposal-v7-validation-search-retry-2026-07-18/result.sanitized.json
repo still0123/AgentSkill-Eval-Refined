@@ -1,0 +1,20 @@
+{
+  "schema_version": "ase/deepseek-proposal-v7-validation-search-retry-sanitized/v1alpha1",
+  "provider": "deepseek",
+  "model": "deepseek-v4-pro",
+  "planned_logical_agent_runs": 16,
+  "attempted_runs": 4,
+  "observed_agent_runs": 4,
+  "observed_cost_microusd": 0,
+  "simulated": false,
+  "search_executed": true,
+  "regression_executed": false,
+  "confirmation_executed": false,
+  "locked_test_accessed": false,
+  "status": "FAILED_FAST",
+  "invalid_runs": 4,
+  "invalid_reason": "provider_error_402_insufficient_balance",
+  "claim_limit": "No candidate quality evidence; provider rejected all attempts before model execution.",
+  "secret_value_stored": false,
+  "hidden_reasoning_stored": false
+}
