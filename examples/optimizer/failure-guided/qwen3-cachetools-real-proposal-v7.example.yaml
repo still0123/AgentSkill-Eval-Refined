@@ -1,0 +1,32 @@
+schema_version: ase/real-llm-proposal-spec/v1alpha1
+name: python-bug-fix-cachetools-real-proposal-v7
+base_skill_path: /Users/bytedance/Documents/skill/examples/skills/python-bug-fix-v1
+failure_bundle_path: /Users/bytedance/Documents/skill/.agentskill-eval/real-optimizer-smoke/real-optimizer-evidence/train-failures.deepseek.reviewed.yaml
+input_evidence_class: observed_train
+generator:
+  type: deepseek
+  name: deepseek-skill-proposal
+  version: proposal-observed-verification-v7
+  max_hypotheses: 4
+  base_url: https://api.deepseek.com
+  model: deepseek-v4-pro
+  temperature: 0.0
+  max_output_tokens: 2400
+  secret_env_name: OPENAI_API_KEY
+  timeout_seconds: 60
+  input_cache_miss_microusd_per_million: 435000
+  input_cache_hit_microusd_per_million: 3625
+  output_microusd_per_million: 870000
+  prompt_guidance: >-
+    Prefer hypotheses that make success claims depend on observed verification evidence. The
+    Agent should reproduce the failure, inspect the relevant implementation path, apply a minimal
+    general edit, run the targeted regression test, and only report success when the observed test
+    result passes. If verification fails, treat the failure as new evidence, diagnose before
+    editing again, and never let a confident final message override a failed deterministic check.
+    Keep every instruction reusable across Python repositories and do not mention case IDs,
+    repository names, patches, test answers, or hidden validation data.
+claim_limit: >-
+  Proposal v7 uses only the base Skill and the sanitized observed train failure bundle with frozen
+  provider/model metadata. It is proposal-only; candidates remain unvalidated until a separately
+  authorized validation_search and regression_dev. No confirmation, locked test, or Skill v2
+  publication claim is supported.
