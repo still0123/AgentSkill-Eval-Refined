@@ -52,6 +52,7 @@ class RealPreflightReport(FrozenModel):
     dataset_sha256: HexDigest
     case_ids: Tuple[str, ...] = Field(min_length=2)
     skill_sha256: HexDigest
+    baseline_skill_sha256: Optional[HexDigest] = None
     runner: ExecutableSnapshot
     agent: ExecutableSnapshot
     provider: str = Field(min_length=1)
@@ -116,6 +117,7 @@ class RealEvidenceRunManifest(FrozenModel):
     planned_runs: int = Field(ge=1)
     completed_runs: int = Field(ge=0)
     invalid_runs: int = Field(ge=0)
+    reused_runs: int = Field(default=0, ge=0)
     observed_or_reserved_cost_microusd: int = Field(ge=0)
     started_at: datetime
     completed_at: Optional[datetime] = None
@@ -133,6 +135,8 @@ class RealEvidenceRunManifest(FrozenModel):
             raise ValueError("terminal real-evidence status requires completed_at")
         if self.completed_runs > self.planned_runs or self.planned_runs > self.max_agent_runs:
             raise ValueError("real-evidence run counts exceed authorization")
+        if self.reused_runs > self.completed_runs + self.invalid_runs:
+            raise ValueError("reused runs cannot exceed terminal runs")
         observed = self.evidence_class == RealEvidenceClass.OBSERVED_AGENT
         if self.simulated == observed or self.real_run_confirmed != observed:
             raise ValueError("run simulation/confirmation flags contradict evidence class")
@@ -160,6 +164,7 @@ class RealExperimentReport(FrozenModel):
     runner_snapshot: RunnerSnapshot
     agent_snapshot: AgentSnapshot
     skill_sha256: HexDigest
+    baseline_skill_sha256: Optional[HexDigest] = None
     baseline_pass_rate: Optional[float] = Field(default=None, ge=0, le=1)
     treatment_pass_rate: Optional[float] = Field(default=None, ge=0, le=1)
     absolute_gain: Optional[float] = Field(default=None, ge=-1, le=1)

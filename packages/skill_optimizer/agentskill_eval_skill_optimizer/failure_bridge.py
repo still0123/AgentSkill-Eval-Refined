@@ -306,6 +306,8 @@ class ObservedFailureEvidenceBridge:
                 name=f"{experiment.name} observed train failures",
                 split="train",
                 diagnoses=tuple(diagnoses),
+                agent_provider=real_run.provider,
+                agent_model=real_run.model,
             )
             bundle_bytes = yaml.safe_dump(
                 bundle.model_dump(mode="json"), allow_unicode=True, sort_keys=False

@@ -1,6 +1,8 @@
 """Observed-Agent evidence orchestration."""
 
 from agentskill_eval_real_evidence.execution import (
+    BaselineReplay,
+    BaselineReplayAdapter,
     CostingRunnerAdapter,
     RealAgentEvidenceRunner,
     RealEvidenceError,
@@ -21,6 +23,8 @@ from agentskill_eval_real_evidence.spec import (
 
 __all__ = [
     "AgentSpec",
+    "BaselineReplay",
+    "BaselineReplayAdapter",
     "CostingRunnerAdapter",
     "ExecutableSpec",
     "PricingSpec",

@@ -1,5 +1,12 @@
 """Leakage-safe benchmark-guided Agent Skill search package."""
 
+from agentskill_eval_skill_optimizer.candidate_quality import (
+    CandidateQualityDecision,
+    CandidateQualityError,
+    CandidateQualityGate,
+    CandidateQualityReport,
+    MaterializedCandidate,
+)
 from agentskill_eval_skill_optimizer.deepseek_generator import (
     DeepSeekGenerationResult,
     DeepSeekGeneratorAuthorization,
@@ -95,6 +102,16 @@ from agentskill_eval_skill_optimizer.final_spec import (
     IndependentFinalEvaluationSpec,
     SimulatedFinalDataset,
 )
+from agentskill_eval_skill_optimizer.optimization_v2 import (
+    OptimizationV2CandidateResult,
+    OptimizationV2Error,
+    OptimizationV2Planner,
+    OptimizationV2Preflight,
+    OptimizationV2PreflightResult,
+    OptimizationV2ScreeningReport,
+    OptimizationV2ScreeningRunner,
+    OptimizationV2Spec,
+)
 from agentskill_eval_skill_optimizer.process_generator import (
     GeneratorInvocationEvidence,
     HypothesisGeneratorSpec,
@@ -158,6 +175,10 @@ from agentskill_eval_skill_optimizer.spec import (
 
 __all__ = [
     "BenchmarkGuidedSkillSearch",
+    "CandidateQualityDecision",
+    "CandidateQualityError",
+    "CandidateQualityGate",
+    "CandidateQualityReport",
     "CandidateEvaluator",
     "EvaluationError",
     "DeterministicHypothesisGenerator",
@@ -226,6 +247,14 @@ __all__ = [
     "IndependentFinalEvaluator",
     "OptimizationSearchSpec",
     "OptimizationContext",
+    "OptimizationV2Error",
+    "OptimizationV2CandidateResult",
+    "OptimizationV2Planner",
+    "OptimizationV2Preflight",
+    "OptimizationV2PreflightResult",
+    "OptimizationV2ScreeningReport",
+    "OptimizationV2ScreeningRunner",
+    "OptimizationV2Spec",
     "OptimizationStore",
     "ObservedFailureEvidenceBridge",
     "ObservedFindingDecision",
@@ -235,6 +264,7 @@ __all__ = [
     "ProcessHypothesisGenerator",
     "ProcessHypothesisProposal",
     "ProcessHypothesisResponse",
+    "MaterializedCandidate",
     "ProposalGeneratorParameters",
     "RegressionDevDataset",
     "RegressionGateResult",

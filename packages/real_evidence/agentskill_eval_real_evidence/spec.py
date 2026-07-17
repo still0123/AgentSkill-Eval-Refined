@@ -150,6 +150,7 @@ class RealAgentEvidenceSpec(StrictModel):
     name: str = Field(min_length=1)
     dataset_path: Path
     skill_path: Path
+    baseline_skill_path: Optional[Path] = None
     case_ids: Tuple[str, ...] = Field(min_length=2, max_length=2)
     evidence_class: RealEvidenceClass
     simulated: bool
@@ -169,6 +170,11 @@ class RealAgentEvidenceSpec(StrictModel):
             )
         if len(set(self.case_ids)) != len(self.case_ids):
             raise ValueError("case IDs must be unique")
+        if (
+            self.baseline_skill_path is not None
+            and self.baseline_skill_path.resolve() == self.skill_path.resolve()
+        ):
+            raise ValueError("baseline and treatment Skill paths must differ")
         return self
 
     @classmethod

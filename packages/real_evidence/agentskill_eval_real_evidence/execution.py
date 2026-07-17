@@ -10,7 +10,7 @@ import subprocess
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Callable, Optional, Tuple
+from typing import Callable, MutableMapping, Optional, Tuple
 from uuid import NAMESPACE_URL, UUID, uuid5
 
 from pydantic import JsonValue
@@ -61,11 +61,93 @@ from agentskill_eval_runner_adapters import (
     SkillUpRunnerAdapter,
     ValidationReport,
 )
-from agentskill_eval_runner_adapters.contracts import TraceEventSink, null_event_sink
+from agentskill_eval_runner_adapters.contracts import (
+    RunnerStatus,
+    TraceEventSink,
+    null_event_sink,
+)
 
 
 class RealEvidenceError(RuntimeError):
     """Raised when authorization, evidence boundaries, or budgets are violated."""
+
+
+@dataclass(frozen=True)
+class BaselineReplay:
+    """A previously observed baseline result that can be reused for another candidate."""
+
+    result: RunnerResult
+    artifacts: Tuple[Tuple[str, bytes], ...] = ()
+
+
+class BaselineReplayAdapter:
+    """Replay only the frozen baseline arm while executing a new treatment arm."""
+
+    def __init__(
+        self,
+        delegate: RunnerAdapter,
+        cache: MutableMapping[str, BaselineReplay],
+        baseline_variant_id: str,
+    ) -> None:
+        self.delegate = delegate
+        self.cache = cache
+        self.baseline_variant_id = baseline_variant_id
+        self.reused_runs = 0
+
+    @property
+    def compatibility(self):  # type: ignore[no-untyped-def]
+        return self.delegate.compatibility
+
+    async def validate(self, request: RunnerRequest) -> ValidationReport:
+        return await self.delegate.validate(request)
+
+    async def execute(
+        self, request: RunnerRequest, event_sink: TraceEventSink = null_event_sink
+    ) -> RunnerResult:
+        if request.variant != self.baseline_variant_id:
+            return await self.delegate.execute(request, event_sink)
+        replay = self.cache.get(request.case_id)
+        if replay is not None:
+            output_root = request.run_dir / "runner-output" / "iteration-1"
+            for relative, content in replay.artifacts:
+                destination = output_root / relative
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_bytes(content)
+            self.reused_runs += 1
+            raw_result = dict(replay.result.raw_result)
+            raw_result["baseline_reused"] = True
+            raw_result["replay_case_id"] = request.case_id
+            return replace(
+                replay.result,
+                execution_id=request.execution_id,
+                input_tokens=0,
+                output_tokens=0,
+                cached_input_tokens=0,
+                tool_calls=0,
+                duration_ms=0,
+                cost_microusd=0,
+                raw_result=raw_result,
+            )
+
+        result = await self.delegate.execute(request, event_sink)
+        if result.status not in {RunnerStatus.PASS, RunnerStatus.FAIL}:
+            return result
+        captured: list[Tuple[str, bytes]] = []
+        source_root = request.run_dir / "runner-output" / "iteration-1"
+        for observed in result.artifacts:
+            source = source_root / observed.path
+            if not source.is_file() or source.is_symlink():
+                # An incomplete artifact set cannot be safely replayed.
+                return result
+            content = source.read_bytes()
+            if hashlib.sha256(content).hexdigest() != observed.sha256:
+                return result
+            captured.append((observed.path, content))
+        self.cache[request.case_id] = BaselineReplay(result=result, artifacts=tuple(captured))
+        return result
+
+    async def cancel(self, execution_id: str) -> bool:
+        return await self.delegate.cancel(execution_id)
 
 
 @dataclass(frozen=True)
@@ -186,6 +268,7 @@ class RealAgentEvidenceRunner:
         max_agent_runs: int,
         allow_process_integration: bool = False,
         progress_sink: Optional[Callable[..., None]] = None,
+        baseline_replay_cache: Optional[MutableMapping[str, BaselineReplay]] = None,
     ) -> RealEvidenceResult:
         if max_cost_microusd < 1 or max_agent_runs < 1:
             raise RealEvidenceError("positive cost and Agent Run limits are required")
@@ -254,6 +337,7 @@ class RealAgentEvidenceRunner:
                 manifest,
                 repeats,
                 progress_sink,
+                baseline_replay_cache,
             )
         except BaseException as exc:
             cancelled = isinstance(exc, (KeyboardInterrupt, asyncio.CancelledError))
@@ -278,6 +362,7 @@ class RealAgentEvidenceRunner:
         manifest: RealEvidenceRunManifest,
         repeats: int,
         progress_sink: Optional[Callable[..., None]],
+        baseline_replay_cache: Optional[MutableMapping[str, BaselineReplay]],
     ) -> RealEvidenceResult:
         variants, runtimes, experiment = self._experiment_inputs(
             spec, mode, preflight, dataset, manifest.experiment_id
@@ -299,7 +384,7 @@ class RealAgentEvidenceRunner:
             max_attempts=1,
         )
         planner.persist(plan)
-        adapter = CostingRunnerAdapter(
+        base_adapter = CostingRunnerAdapter(
             SkillUpRunnerAdapter(
                 spec.runner.path,
                 expected_sha256=spec.runner.expected_sha256,
@@ -307,6 +392,15 @@ class RealAgentEvidenceRunner:
             ),
             spec,
         )
+        adapter: RunnerAdapter = base_adapter
+        replay_adapter: Optional[BaselineReplayAdapter] = None
+        if baseline_replay_cache is not None:
+            replay_adapter = BaselineReplayAdapter(
+                base_adapter,
+                baseline_replay_cache,
+                str(variants[0].id),
+            )
+            adapter = replay_adapter
 
         def observed_or_reserved_cost() -> int:
             total = 0
@@ -342,6 +436,7 @@ class RealAgentEvidenceRunner:
                     "completed_runs": execution.completed_runs,
                     "invalid_runs": execution.invalid_runs,
                     "observed_or_reserved_cost_microusd": cost,
+                    "reused_runs": replay_adapter.reused_runs if replay_adapter else 0,
                     "completed_at": now,
                 }
             )
@@ -354,6 +449,7 @@ class RealAgentEvidenceRunner:
                     "completed_runs": execution.completed_runs,
                     "invalid_runs": execution.invalid_runs,
                     "observed_or_reserved_cost_microusd": cost,
+                    "reused_runs": replay_adapter.reused_runs if replay_adapter else 0,
                     "completed_at": now,
                 }
             )
@@ -368,6 +464,7 @@ class RealAgentEvidenceRunner:
                 "completed_runs": execution.completed_runs,
                 "invalid_runs": execution.invalid_runs,
                 "observed_or_reserved_cost_microusd": cost,
+                "reused_runs": replay_adapter.reused_runs if replay_adapter else 0,
                 "completed_at": now,
             }
         )
@@ -481,10 +578,25 @@ class RealAgentEvidenceRunner:
         baseline = ExperimentVariant(
             id=uuid5(experiment_id, "variant:without-skill"),
             experiment_id=experiment_id,
-            name="without-skill",
+            name="skill-v1" if spec.baseline_skill_path is not None else "without-skill",
             role=VariantRole.BASELINE,
             runner_snapshot=runner,
             agent_snapshot=agent,
+            skill_snapshot=(
+                SkillSnapshot(
+                    skill_id=uuid5(NAMESPACE_URL, "agentskill-eval:skill:python-bug-fix"),
+                    version_id=uuid5(
+                        NAMESPACE_URL, f"skill:{preflight.baseline_skill_sha256}"
+                    ),
+                    name="python-bug-fix-v1",
+                    version="1.0.0",
+                    content_sha256=preflight.baseline_skill_sha256,
+                    injection_mode="skill-up-native-install",
+                )
+                if spec.baseline_skill_path is not None
+                and preflight.baseline_skill_sha256 is not None
+                else None
+            ),
             tool_snapshot=tools,
             sandbox_snapshot=sandbox,
             price_snapshot=price,
@@ -492,7 +604,7 @@ class RealAgentEvidenceRunner:
         treatment = ExperimentVariant(
             id=uuid5(experiment_id, "variant:with-skill"),
             experiment_id=experiment_id,
-            name="with-skill",
+            name="candidate-v2" if spec.baseline_skill_path is not None else "with-skill",
             role=VariantRole.TREATMENT,
             runner_snapshot=runner,
             agent_snapshot=agent,
@@ -530,6 +642,11 @@ class RealAgentEvidenceRunner:
                 environment={"type": "none"},
                 timeout_seconds=spec.agent.timeout_seconds,
                 max_turns=spec.agent.max_turns,
+                skill_path=(
+                    spec.baseline_skill_path.resolve()
+                    if spec.baseline_skill_path is not None
+                    else None
+                ),
                 agent_home_files=spec.agent.home_config_files,
                 secret_env=secrets,
             ),

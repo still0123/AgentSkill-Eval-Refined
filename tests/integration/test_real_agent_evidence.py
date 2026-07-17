@@ -28,6 +28,7 @@ from agentskill_eval_contracts import (
 from agentskill_eval_experiment import LocalExperimentStore, ReplayBundleWriter
 from agentskill_eval_real_evidence import (
     AgentSpec,
+    BaselineReplay,
     PricingSpec,
     ProtocolSpec,
     RealAgentEvidenceRunner,
@@ -562,4 +563,80 @@ def test_real_candidate_evaluator_reuses_observed_runtime_and_case_cache(
     assert search_run.exit_code == 1
     assert isinstance(search_run.exception, Exception)
     assert "no search-origin candidate" in str(search_run.exception)
-    assert counter.read_text(encoding="utf-8") == "24"
+    # Search now reuses the frozen v1 baseline across candidate pairs:
+    # 4 runs for the first candidate and 2 treatment runs for each later pair.
+    assert counter.read_text(encoding="utf-8") == "16"
+
+
+def test_real_candidate_evaluator_reuses_v1_baseline_across_candidates(
+    published_dataset: Path, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    counter = tmp_path / "baseline-reuse-calls.txt"
+    _set_fake_secrets(monkeypatch, counter)
+    observed = _spec(published_dataset).model_copy(
+        update={"evidence_class": RealEvidenceClass.OBSERVED_AGENT, "simulated": False}
+    )
+    baseline_cache: dict[str, BaselineReplay] = {}
+    authorization = RealEvaluationAuthorization(
+        confirm_real_run=True,
+        max_cost_microusd=10_000,
+        max_agent_runs=8,
+    )
+    candidate_one = tmp_path / "candidate-one"
+    candidate_two = tmp_path / "candidate-two"
+    candidate_one.mkdir()
+    candidate_two.mkdir()
+    candidate_one.joinpath("SKILL.md").write_bytes(
+        SKILL.joinpath("SKILL.md").read_bytes() + b"\n- Verify once.\n"
+    )
+    candidate_two.joinpath("SKILL.md").write_bytes(
+        SKILL.joinpath("SKILL.md").read_bytes() + b"\n- Retry once.\n"
+    )
+
+    def write_config(path: Path, skill: Path) -> None:
+        path.write_text(
+            yaml.safe_dump(
+                observed.model_copy(update={"skill_path": skill}).model_dump(mode="json"),
+                sort_keys=False,
+            ),
+            encoding="utf-8",
+        )
+
+    cases = tuple(SearchCase(id=case_id) for case_id in CASE_IDS)
+    first_config = tmp_path / "candidate-one.yaml"
+    write_config(first_config, candidate_one)
+    first = RealAgentCandidateEvaluator(
+        first_config,
+        tmp_path / "reuse-workspace",
+        authorization,
+        baseline_skill_path=SKILL,
+        baseline_replay_cache=baseline_cache,
+    ).evaluate(
+        candidate_one / "SKILL.md",
+        published_dataset / "dataset.yaml",
+        DatasetLoader().load(published_dataset).dataset_sha256,
+        cases,
+        SearchEvaluationStage.FULL,
+        30,
+    )
+    second_config = tmp_path / "candidate-two.yaml"
+    write_config(second_config, candidate_two)
+    second = RealAgentCandidateEvaluator(
+        second_config,
+        tmp_path / "reuse-workspace",
+        authorization,
+        baseline_skill_path=SKILL,
+        baseline_replay_cache=baseline_cache,
+    ).evaluate(
+        candidate_two / "SKILL.md",
+        published_dataset / "dataset.yaml",
+        DatasetLoader().load(published_dataset).dataset_sha256,
+        cases,
+        SearchEvaluationStage.FULL,
+        30,
+    )
+
+    assert all(item.outcome == "pass" for item in first.results + second.results)
+    assert set(baseline_cache) == set(CASE_IDS)
+    assert counter.read_text(encoding="utf-8") == "6"
+    assert authorization.consumed_agent_runs == 6

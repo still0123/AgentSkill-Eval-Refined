@@ -90,6 +90,11 @@ class RealEvidenceReportWriter:
             skill_sha256=(
                 treatment.skill_snapshot.content_sha256 if treatment.skill_snapshot else "0" * 64
             ),
+            baseline_skill_sha256=(
+                baseline.skill_snapshot.content_sha256
+                if baseline.skill_snapshot is not None
+                else None
+            ),
             baseline_pass_rate=statistics.primary_assignment_based.control_pass_rate,
             treatment_pass_rate=statistics.primary_assignment_based.treatment_pass_rate,
             absolute_gain=statistics.primary_assignment_based.absolute_gain,
@@ -194,7 +199,8 @@ table{{border-collapse:collapse;width:100%}}th,td{{border:1px solid #aaa;padding
 <dt>agent</dt><dd>{esc(report.agent_snapshot.engine)} {esc(report.agent_snapshot.engine_version)} ·
 {esc(report.agent_snapshot.model)} · executable
 <code>{esc(report.runner_snapshot.config.get("agent_executable_sha256", "unavailable"))}</code></dd>
-<dt>Skill hash</dt><dd><code>{esc(report.skill_sha256)}</code></dd></dl>
+<dt>Skill hash</dt><dd><code>{esc(report.skill_sha256)}</code></dd>
+<dt>Baseline Skill hash</dt><dd><code>{esc(report.baseline_skill_sha256 or "none")}</code></dd></dl>
 <h2>Outcome</h2><p>Baseline {esc(report.baseline_pass_rate)} · Treatment
 {esc(report.treatment_pass_rate)} · Absolute gain {esc(report.absolute_gain)} · Invalid
 {report.invalid_runs}</p><p>{esc(report.inference_note)}</p>

@@ -168,6 +168,7 @@ class BenchmarkGuidedSkillSearch:
             dataset,
             workspace=self.workspace,
             real_authorization=real_authorization,
+            baseline_skill_path=spec.base_skill_path,
         )
         semantic_spec = spec.model_dump(
             mode="json",

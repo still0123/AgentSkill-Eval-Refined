@@ -222,6 +222,7 @@ def build_evaluator(
     *,
     workspace: Optional[Path] = None,
     real_authorization: Optional["RealEvaluationAuthorization"] = None,
+    baseline_skill_path: Optional[Path] = None,
 ) -> CandidateEvaluator:
     if spec.type == "simulated_keyword":
         return SimulatedKeywordEvaluator(dataset, spec.version)
@@ -234,5 +235,8 @@ def build_evaluator(
     from agentskill_eval_skill_optimizer.real_evaluator import RealAgentCandidateEvaluator
 
     return RealAgentCandidateEvaluator(
-        spec.real_agent_config_path, workspace, real_authorization
+        spec.real_agent_config_path,
+        workspace,
+        real_authorization,
+        baseline_skill_path=baseline_skill_path,
     )

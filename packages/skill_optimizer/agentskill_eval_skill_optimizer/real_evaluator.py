@@ -8,7 +8,7 @@ import json
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, Sequence, Tuple
+from typing import Dict, MutableMapping, Optional, Sequence, Tuple
 from uuid import UUID, uuid5
 
 import yaml
@@ -26,7 +26,11 @@ from agentskill_eval_contracts import (
 )
 from agentskill_eval_experiment import ExperimentLayout, LocalExperimentStore
 from agentskill_eval_experiment.storage.atomic import AtomicFileWriter
-from agentskill_eval_real_evidence import RealAgentEvidenceRunner, RealAgentEvidenceSpec
+from agentskill_eval_real_evidence import (
+    BaselineReplay,
+    RealAgentEvidenceRunner,
+    RealAgentEvidenceSpec,
+)
 from agentskill_eval_skill_optimizer.spec import SearchCase
 
 
@@ -63,6 +67,9 @@ class RealAgentCandidateEvaluator:
         config_path: Path,
         workspace: Path,
         authorization: RealEvaluationAuthorization,
+        *,
+        baseline_skill_path: Optional[Path] = None,
+        baseline_replay_cache: Optional[MutableMapping[str, BaselineReplay]] = None,
     ) -> None:
         self.template = RealAgentEvidenceSpec.load(config_path)
         if self.template.simulated:
@@ -74,6 +81,13 @@ class RealAgentCandidateEvaluator:
         self.workspace = workspace.resolve() / "real-optimizer-evidence"
         self.workspace.mkdir(parents=True, exist_ok=True)
         self.authorization = authorization
+        self.baseline_skill_path = (
+            baseline_skill_path.resolve(strict=True) if baseline_skill_path is not None else None
+        )
+        self.baseline_replay_cache = (
+            baseline_replay_cache if baseline_replay_cache is not None else {}
+        )
+        self._baseline_results: Dict[str, SearchCaseResult] = {}
         self.writer = AtomicFileWriter()
         self.cache_path = self.workspace / "candidate-case-cache.json"
         self._cache: Dict[str, object] = self._load_cache()
@@ -93,6 +107,11 @@ class RealAgentCandidateEvaluator:
     @property
     def simulated(self) -> bool:
         return False
+
+    @property
+    def baseline_results(self) -> Dict[str, SearchCaseResult]:
+        """Return the first observed v1 result for each Case, never a candidate result."""
+        return dict(self._baseline_results)
 
     def authorize_plan(self, candidate_case_evaluations: int) -> Tuple[int, int]:
         """Reject the complete plan before the first external Agent call."""
@@ -172,6 +191,7 @@ class RealAgentCandidateEvaluator:
                 "name": f"optimizer-{skill_sha[:12]}-{stable_sha256(pair_ids)[:12]}",
                 "dataset_path": dataset_root,
                 "skill_path": skill_root,
+                "baseline_skill_path": self.baseline_skill_path,
                 "case_ids": pair_ids,
             }
         )
@@ -183,6 +203,7 @@ class RealAgentCandidateEvaluator:
                 confirm_real_run=True,
                 max_cost_microusd=self.authorization.remaining_cost(),
                 max_agent_runs=self.authorization.remaining_runs(),
+                baseline_replay_cache=self.baseline_replay_cache,
             )
         )
         if result.manifest.status != RealEvidenceStatus.COMPLETED:
@@ -190,29 +211,54 @@ class RealAgentCandidateEvaluator:
                 f"real evidence pair ended as {result.manifest.status.value}"
             )
         self.authorization.reserve_completed(
-            result.manifest.completed_runs + result.manifest.invalid_runs,
+            result.manifest.completed_runs
+            + result.manifest.invalid_runs
+            - result.manifest.reused_runs,
             result.manifest.observed_or_reserved_cost_microusd,
         )
-        return self._treatment_results(result.manifest.experiment_id, dataset_root, pair_ids)
+        baseline, treatment = self._variant_results(
+            result.manifest.experiment_id, dataset_root, pair_ids
+        )
+        for item in baseline:
+            self._baseline_results.setdefault(item.case_id, item)
+        return treatment
 
-    def _treatment_results(
+    def _variant_results(
         self, experiment_id: UUID, dataset_root: Path, case_ids: Tuple[str, str]
-    ) -> Tuple[SearchCaseResult, SearchCaseResult]:
+    ) -> Tuple[
+        Tuple[SearchCaseResult, SearchCaseResult],
+        Tuple[SearchCaseResult, SearchCaseResult],
+    ]:
         store = LocalExperimentStore(self.workspace)
         loaded = DatasetLoader().load(dataset_root)
         case_by_uuid = {
             uuid5(loaded.dataset_id, f"case:{item.metadata.case_id}"): item.metadata.case_id
             for item in loaded.cases
         }
+        baseline_ids = {
+            item.id
+            for item in store.list_variants(experiment_id)
+            if item.role == VariantRole.BASELINE
+        }
         treatment_ids = {
             item.id
             for item in store.list_variants(experiment_id)
             if item.role == VariantRole.TREATMENT
         }
-        found: Dict[str, SearchCaseResult] = {}
+        found: Dict[str, Dict[str, SearchCaseResult]] = {
+            "baseline": {},
+            "treatment": {},
+        }
         layout = ExperimentLayout(self.workspace, experiment_id)
         for run in store.list_runs(experiment_id):
-            if run.variant_id not in treatment_ids:
+            role = (
+                "baseline"
+                if run.variant_id in baseline_ids
+                else "treatment"
+                if run.variant_id in treatment_ids
+                else None
+            )
+            if role is None:
                 continue
             block = store.load_pair_block(experiment_id, run.pair_block_id)
             case_id = case_by_uuid[block.case_id]
@@ -223,7 +269,7 @@ class RealAgentCandidateEvaluator:
             outcome = run.evaluation_outcome or EvaluationOutcome.INVALID
             trace = layout.trace_manifest(run.id, attempt.attempt_no)
             diagnosis = layout.failure_diagnosis(run.id, attempt.attempt_no)
-            found[case_id] = SearchCaseResult(
+            found[role][case_id] = SearchCaseResult(
                 case_id=case_id,
                 passed=outcome == EvaluationOutcome.PASS,
                 score=run.final_score or 0,
@@ -238,9 +284,13 @@ class RealAgentCandidateEvaluator:
                 trace_ref=str(trace) if trace.is_file() else None,
                 failure_diagnosis_ref=str(diagnosis) if diagnosis.is_file() else None,
             )
-        if set(found) != set(case_ids):
-            raise RealCandidateEvaluationError("real evidence returned the wrong treatment cases")
-        return (found[case_ids[0]], found[case_ids[1]])
+        expected = set(case_ids)
+        if set(found["baseline"]) != expected or set(found["treatment"]) != expected:
+            raise RealCandidateEvaluationError("real evidence returned the wrong paired cases")
+        return (
+            (found["baseline"][case_ids[0]], found["baseline"][case_ids[1]]),
+            (found["treatment"][case_ids[0]], found["treatment"][case_ids[1]]),
+        )
 
     def _skill_package(self, skill_file: Path) -> Tuple[Path, str]:
         content = skill_file.read_bytes()

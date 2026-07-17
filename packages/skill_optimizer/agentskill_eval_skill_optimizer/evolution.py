@@ -63,6 +63,8 @@ class FailureEvidenceBundle(FrozenModel):
     name: str = Field(min_length=1)
     split: Literal["train"]
     diagnoses: Tuple[FailureDiagnosis, ...] = Field(min_length=1)
+    agent_provider: Optional[str] = Field(default=None, min_length=1)
+    agent_model: Optional[str] = Field(default=None, min_length=1)
 
     @classmethod
     def load(cls, path: Path) -> "FailureEvidenceBundle":

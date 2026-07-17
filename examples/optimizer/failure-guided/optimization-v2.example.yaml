@@ -1,0 +1,14 @@
+schema_version: ase/optimization-evaluation-v2/v1alpha1
+name: deepseek-direct-skill-v1-v2-screening
+base_skill_path: /Users/bytedance/Documents/skill/examples/skills/python-bug-fix-v1
+proposal_directory: /Users/bytedance/Documents/skill/.agentskill-eval/deepseek-proposal-v5-guided/proposal-jobs/a9593db6-dda3-5925-86bf-526cbf460357
+failure_bundle_path: /Users/bytedance/Documents/skill/examples/optimizer/failure-guided/qwen3-cachetools-failure-bundle-v4.yaml
+real_agent_config_path: /Users/bytedance/Documents/skill/examples/real-agent-evidence/deepseek-boltons-smoke-v1.example.yaml
+validation_search_path: /Users/bytedance/.codex/worktrees/fb0a/stage3b-offline-evidence/.agentskill-eval/stage2-reproduction/dataset-versions/99fd667b-0657-5e3d-89d3-2411236ff258
+case_ids:
+  - boltons-split-maxsplit-zero
+  - boltons-lri-replacement
+target_provider: deepseek
+target_model: deepseek-v4-pro
+max_candidates: 3
+max_agent_runs: 12

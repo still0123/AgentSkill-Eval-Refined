@@ -25,6 +25,11 @@ class RealEvidencePreflight:
         selected = self._selected_cases(dataset, spec.case_ids)
         self._validate_real_cases(dataset, selected)
         skill_sha = self._skill_tree_sha256(spec.skill_path, selected)
+        baseline_skill_sha = (
+            self._skill_tree_sha256(spec.baseline_skill_path, selected)
+            if spec.baseline_skill_path is not None
+            else None
+        )
         runner = self._probe("runner", spec.runner)
         agent = self._probe("agent", spec.agent)
         self._require_secret_environment(spec.agent.secret_env_names)
@@ -38,6 +43,7 @@ class RealEvidencePreflight:
             dataset_sha256=dataset.dataset_sha256,
             case_ids=spec.case_ids,
             skill_sha256=skill_sha,
+            baseline_skill_sha256=baseline_skill_sha,
             runner=runner,
             agent=agent,
             provider=spec.agent.provider,

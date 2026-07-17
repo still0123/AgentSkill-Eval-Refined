@@ -76,6 +76,9 @@ from agentskill_eval_skill_optimizer import (
     ObservedFailureEvidenceBridge,
     OptimizationSearchSpec,
     OptimizationStore,
+    OptimizationV2Planner,
+    OptimizationV2ScreeningRunner,
+    OptimizationV2Spec,
     PromotionWorkflow,
     PromotionWorkflowResult,
     RealEvaluationAuthorization,
@@ -113,6 +116,10 @@ benchmark_split_app = typer.Typer(
 benchmark_app.add_typer(benchmark_split_app, name="split")
 optimize_app = typer.Typer(help="Search validation data for a frozen Skill candidate.")
 app.add_typer(optimize_app, name="optimize")
+optimization_v2_app = typer.Typer(
+    help="Prepare direct Skill v1 versus Candidate v2 evaluation without model calls."
+)
+optimize_app.add_typer(optimization_v2_app, name="v2")
 evolution_app = typer.Typer(help="Package and inspect frozen Skill evolution evidence.")
 app.add_typer(evolution_app, name="evolution")
 evolution_release_app = typer.Typer(help="Prepare and verify offline evolution releases.")
@@ -1566,6 +1573,126 @@ def proposal_verify(
                 "passed": True,
                 "proposal_job_id": str(result.manifest.proposal_job_id),
                 "proposal_count": result.manifest.proposal_count,
+            },
+            sort_keys=True,
+        )
+    )
+
+
+@optimization_v2_app.command("preflight")
+def optimization_v2_preflight(
+    spec_path: Path = typer.Argument(  # noqa: B008
+        ..., exists=True, dir_okay=False, help="Frozen Optimization Evaluation v2 spec."
+    ),
+    workspace: Path = typer.Option(  # noqa: B008
+        Path(".agentskill-eval-optimization-v2"), "--workspace", file_okay=False
+    ),
+) -> None:
+    """Prepare candidate Skills and report the bounded no-cost comparison plan."""
+    spec = OptimizationV2Spec.load(spec_path)
+    result = OptimizationV2Planner(workspace).preflight(spec)
+    typer.echo(
+        json.dumps(
+            {
+                "status": result.report.status,
+                "reasons": list(result.report.reasons),
+                "accepted_candidate_ids": list(result.report.accepted_candidate_ids),
+                "rejected_candidate_ids": list(result.report.rejected_candidate_ids),
+                "planned_agent_runs": result.report.planned_agent_runs,
+                "estimated_cost_microusd": result.report.estimated_cost_microusd,
+                "provider": result.report.provider,
+                "model": result.report.model,
+                "evidence_provider": result.report.evidence_provider,
+                "evidence_model": result.report.evidence_model,
+                "simulated": result.report.simulated,
+                "report": str(result.report_path),
+                "html": str(result.html_path),
+            },
+            sort_keys=True,
+        )
+    )
+
+
+@optimization_v2_app.command("verify")
+def optimization_v2_verify(
+    report_path: Path = typer.Argument(  # noqa: B008
+        ..., exists=True, dir_okay=False, help="Optimization v2 preflight report."
+    ),
+    workspace: Path = typer.Option(  # noqa: B008
+        Path(".agentskill-eval-optimization-v2"), "--workspace", file_okay=False
+    ),
+) -> None:
+    """Verify the immutable candidate-quality and preflight hashes."""
+    report = OptimizationV2Planner(workspace).verify(report_path)
+    typer.echo(report.model_dump_json(indent=2))
+
+
+@optimization_v2_app.command("smoke")
+def optimization_v2_smoke(
+    spec_path: Path = typer.Argument(  # noqa: B008
+        ..., exists=True, dir_okay=False, help="Frozen Optimization Evaluation v2 spec."
+    ),
+    workspace: Path = typer.Option(  # noqa: B008
+        Path(".agentskill-eval-optimization-v2"), "--workspace", file_okay=False
+    ),
+    confirm_real_run: bool = typer.Option(False, "--confirm-real-run"),  # noqa: B008
+    max_cost_microusd: Optional[int] = typer.Option(  # noqa: B008
+        None, "--max-cost-microusd", min=1
+    ),
+    max_agent_runs: Optional[int] = typer.Option(  # noqa: B008
+        None, "--max-agent-runs", min=4, max=12
+    ),
+) -> None:
+    """Run bounded direct v1 versus Candidate v2 validation-search screening."""
+    if not confirm_real_run:
+        raise typer.BadParameter(
+            "Optimization v2 real screening requires --confirm-real-run",
+            param_hint="--confirm-real-run",
+        )
+    if max_cost_microusd is None:
+        raise typer.BadParameter(
+            "Optimization v2 real screening requires --max-cost-microusd",
+            param_hint="--max-cost-microusd",
+        )
+    if max_agent_runs is None:
+        raise typer.BadParameter(
+            "Optimization v2 real screening requires --max-agent-runs",
+            param_hint="--max-agent-runs",
+        )
+    spec = OptimizationV2Spec.load(spec_path)
+    preview = OptimizationV2Planner(workspace / "preflight").preflight(spec)
+    typer.echo(
+        json.dumps(
+            {
+                "event": "optimization_v2_real_screening_preflight",
+                "status": preview.report.status,
+                "provider": preview.report.provider,
+                "model": preview.report.model,
+                "planned_agent_runs": preview.report.planned_agent_runs,
+                "max_authorized_agent_runs": max_agent_runs,
+                "estimated_cost_microusd": preview.report.estimated_cost_microusd,
+                "max_authorized_cost_microusd": max_cost_microusd,
+            },
+            sort_keys=True,
+        ),
+        err=True,
+    )
+    report, report_path, html_path = OptimizationV2ScreeningRunner(workspace).run(
+        spec,
+        confirm_real_run=True,
+        max_cost_microusd=max_cost_microusd,
+        max_agent_runs=max_agent_runs,
+    )
+    typer.echo(
+        json.dumps(
+            {
+                "status": report.status,
+                "observed_agent_runs": report.observed_agent_runs,
+                "observed_cost_microusd": report.observed_cost_microusd,
+                "baseline_reused_runs": report.baseline_reused_runs,
+                "report": str(report_path),
+                "html": str(html_path),
+                "claim_limit": report.claim_limit,
             },
             sort_keys=True,
         )
