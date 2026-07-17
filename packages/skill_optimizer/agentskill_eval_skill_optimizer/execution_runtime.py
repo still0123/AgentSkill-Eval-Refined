@@ -570,17 +570,27 @@ class BudgetedRealEvolutionExecutor:
             for item in winner.results
             if base_by_case[item.case_id].passed and not item.passed
         )
+        invalid_cases = tuple(
+            dict.fromkeys(
+                item.case_id
+                for evaluation in (base, winner)
+                for item in evaluation.results
+                if item.outcome == "invalid"
+            )
+        )
         overhead = (winner.total_tokens - base.total_tokens) / max(1, base.total_tokens)
         return RegressionGateResult(
             dataset_sha256=loaded.dataset_sha256,
             base=base,
             winner=winner,
             loss_cases=losses,
+            invalid_cases=invalid_cases,
             token_overhead_ratio=overhead,
             max_loss_cases=spec.constraints.max_loss_cases,
             max_token_overhead_ratio=spec.constraints.max_token_overhead_ratio,
             passed=(
-                len(losses) <= spec.constraints.max_loss_cases
+                not invalid_cases
+                and len(losses) <= spec.constraints.max_loss_cases
                 and overhead <= spec.constraints.max_token_overhead_ratio
             ),
         )
@@ -761,7 +771,8 @@ class BudgetedRealEvolutionExecutor:
 <p>Execution: <code>{esc(preflight.execution_id)}</code></p>
 <p>Search and regression: completed · simulated=false · locked accessed=false</p>
 <p>Winner: <code>{esc(receipt.winner_skill_sha256)}</code></p>
-<p>Regression passed: <strong>{esc(gate.passed)}</strong>; losses: {esc(len(gate.loss_cases))}</p>
+<p>Regression passed: <strong>{esc(gate.passed)}</strong>; losses: {esc(len(gate.loss_cases))};
+invalid: {esc(len(gate.invalid_cases))}</p>
 <p>Runs: {esc(receipt.consumed_agent_runs)}; cost:
 {esc(receipt.consumed_cost_microusd)} microusd</p>
 <h2>Claim limit</h2><p>{esc(preflight.claim_limit)}</p></body></html>"""

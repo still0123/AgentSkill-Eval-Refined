@@ -86,6 +86,66 @@ def _evaluation(dataset_sha: str) -> CandidateEvaluation:
     )
 
 
+def _invalid_evaluation(dataset_sha: str) -> CandidateEvaluation:
+    results = list(_evaluation(dataset_sha).results)
+    results[0] = SearchCaseResult(
+        case_id="case-0",
+        passed=False,
+        score=0,
+        input_tokens=0,
+        output_tokens=0,
+        latency_ms=0,
+        cost_microusd=0,
+        outcome="invalid",
+        experiment_id=uuid4(),
+        run_id=uuid4(),
+        attempt_id=uuid4(),
+    )
+    return CandidateEvaluation(
+        stage=SearchEvaluationStage.REGRESSION_DEV,
+        dataset_sha256=dataset_sha,
+        evaluator_sha256="e" * 64,
+        case_ids=tuple(item.case_id for item in results),
+        results=tuple(results),
+        pass_rate=0.75,
+        mean_score=0.75,
+        total_tokens=36,
+        total_latency_ms=15,
+        total_cost_microusd=3,
+        simulated=False,
+        evaluated_at=datetime.now(timezone.utc),
+    )
+
+
+def test_regression_gate_rejects_invalid_observations() -> None:
+    dataset_sha = "2" * 64
+    evaluation = _invalid_evaluation(dataset_sha)
+    with pytest.raises(ValueError, match="decision"):
+        RegressionGateResult(
+            dataset_sha256=dataset_sha,
+            base=evaluation,
+            winner=evaluation,
+            loss_cases=(),
+            invalid_cases=("case-0",),
+            token_overhead_ratio=0,
+            max_loss_cases=0,
+            max_token_overhead_ratio=0.25,
+            passed=True,
+        )
+    gate = RegressionGateResult(
+        dataset_sha256=dataset_sha,
+        base=evaluation,
+        winner=evaluation,
+        loss_cases=(),
+        invalid_cases=("case-0",),
+        token_overhead_ratio=0,
+        max_loss_cases=0,
+        max_token_overhead_ratio=0.25,
+        passed=False,
+    )
+    assert gate.invalid_cases == ("case-0",)
+
+
 def _fixture(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[EvolutionRuntimeSpec, Path]:
     base = tmp_path / "base"
     manual = tmp_path / "manual"

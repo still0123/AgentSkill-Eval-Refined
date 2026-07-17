@@ -325,6 +325,10 @@ class RegressionGateResult(FrozenModel):
     base: CandidateEvaluation
     winner: CandidateEvaluation
     loss_cases: Tuple[str, ...]
+    # Invalid observations are not task failures.  They are unusable evidence
+    # (for example a provider/runner error) and must prevent a regression gate
+    # from being reported as passed.
+    invalid_cases: Tuple[str, ...] = ()
     token_overhead_ratio: float
     max_loss_cases: int = Field(ge=0)
     max_token_overhead_ratio: float = Field(ge=0)
@@ -347,13 +351,24 @@ class RegressionGateResult(FrozenModel):
         )
         if self.loss_cases != expected_losses:
             raise ValueError("regression gate loss_cases do not match evidence")
+        expected_invalid_cases = tuple(
+            dict.fromkeys(
+                item.case_id
+                for evaluation in evaluations
+                for item in evaluation.results
+                if item.outcome == "invalid"
+            )
+        )
+        if self.invalid_cases != expected_invalid_cases:
+            raise ValueError("regression gate invalid_cases do not match evidence")
         expected_overhead = (self.winner.total_tokens - self.base.total_tokens) / max(
             1, self.base.total_tokens
         )
         if abs(self.token_overhead_ratio - expected_overhead) > 1e-12:
             raise ValueError("regression gate token overhead does not match evidence")
         expected_pass = (
-            len(expected_losses) <= self.max_loss_cases
+            not expected_invalid_cases
+            and len(expected_losses) <= self.max_loss_cases
             and expected_overhead <= self.max_token_overhead_ratio
         )
         if self.passed != expected_pass:
@@ -840,17 +855,27 @@ class FailureGuidedSkillEvolution:
             for item in winner.results
             if base_by_case[item.case_id].passed and not item.passed
         )
+        invalid_cases = tuple(
+            dict.fromkeys(
+                item.case_id
+                for evaluation in (base, winner)
+                for item in evaluation.results
+                if item.outcome == "invalid"
+            )
+        )
         overhead = (winner.total_tokens - base.total_tokens) / max(1, base.total_tokens)
         return RegressionGateResult(
             dataset_sha256=dataset_sha,
             base=base,
             winner=winner,
             loss_cases=losses,
+            invalid_cases=invalid_cases,
             token_overhead_ratio=overhead,
             max_loss_cases=spec.constraints.max_loss_cases,
             max_token_overhead_ratio=spec.constraints.max_token_overhead_ratio,
             passed=(
-                len(losses) <= spec.constraints.max_loss_cases
+                not invalid_cases
+                and len(losses) <= spec.constraints.max_loss_cases
                 and overhead <= spec.constraints.max_token_overhead_ratio
             ),
         )
@@ -908,6 +933,7 @@ td,th{{border:1px solid #aaa;padding:6px}}table{{border-collapse:collapse}}</sty
 {esc(report.winner_candidate_id)}</code> · <code>{esc(report.winner_skill_sha256)}</code></p>
 <p>Regression gate: <strong>{esc(report.regression_gate.passed)}</strong> · losses:
 {esc(len(report.regression_gate.loss_cases))}/{esc(report.regression_gate.max_loss_cases)} ·
+invalid: {esc(len(report.regression_gate.invalid_cases))} ·
 token overhead: {esc(f"{report.regression_gate.token_overhead_ratio:.3f}")} / maximum
 {esc(f"{report.regression_gate.max_token_overhead_ratio:.3f}")}</p>
 <table><thead><tr><th>Hypothesis</th><th>Failure</th><th>Instruction</th></tr></thead>

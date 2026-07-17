@@ -563,6 +563,7 @@ class EvolutionEvidenceReleasePreparer(EvidenceReleasePreparer):
         regression = {
             "passed": evolution.regression_gate.passed,
             "loss_cases": list(evolution.regression_gate.loss_cases),
+            "invalid_cases": list(evolution.regression_gate.invalid_cases),
             "token_overhead_ratio": evolution.regression_gate.token_overhead_ratio,
             "base": self._candidate_summary(evolution.regression_gate.base),
             "winner": self._candidate_summary(evolution.regression_gate.winner),
