@@ -1,0 +1,25 @@
+{
+  "schema_version": "ase/deepseek-proposal-v6-sanitized/v1alpha1",
+  "proposal_job_id": "97761772-f675-53b2-bcd0-7dd5b5e51a7c",
+  "provider": "deepseek",
+  "model": "deepseek-v4-pro",
+  "generator_version": "proposal-observed-verification-v6",
+  "proposal_count": 4,
+  "calls_consumed": 1,
+  "observed_cost_microusd": 909,
+  "simulated": false,
+  "search_executed": false,
+  "locked_test_accessed": false,
+  "hidden_reasoning_stored": false,
+  "secret_value_stored": false,
+  "prompt_sha256": "0f2584c90272ae540160c38c01d266d79478f9bfa43f85c96af403f2b31a5252",
+  "output_schema_sha256": "40bf0f1d93d59ab2a73e61409901d040dfafeb38bd5080c8c31f70e6cdca7ee5",
+  "request_sha256": "9fadb445ad2b42a94d6a1df0f307aeac617e6b1612576d71635bff89c667b2a7",
+  "candidate_ids": [
+    "inspect-tool-schema",
+    "validate-edit-args",
+    "retry-on-rejection",
+    "verify-edit-result"
+  ],
+  "claim_limit": "Proposal-only evidence; candidates are unvalidated and do not support a Skill improvement or Skill v2 release claim."
+}
