@@ -204,6 +204,13 @@ class RealAgentCandidateEvaluator:
                 max_cost_microusd=self.authorization.remaining_cost(),
                 max_agent_runs=self.authorization.remaining_runs(),
                 baseline_replay_cache=self.baseline_replay_cache,
+                baseline_replay_namespace=stable_sha256(
+                    {
+                        "baseline_skill_sha256": self._skill_sha(self.baseline_skill_path),
+                        "dataset_sha256": dataset_sha256,
+                        "evaluator_sha256": self.evaluator_sha256,
+                    }
+                ),
             )
         )
         if result.manifest.status != RealEvidenceStatus.COMPLETED:
@@ -317,6 +324,13 @@ class RealAgentCandidateEvaluator:
             ).encode(),
         )
         return root, digest
+
+    @staticmethod
+    def _skill_sha(path: Optional[Path]) -> Optional[str]:
+        if path is None:
+            return None
+        file = path / "SKILL.md" if path.is_dir() else path
+        return hashlib.sha256(file.read_bytes()).hexdigest()
 
     def _cache_key(self, skill_sha: str, dataset_sha: str, case_id: str) -> str:
         return stable_sha256(

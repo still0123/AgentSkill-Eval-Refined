@@ -88,11 +88,18 @@ class BaselineReplayAdapter:
         delegate: RunnerAdapter,
         cache: MutableMapping[str, BaselineReplay],
         baseline_variant_id: str,
+        cache_namespace: Optional[str] = None,
     ) -> None:
         self.delegate = delegate
         self.cache = cache
         self.baseline_variant_id = baseline_variant_id
+        self.cache_namespace = cache_namespace
         self.reused_runs = 0
+
+    def _cache_key(self, case_id: str) -> str:
+        if self.cache_namespace is None:
+            return case_id
+        return stable_sha256({"namespace": self.cache_namespace, "case_id": case_id})
 
     @property
     def compatibility(self):  # type: ignore[no-untyped-def]
@@ -106,7 +113,7 @@ class BaselineReplayAdapter:
     ) -> RunnerResult:
         if request.variant != self.baseline_variant_id:
             return await self.delegate.execute(request, event_sink)
-        replay = self.cache.get(request.case_id)
+        replay = self.cache.get(self._cache_key(request.case_id))
         if replay is not None:
             output_root = request.run_dir / "runner-output" / "iteration-1"
             for relative, content in replay.artifacts:
@@ -143,7 +150,9 @@ class BaselineReplayAdapter:
             if hashlib.sha256(content).hexdigest() != observed.sha256:
                 return result
             captured.append((observed.path, content))
-        self.cache[request.case_id] = BaselineReplay(result=result, artifacts=tuple(captured))
+        self.cache[self._cache_key(request.case_id)] = BaselineReplay(
+            result=result, artifacts=tuple(captured)
+        )
         return result
 
     async def cancel(self, execution_id: str) -> bool:
@@ -269,6 +278,7 @@ class RealAgentEvidenceRunner:
         allow_process_integration: bool = False,
         progress_sink: Optional[Callable[..., None]] = None,
         baseline_replay_cache: Optional[MutableMapping[str, BaselineReplay]] = None,
+        baseline_replay_namespace: Optional[str] = None,
     ) -> RealEvidenceResult:
         if max_cost_microusd < 1 or max_agent_runs < 1:
             raise RealEvidenceError("positive cost and Agent Run limits are required")
@@ -338,6 +348,7 @@ class RealAgentEvidenceRunner:
                 repeats,
                 progress_sink,
                 baseline_replay_cache,
+                baseline_replay_namespace,
             )
         except BaseException as exc:
             cancelled = isinstance(exc, (KeyboardInterrupt, asyncio.CancelledError))
@@ -363,6 +374,7 @@ class RealAgentEvidenceRunner:
         repeats: int,
         progress_sink: Optional[Callable[..., None]],
         baseline_replay_cache: Optional[MutableMapping[str, BaselineReplay]],
+        baseline_replay_namespace: Optional[str],
     ) -> RealEvidenceResult:
         variants, runtimes, experiment = self._experiment_inputs(
             spec, mode, preflight, dataset, manifest.experiment_id
@@ -399,6 +411,7 @@ class RealAgentEvidenceRunner:
                 base_adapter,
                 baseline_replay_cache,
                 str(variants[0].id),
+                baseline_replay_namespace,
             )
             adapter = replay_adapter
 

@@ -637,6 +637,7 @@ def test_real_candidate_evaluator_reuses_v1_baseline_across_candidates(
     )
 
     assert all(item.outcome == "pass" for item in first.results + second.results)
-    assert set(baseline_cache) == set(CASE_IDS)
+    assert len(baseline_cache) == len(CASE_IDS)
+    assert all(len(key) == 64 for key in baseline_cache)
     assert counter.read_text(encoding="utf-8") == "6"
     assert authorization.consumed_agent_runs == 6
