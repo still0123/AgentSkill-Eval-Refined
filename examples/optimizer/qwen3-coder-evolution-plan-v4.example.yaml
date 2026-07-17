@@ -1,0 +1,59 @@
+schema_version: ase/real-evolution-execution-plan-spec/v1alpha1
+name: qwen3-coder-python-bug-fix-evolution-v4-runtime
+proposal_directory: /Users/bytedance/.codex/workspaces/qwen3-cachetools-real-proposal-v2/proposal-jobs/d54b1196-9f6a-575b-8a50-9b2e440654b0
+real_agent_config_path: /Users/bytedance/Documents/skill/examples/real-agent-evidence/qwen3-coder-validation-search.yaml
+
+datasets:
+  validation_search:
+    split: validation_search
+    dataset_version_sha256: 723226949bf63e9ac3577c45190e4fe9e65189cdd3c450335dbe893644d1d910
+    split_plan_sha256: &split_plan da1df63ef965fd5faef5baca1b5ae15e7169809b4b7d5abf81ac50157a88d75e
+    case_count: 4
+    independent_group_count: 4
+    content_access: metadata_only
+  regression_dev:
+    split: regression_dev
+    dataset_version_sha256: be9c622e0b22c839b0f995bd643b68d8e6e0610ad16224be17f7a38db8d4c262
+    split_plan_sha256: *split_plan
+    case_count: 4
+    independent_group_count: 4
+    content_access: metadata_only
+  validation_confirm:
+    split: validation_confirm
+    dataset_version_sha256: 2c882a71305e78526786684db0aa0a6a9291b61e467289f3a18136809ed82ac5
+    split_plan_sha256: *split_plan
+    case_count: 4
+    independent_group_count: 4
+    content_access: metadata_only
+  locked_test:
+    split: locked_test
+    dataset_version_sha256: 04017e1d22bf4b150ba132261e16529297ace156d4163df8443fe04fb6b4c3e2
+    split_plan_sha256: *split_plan
+    case_count: 4
+    independent_group_count: 4
+    content_access: metadata_only
+
+search:
+  subset_size: 2
+  promote_search_candidates: 2
+  random_seed: 2026
+final:
+  validation_confirm_repeats: 3
+  locked_test_repeats: 1
+budgets:
+  validation_search:
+    max_agent_runs: 48
+    max_cost_microusd: 48
+  regression_dev:
+    max_agent_runs: 16
+    max_cost_microusd: 16
+  validation_confirm:
+    max_agent_runs: 48
+    max_cost_microusd: 48
+  locked_test:
+    max_agent_runs: 16
+    max_cost_microusd: 16
+claim_limit: >-
+  Qwen3-Coder observed-Agent adaptive evidence only. This v4 run may select a provisional
+  winner after validation_search and regression_dev; validation_confirm and locked_test remain
+  withheld, and no Skill v2 publication claim is supported.
