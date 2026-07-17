@@ -1,0 +1,52 @@
+{
+  "schema_version": "ase/optimization-v2-screening-sanitized/v1alpha1",
+  "provider": "deepseek",
+  "model": "deepseek-v4-pro",
+  "case_ids": [
+    "more-itertools-last-reversed-none",
+    "cachetools-cachedmethod-autospec"
+  ],
+  "candidate_count": 3,
+  "planned_logical_agent_runs": 12,
+  "observed_agent_runs": 8,
+  "baseline_reused_runs": 4,
+  "observed_cost_microusd": 183674,
+  "simulated": false,
+  "search_executed": true,
+  "regression_executed": false,
+  "confirmation_executed": false,
+  "locked_test_accessed": false,
+  "invalid_runs": 0,
+  "candidates": [
+    {
+      "candidate_id": "inspect-tool-schema-before-edit",
+      "pass_rate": 1.0,
+      "absolute_gain": 0.0,
+      "wins": 0,
+      "ties": 2,
+      "losses": 0,
+      "conclusion": "tie"
+    },
+    {
+      "candidate_id": "verify-edit-result-and-retry",
+      "pass_rate": 0.5,
+      "absolute_gain": -0.5,
+      "wins": 0,
+      "ties": 1,
+      "losses": 1,
+      "conclusion": "regression"
+    },
+    {
+      "candidate_id": "map-edit-operation-to-tool-args",
+      "pass_rate": 1.0,
+      "absolute_gain": 0.0,
+      "wins": 0,
+      "ties": 2,
+      "losses": 0,
+      "conclusion": "tie"
+    }
+  ],
+  "claim_limit": "Validation-search evidence only; no regression, confirmation, locked-test, generalization, or Skill v2 release claim.",
+  "secret_value_stored": false,
+  "hidden_reasoning_stored": false
+}
