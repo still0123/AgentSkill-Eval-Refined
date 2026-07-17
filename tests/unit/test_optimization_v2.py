@@ -24,3 +24,14 @@ def test_screening_refuses_before_any_real_call_when_evidence_is_misaligned(
         )
 
     assert not (tmp_path / "runtime").exists()
+
+
+def test_screening_spec_allows_four_generated_candidates() -> None:
+    spec = OptimizationV2Spec.load(
+        PROJECT / "examples/optimizer/failure-guided/optimization-v2.example.yaml"
+    )
+
+    expanded = spec.model_copy(update={"max_candidates": 4, "max_agent_runs": 20})
+
+    assert expanded.max_candidates == 4
+    assert expanded.max_agent_runs == 20

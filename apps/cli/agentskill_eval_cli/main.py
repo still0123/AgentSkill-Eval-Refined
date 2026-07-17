@@ -1642,7 +1642,7 @@ def optimization_v2_smoke(
         None, "--max-cost-microusd", min=1
     ),
     max_agent_runs: Optional[int] = typer.Option(  # noqa: B008
-        None, "--max-agent-runs", min=4, max=12
+        None, "--max-agent-runs", min=4, max=20
     ),
 ) -> None:
     """Run bounded direct v1 versus Candidate v2 validation-search screening."""

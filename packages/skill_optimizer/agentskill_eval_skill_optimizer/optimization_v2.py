@@ -50,8 +50,8 @@ class OptimizationV2Spec(FrozenModel):
     case_ids: Tuple[str, str]
     target_provider: str = "deepseek"
     target_model: str = Field(min_length=1)
-    max_candidates: int = Field(default=3, ge=1, le=3)
-    max_agent_runs: int = Field(default=12, ge=4, le=12)
+    max_candidates: int = Field(default=3, ge=1, le=5)
+    max_agent_runs: int = Field(default=12, ge=4, le=20)
 
     @classmethod
     def load(cls, path: Path) -> "OptimizationV2Spec":
@@ -100,8 +100,8 @@ class OptimizationV2Preflight(FrozenModel):
     model: str
     evidence_provider: Optional[str] = None
     evidence_model: Optional[str] = None
-    planned_agent_runs: int = Field(ge=0, le=12)
-    expected_new_agent_runs: int = Field(ge=0, le=12)
+    planned_agent_runs: int = Field(ge=0, le=20)
+    expected_new_agent_runs: int = Field(ge=0, le=20)
     estimated_cost_microusd: int = Field(ge=0)
     estimated_new_cost_microusd: int = Field(ge=0)
     simulated: Literal[False] = False
@@ -225,7 +225,7 @@ class OptimizationV2Planner:
         )
         estimated_new_cost = expected_new_runs * agent_spec.pricing.estimated_cost_per_run_microusd
         if planned_runs > spec.max_agent_runs:
-            reasons.append("planned Agent Runs exceed the 12-Run Optimization v2 cap")
+            reasons.append("planned Agent Runs exceed the 20-Run Optimization v2 cap")
 
         report = OptimizationV2Preflight(
             name=spec.name,
@@ -344,8 +344,8 @@ class OptimizationV2ScreeningRunner:
                 "Optimization v2 preflight is insufficient: "
                 + "; ".join(preflight.report.reasons)
             )
-        if max_agent_runs < 4 or max_agent_runs > 12:
-            raise OptimizationV2Error("Optimization v2 requires a 4..12 Agent Run limit")
+        if max_agent_runs < 4 or max_agent_runs > 20:
+            raise OptimizationV2Error("Optimization v2 requires a 4..20 Agent Run limit")
         if max_cost_microusd < 1:
             raise OptimizationV2Error("positive max cost is required")
 
