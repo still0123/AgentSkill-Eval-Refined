@@ -86,3 +86,28 @@ def test_quality_gate_is_idempotent_and_detects_report_drift(tmp_path: Path) -> 
     report.write_text(report.read_text().replace('"proposal-test"', '"tampered"'))
     with pytest.raises(CandidateQualityError, match="different content"):
         gate.materialize_hypotheses(**kwargs)
+
+
+def test_quality_gate_accepts_observed_test_execution_guidance(tmp_path: Path) -> None:
+    gate = CandidateQualityGate(tmp_path)
+    hypothesis = _hypothesis(
+        "rerun-and-parse",
+        "Re-execute the deterministic test, parse its output, and confirm the exit code.",
+    )
+
+    report = gate.materialize_hypotheses(
+        proposal_job_id="proposal-test",
+        proposal_manifest_sha256="c" * 64,
+        parent_content=b"# Base Skill\n",
+        hypotheses=(
+            hypothesis,
+            _hypothesis("inspect-path", "Inspect the changed path before editing."),
+            _hypothesis("verify-result", "Verify the result after editing."),
+        ),
+        max_candidates=3,
+    )
+
+    candidate = next(
+        item for item in report.candidates if item.candidate_id == "rerun-and-parse"
+    )
+    assert candidate.accepted is True
