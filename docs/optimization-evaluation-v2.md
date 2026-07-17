@@ -50,7 +50,19 @@ budget. It writes JSON and offline HTML reports and makes no model calls.
 
 The current example intentionally reports `INSUFFICIENT` until a real DeepSeek
 observed-train failure bundle is supplied. That is a safe evidence boundary, not a
-failed experiment.
+failed experiment. An existing local DeepSeek evidence workspace can be bridged
+without a model call:
+
+```bash
+.venv/bin/agentskill-eval optimize prepare-failures \
+  .agentskill-eval/real-optimizer-smoke/real-optimizer-evidence \
+  883d853b-08bb-5da8-a384-9fba7e01d57f \
+  --output .agentskill-eval/real-optimizer-smoke/real-optimizer-evidence/train-failures.deepseek.yaml
+```
+
+If that workspace contains no eligible task-failure Run, the command deliberately
+returns `INSUFFICIENT`; an invalid or infrastructure Run cannot be promoted into
+optimization evidence.
 
 ## Candidate materialization
 
