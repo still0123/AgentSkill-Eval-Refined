@@ -1,0 +1,18 @@
+schema_version: ase/failure-evidence-review/v1alpha1
+decisions:
+  - run_id: 5d5854ea-54d4-52ef-aa87-b7ee827c7dc0
+    rule_id: rule.insufficient_observable_trace
+    action: include
+    override_label: TOOL_ARGUMENT
+    reason: >-
+      The Agent emitted a replace_in_file call with file/pattern/replacement fields, but the
+      available tool contract requires path/old/new. This is a concrete tool-argument mismatch;
+      the Skill should require checking the exposed tool schema before editing.
+  - run_id: 1b4b569e-c8eb-5cfa-b669-0083b29e7125
+    rule_id: rule.insufficient_observable_trace
+    action: include
+    override_label: TOOL_ARGUMENT
+    reason: >-
+      The Agent stopped after emitting a tool call without completing the exposed edit contract
+      or obtaining a successful tool result. Treat this as a tool-argument and tool-completion
+      failure, not a generic verification failure.

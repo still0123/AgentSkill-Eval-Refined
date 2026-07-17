@@ -49,7 +49,12 @@ def main() -> int:
         observed = int(path.read_text(encoding="utf-8")) if path.exists() else 0
         path.write_text(str(observed + 1), encoding="utf-8")
     request = json.load(sys.stdin)
-    labels = sorted({item["label"] for item in request["eligible_failures"]})
+    labels = sorted(
+        {
+            item.get("failure_label", item.get("label"))
+            for item in request["eligible_failures"]
+        }
+    )
     proposals = []
     for label in labels:
         if label not in GUIDANCE:

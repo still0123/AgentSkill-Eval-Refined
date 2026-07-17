@@ -27,6 +27,7 @@
 - [Failure-Guided Skill Evolution MVP](./failure-guided-skill-evolution.md)
 - [Audited Process Skill Proposal Generator MVP](./audited-process-skill-proposal-generator.md)
 - [Real LLM / DeepSeek Skill Proposal MVP](./deepseek-skill-proposal.md)
+- [Proposal v3 Failure Evidence 对齐](./proposal-v3-alignment.md)
 - [Stage 3A Real Evolution Execution Planner](./real-evolution-execution-planner.md)
 - [Stage 3B Real Evolution Dry-Run Orchestration](./real-evolution-dry-run-orchestration.md)
 - [Stage 3C Budgeted Real Search / Regression Execution](./budgeted-real-evolution-execution.md)

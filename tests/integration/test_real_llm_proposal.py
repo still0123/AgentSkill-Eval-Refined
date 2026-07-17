@@ -221,7 +221,7 @@ def test_proposal_cli_is_budgeted_audited_idempotent_and_proposal_only(
     assert "validation_search" not in request_body
     assert "regression_dev" not in request_body
     assert "locked_test" not in request_body
-    assert "The Agent compared values" not in request_body
+    assert "The Agent compared values" in request_body
     assert "fake-proposal-secret" not in request_body
     persisted = "\n".join(
         path.read_text(encoding="utf-8", errors="replace")

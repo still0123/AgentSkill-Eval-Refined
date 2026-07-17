@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import html
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Literal, Optional, Protocol, Tuple, Union
@@ -162,6 +163,7 @@ class EligibilityDecision(FrozenModel):
     evidence_sequence_nos: Tuple[int, ...]
     eligible: bool
     reason: str = Field(min_length=1)
+    observed_summary: str = Field(default="", max_length=1200, exclude=True)
 
 
 def classify_failure_bundle(bundle: FailureEvidenceBundle) -> Tuple[EligibilityDecision, ...]:
@@ -187,11 +189,24 @@ def classify_failure_bundle(bundle: FailureEvidenceBundle) -> Tuple[EligibilityD
                         if eligible
                         else "infrastructure, budget, Judge, unknown, or abstained failure"
                     ),
+                    observed_summary=sanitize_observed_summary(finding.rationale),
                 )
             )
     return tuple(
         sorted(decisions, key=lambda item: (str(item.run_id), item.label.value, item.rule_id))
     )
+
+
+def sanitize_observed_summary(value: str) -> str:
+    """Keep proposal context actionable without persisting secrets or host paths."""
+
+    summary = re.sub(
+        r"(?i)\b(secret|api[_-]?key|token|password)\s*[:=]\s*[^\s,;]+",
+        r"\1=<redacted>",
+        value,
+    )
+    summary = re.sub(r"/(?:Users|home|private|tmp|var)/[^\s,;]+", "<path>", summary)
+    return summary.strip()[:1200]
 
 
 class ImprovementHypothesis(FrozenModel):
@@ -256,7 +271,15 @@ def build_hypothesis_request(
             "sha256": context.base_skill_sha256,
             "content": base_skill.read_text(encoding="utf-8"),
         },
-        "eligible_failures": [item.model_dump(mode="json") for item in context.eligible],
+        "eligible_failures": [
+            {
+                "failure_label": item.label.value,
+                "rule_id": item.rule_id,
+                "confidence": item.confidence,
+                "observed_summary": item.observed_summary,
+            }
+            for item in context.eligible
+        ],
         "max_hypotheses": max_hypotheses,
         "output_contract": "structured_hypotheses_only_no_case_answers_no_hidden_reasoning",
     }

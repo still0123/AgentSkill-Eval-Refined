@@ -11,7 +11,7 @@ generator:
   version: "1.0.0"
   max_hypotheses: 8
   executable: fake-process-generator.py
-  expected_sha256: a6425ca25d3e120d05ec82d24d6dc1013265b8c63d56c79738101ed393ecc58d
+  expected_sha256: 818c56c90090a80413ecd7230d6490ea38870e632b0e33f1be87d9b33d8078ca
   version_args: ["--version"]
   expected_version_output: ase-fake-process-generator 1.0.0
   timeout_seconds: 5

@@ -252,6 +252,7 @@ def test_observed_failures_become_trace_linked_train_bundle(tmp_path: Path) -> N
         "VERIFICATION",
     }
     assert all(item.trace_event_refs for item in result.report.eligible)
+    assert all(item.observed_summary for item in result.report.eligible)
     assert len(result.report.clusters) == 3
     assert FailureEvidenceBundle.load(output) == result.bundle
 
@@ -310,6 +311,8 @@ def test_review_can_exclude_and_override_only_task_failures(tmp_path: Path) -> N
         for item in reviewed.report.eligible
         if item.label.value == "MEMORY"
     )
+    memory = next(item for item in reviewed.report.eligible if item.label.value == "MEMORY")
+    assert "human review confirmed stale memory use" in memory.reason
     infra = next(item for item in reviewed.report.excluded if item.label.value == "ENVIRONMENT")
     assert infra.eligible is False
 

@@ -30,7 +30,10 @@ from agentskill_eval_contracts import (
 )
 from agentskill_eval_experiment import LocalExperimentStore
 from agentskill_eval_experiment.storage import AtomicFileWriter, ExperimentLayout, load_model
-from agentskill_eval_skill_optimizer.evolution import FailureEvidenceBundle
+from agentskill_eval_skill_optimizer.evolution import (
+    FailureEvidenceBundle,
+    sanitize_observed_summary,
+)
 
 
 class FailureBridgeError(RuntimeError):
@@ -80,6 +83,7 @@ class ObservedFindingDecision(FrozenModel):
     trace_event_refs: Tuple[str, ...]
     eligible: bool
     reason: str = Field(min_length=1)
+    observed_summary: str = Field(default="", max_length=1200, exclude=True)
     review_applied: bool = False
 
 
@@ -467,6 +471,7 @@ class ObservedFailureEvidenceBridge:
             trace_event_refs=refs,
             eligible=eligible,
             reason=reason,
+            observed_summary=sanitize_observed_summary(finding.rationale),
             review_applied=review_applied,
         )
 

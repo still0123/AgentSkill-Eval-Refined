@@ -127,8 +127,13 @@ _OUTPUT_SCHEMA = {
 
 _SYSTEM_PROMPT = """You improve an Agent Skill from audited train failures.
 Return one JSON object only. Produce exactly the requested number of distinct hypotheses using
-the supplied JSON schema shape. Every hypothesis must use an eligible failure_label, describe a
-general reusable change, and include concrete risks. Keep instructions concise and imperative.
+the supplied JSON schema shape. Every hypothesis must use an eligible failure_label and must
+address the observed failure summary, not merely add generic logging or reporting advice.
+Describe a general reusable change that would prevent the observed Agent behavior, keep the
+instruction concise and imperative, and include concrete risks. Prefer changes to task
+interpretation, planning, tool selection/arguments, recovery, or verification workflow when
+those are supported by the observed summary. A candidate must be useful even when the exact
+repository and case are unknown.
 Do not mention case IDs, repository names, tests, patches, expected answers, validation data,
 hidden reasoning, or facts not present in the train input. Do not copy failure evidence verbatim.
 """

@@ -111,9 +111,12 @@ def _request() -> dict[str, object]:
         "base_skill": {"sha256": "a" * 64, "content": "# Skill\nVerify fixes."},
         "eligible_failures": [
             {
-                "label": "VERIFICATION",
+                "failure_label": "VERIFICATION",
                 "rule_id": "observed-runtime-failure",
                 "confidence": 0.9,
+                "observed_summary": (
+                    "The Agent reported a failed targeted check after an attempted edit."
+                ),
             }
         ],
         "max_hypotheses": 3,
@@ -150,6 +153,9 @@ def test_deepseek_generator_calls_fake_api_and_records_usage(
     payload = json.loads(body)
     assert payload["response_format"] == {"type": "json_object"}
     assert payload["thinking"] == {"type": "disabled"}
+    encoded = body.decode("utf-8")
+    assert "observed_summary" in encoded
+    assert "failed targeted check" in encoded
     assert "validation_search" not in body.decode("utf-8")
     assert "locked_test" not in body.decode("utf-8")
     assert b"fake-api-key" not in body
