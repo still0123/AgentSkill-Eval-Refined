@@ -1,0 +1,38 @@
+{
+  "schema_version": "ase/qwen3-proposal-v4-negative/v1alpha1",
+  "proposal_job_id": "d2d500a2-2aaa-5d84-9d66-85a1a80882d4",
+  "proposal_version": "v4",
+  "validation_search_execution_id": "063903bd-96e6-5c1c-b26f-502924f0b2f2",
+  "validation_search_result_sha256": "88f253bd3c4dccdd15a1f304207b7f2d717712bf1fdc409ad5ea205494f93d9a",
+  "candidate_count": 7,
+  "winner_candidate_id": "56b495b3-f739-5490-b7f0-f829cf41e96c",
+  "winner_skill_sha256": "2f414737f43ec06d73fe8777232f166a467d1d4b3809bae59726f6b61e60e72e",
+  "validation_search": {
+    "provider": "qwen-local",
+    "model": "qwen3-coder-local",
+    "simulated": false,
+    "consumed_agent_runs": 40,
+    "observed_cost_microusd": 0,
+    "baseline_pass_rate": 0.5,
+    "winner_pass_rate": 0.5,
+    "claim": "descriptive development evidence only"
+  },
+  "regression_dev": {
+    "provider": "qwen-local",
+    "model": "qwen3-coder-local",
+    "dataset_sha256": "f4fd9f11a0a9864e07229a39b64a4f657d7cd82dde5f5dc6fc74c27fa13302a3",
+    "receipt_sha256": "5a87294956863fa4b3bb30c852b1833d3b7f9f0c890099a66bb0e8460cb620dd",
+    "consumed_agent_runs": 8,
+    "observed_cost_microusd": 0,
+    "base_pass_rate": 0.0,
+    "winner_pass_rate": 0.0,
+    "invalid_cases": ["boltons-lri-replacement"],
+    "loss_cases": [],
+    "gate_status": "REGRESSION_REJECTED"
+  },
+  "simulated": false,
+  "real_run_confirmed": true,
+  "validation_confirm_accessed": false,
+  "locked_test_accessed": false,
+  "claim_limit": "Negative adaptive evidence only; no Skill improvement, confirmation, locked-test, or Skill v2 publication claim."
+}

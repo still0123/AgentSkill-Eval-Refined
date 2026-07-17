@@ -1,0 +1,86 @@
+# DeepSeek Agent smoke configuration. This uses the existing Qwen Code CLI as an
+# OpenAI-compatible process wrapper; the provider/model under test is DeepSeek.
+schema_version: ase/real-agent-evidence/v1alpha1
+name: deepseek-boltons-proposal-v5-smoke
+dataset_path: /Users/bytedance/.codex/worktrees/fb0a/stage3b-offline-evidence/.agentskill-eval/stage2-reproduction/dataset-versions/99fd667b-0657-5e3d-89d3-2411236ff258
+skill_path: /Users/bytedance/Documents/skill/examples/skills/python-bug-fix-v1
+case_ids:
+  - boltons-split-maxsplit-zero
+  - boltons-lri-replacement
+evidence_class: observed_agent
+simulated: false
+runner:
+  type: skill_up
+  name: skill-up
+  path: /Users/bytedance/.local/share/agentskill-eval/runners/skill-up/v0.5.0/skill-up
+  expected_sha256: b8473aad3fe997f3aa8de1e9bd9bc127e5254b25371567a0e07143afc809c359
+  expected_version: skill-up version 0.5.0
+  version_args: [--version]
+agent:
+  path: /Users/bytedance/.local/share/agentskill-eval/agents/qwen-code/v0.19.9/node_modules/.bin/qwen
+  expected_sha256: b4c84c64de753147e765ed65411a3e7f767be0c491c4f6e202423879cad01f35
+  expected_version: 0.19.9
+  version_args: [--version]
+  engine: qwen_code
+  engine_version: 0.19.9
+  provider: deepseek
+  engine_provider: openai
+  model: deepseek-v4-pro
+  base_url: https://api.deepseek.com
+  temperature: 0.0
+  seed: null
+  max_turns: 24
+  max_tool_calls: 48
+  timeout_seconds: 900
+  tool_capabilities: [filesystem, shell, tests]
+  secret_env_names: [OPENAI_API_KEY]
+  max_input_tokens: 131072
+  max_output_tokens: 20000
+  home_config_files:
+    .qwen/settings.json:
+      security:
+        auth:
+          selectedType: openai
+      model:
+        name: deepseek-v4-pro
+        maxSessionTurns: 24
+        maxWallTimeSeconds: 240
+        maxToolCalls: 48
+        maxSubagentDepth: 1
+        sessionTokenLimit: 600000
+        skipLoopDetection: false
+        skipStartupContext: true
+      tools:
+        disabled: [agent]
+        toolSearch:
+          enabled: false
+      ui:
+        enableFollowupSuggestions: false
+      memory:
+        enableManagedAutoMemory: false
+        enableManagedAutoDream: false
+        enableAutoSkill: false
+      modelProviders:
+        openai:
+          - id: deepseek-v4-pro
+            name: DeepSeek V4 Pro
+            envKey: OPENAI_API_KEY
+            baseUrl: https://api.deepseek.com
+            generationConfig:
+              reasoning: false
+              timeout: 900000
+              maxRetries: 0
+pricing:
+  input_microusd_per_million_tokens: 435000
+  input_cache_hit_microusd_per_million_tokens: 3625
+  output_microusd_per_million_tokens: 870000
+  estimated_input_tokens_per_run: 30000
+  estimated_cache_hit_tokens_per_run: 25000
+  estimated_output_tokens_per_run: 5000
+protocol:
+  evidence_repeats: 3
+  random_seed: 2026
+  bootstrap_resamples: 2000
+  min_independent_groups: 1
+sandbox_profile: runner_default
+network_policy: provider_only
