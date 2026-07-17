@@ -68,6 +68,7 @@ def main() -> int:
                 "tool_calls": agent_result["tool_calls"],
                 "cost_microusd": agent_result["cost_microusd"],
                 "grading": {"score": 1 if agent_result["status"] == "pass" else 0},
+                "error": agent_result.get("error"),
             }
         ],
         "trace_events": agent_result["trace_events"],

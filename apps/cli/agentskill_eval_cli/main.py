@@ -1694,6 +1694,95 @@ def optimization_v2_smoke(
                 "observed_agent_runs": report.observed_agent_runs,
                 "observed_cost_microusd": report.observed_cost_microusd,
                 "baseline_reused_runs": report.baseline_reused_runs,
+                "remaining_candidate_ids": list(report.remaining_candidate_ids),
+                "error_counts": report.error_counts,
+                "session": report.session_path,
+                "report": str(report_path),
+                "html": str(html_path),
+                "claim_limit": report.claim_limit,
+            },
+            sort_keys=True,
+        )
+    )
+
+
+@optimization_v2_app.command("status")
+def optimization_v2_status(
+    workspace: Path = typer.Argument(..., exists=True, file_okay=False),  # noqa: B008
+) -> None:
+    """Show progress, blocked work, and claim limits for one durable v2 session."""
+    _session, report, report_path, html_path = OptimizationV2ScreeningRunner(workspace).status()
+    typer.echo(
+        json.dumps(
+            {
+                "status": report.status,
+                "completed_candidate_ids": list(report.completed_candidate_ids),
+                "invalid_candidate_ids": list(report.invalid_candidate_ids),
+                "provider_blocked_candidate_ids": list(report.provider_blocked_candidate_ids),
+                "remaining_candidate_ids": list(report.remaining_candidate_ids),
+                "observed_agent_runs": report.observed_agent_runs,
+                "observed_cost_microusd": report.observed_cost_microusd,
+                "error_counts": report.error_counts,
+                "session": report.session_path,
+                "report": str(report_path),
+                "html": str(html_path),
+                "claim_limit": report.claim_limit,
+            },
+            sort_keys=True,
+        )
+    )
+
+
+@optimization_v2_app.command("resume")
+def optimization_v2_resume(
+    spec_path: Path = typer.Argument(  # noqa: B008
+        ..., exists=True, dir_okay=False, help="Frozen Optimization Evaluation v2 spec."
+    ),
+    workspace: Path = typer.Option(  # noqa: B008
+        ..., "--workspace", file_okay=False, help="Workspace containing the existing session."
+    ),
+    confirm_real_run: bool = typer.Option(False, "--confirm-real-run"),  # noqa: B008
+    max_cost_microusd: Optional[int] = typer.Option(  # noqa: B008
+        None, "--max-cost-microusd", min=1
+    ),
+    max_agent_runs: Optional[int] = typer.Option(  # noqa: B008
+        None, "--max-agent-runs", min=1, max=20
+    ),
+) -> None:
+    """Resume pending candidates only, with a new explicit authorization envelope."""
+    if not confirm_real_run:
+        raise typer.BadParameter(
+            "Optimization v2 resume requires --confirm-real-run",
+            param_hint="--confirm-real-run",
+        )
+    if max_cost_microusd is None:
+        raise typer.BadParameter(
+            "Optimization v2 resume requires --max-cost-microusd",
+            param_hint="--max-cost-microusd",
+        )
+    if max_agent_runs is None:
+        raise typer.BadParameter(
+            "Optimization v2 resume requires --max-agent-runs",
+            param_hint="--max-agent-runs",
+        )
+    report, report_path, html_path = OptimizationV2ScreeningRunner(workspace).resume(
+        OptimizationV2Spec.load(spec_path),
+        confirm_real_run=True,
+        max_cost_microusd=max_cost_microusd,
+        max_agent_runs=max_agent_runs,
+    )
+    typer.echo(
+        json.dumps(
+            {
+                "status": report.status,
+                "completed_candidate_ids": list(report.completed_candidate_ids),
+                "invalid_candidate_ids": list(report.invalid_candidate_ids),
+                "provider_blocked_candidate_ids": list(report.provider_blocked_candidate_ids),
+                "remaining_candidate_ids": list(report.remaining_candidate_ids),
+                "observed_agent_runs": report.observed_agent_runs,
+                "observed_cost_microusd": report.observed_cost_microusd,
+                "error_counts": report.error_counts,
+                "session": report.session_path,
                 "report": str(report_path),
                 "html": str(html_path),
                 "claim_limit": report.claim_limit,
