@@ -1,0 +1,25 @@
+schema_version: ase/sanitized-real-llm-proposal-config/v1alpha1
+name: python-bug-fix-cachetools-real-proposal-v5
+provider: deepseek
+model: deepseek-v4-pro
+generator_version: proposal-execution-loop-v1
+base_skill_sha256: 5ff780e023c00cd08232688ec013a47f51926b4e1c8a5171465085ee967bc5d6
+failure_bundle_sha256: 7021d3a794102e619b859d9621f397dd50fd613baf78cedfd9c22fe6c23fc677
+prompt_sha256: e851bd1bbf96cf1fa225733521b760ee1be388cbe76fa6bd539ccdfdc1baddd5
+output_schema_sha256: 40bf0f1d93d59ab2a73e61409901d040dfafeb38bd5080c8c31f70e6cdca7ee5
+request_sha256: 5cee40716d2bc55193f21d32cb87ed8131f15a3dab77b43cafd7ad0a30fcbcee
+parameters:
+  temperature: 0.0
+  max_output_tokens: 2400
+  timeout_seconds: 60
+  max_hypotheses: 4
+authorization:
+  max_calls: 1
+  max_cost_microusd: 5000
+  observed_calls: 1
+  observed_cost_microusd: 592
+raw_secret_values_included: false
+raw_request_stored: false
+raw_response_stored: false
+search_executed: false
+simulated: false

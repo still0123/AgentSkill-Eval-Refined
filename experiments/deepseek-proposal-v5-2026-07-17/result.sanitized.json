@@ -1,0 +1,33 @@
+{
+  "schema_version": "ase/deepseek-proposal-v5/v1alpha1",
+  "proposal_job_id": "a8cf2165-af9b-5b78-883a-022ca2653950",
+  "manifest_sha256": "4cddde869c0bc9ca31c29809667ed1067921d06268412f73f6f7cb175bc68a3a",
+  "report_sha256": "9877349523890b78a2f749b77a87df71b5641dfeb463d83886149eab54f45015",
+  "proposals_sha256": "543e2dcab07b6385cbd24c9f411758ec75b6b3841a3f173041937cae42e79b2a",
+  "provider": "deepseek",
+  "model": "deepseek-v4-pro",
+  "generator_version": "proposal-execution-loop-v1",
+  "prompt_sha256": "e851bd1bbf96cf1fa225733521b760ee1be388cbe76fa6bd539ccdfdc1baddd5",
+  "output_schema_sha256": "40bf0f1d93d59ab2a73e61409901d040dfafeb38bd5080c8c31f70e6cdca7ee5",
+  "request_sha256": "5cee40716d2bc55193f21d32cb87ed8131f15a3dab77b43cafd7ad0a30fcbcee",
+  "proposal_count": 4,
+  "candidate_ids": [
+    "inspect-tool-schema-before-edit",
+    "verify-edit-outcome",
+    "use-exact-tool-argument-names",
+    "recover-from-failed-edit"
+  ],
+  "input_tokens": 895,
+  "cached_input_tokens": 768,
+  "output_tokens": 613,
+  "reasoning_tokens": 0,
+  "observed_cost_microusd": 592,
+  "duration_ms": 9366,
+  "real_run_confirmed": true,
+  "simulated": false,
+  "search_executed": false,
+  "locked_test_accessed": false,
+  "hidden_reasoning_stored": false,
+  "secret_value_stored": false,
+  "claim_limit": "Unvalidated Proposal v5 hypotheses only; no Agent quality, Skill improvement, confirmation, locked-test, or Skill v2 publication claim."
+}
