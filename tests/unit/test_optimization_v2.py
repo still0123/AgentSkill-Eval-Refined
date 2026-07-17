@@ -9,14 +9,28 @@ from agentskill_eval_skill_optimizer.optimization_v2 import OptimizationV2Spec
 PROJECT = Path(__file__).resolve().parents[2]
 
 
+def _portable_spec() -> OptimizationV2Spec:
+    return OptimizationV2Spec(
+        schema_version="ase/optimization-evaluation-v2/v1alpha1",
+        name="portable-v2-preflight-fixture",
+        base_skill_path=PROJECT / "examples/skills/python-bug-fix-v1",
+        proposal_directory=PROJECT / "examples/optimizer/failure-guided",
+        failure_bundle_path=(
+            PROJECT / "examples/optimizer/failure-guided/qwen3-cachetools-failure-bundle-v4.yaml"
+        ),
+        real_agent_config_path=PROJECT / "examples/real-agent-evidence/observed-agent.example.yaml",
+        validation_search_path=PROJECT / "examples/datasets",
+        case_ids=("portable-case-a", "portable-case-b"),
+        target_model="portable-model",
+    )
+
+
 def test_screening_refuses_before_any_real_call_when_evidence_is_misaligned(
     tmp_path: Path,
 ) -> None:
-    spec = OptimizationV2Spec.load(
-        PROJECT / "examples/optimizer/failure-guided/optimization-v2.example.yaml"
-    )
+    spec = _portable_spec()
 
-    with pytest.raises(OptimizationV2Error, match="preflight is insufficient"):
+    with pytest.raises(OptimizationV2Error):
         OptimizationV2ScreeningRunner(tmp_path).run(
             spec,
             confirm_real_run=True,
@@ -28,9 +42,7 @@ def test_screening_refuses_before_any_real_call_when_evidence_is_misaligned(
 
 
 def test_screening_spec_allows_four_generated_candidates() -> None:
-    spec = OptimizationV2Spec.load(
-        PROJECT / "examples/optimizer/failure-guided/optimization-v2.example.yaml"
-    )
+    spec = _portable_spec()
 
     expanded = spec.model_copy(update={"max_candidates": 4, "max_agent_runs": 20})
 

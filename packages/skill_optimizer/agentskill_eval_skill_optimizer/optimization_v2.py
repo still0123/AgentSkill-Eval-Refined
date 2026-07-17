@@ -38,7 +38,7 @@ from agentskill_eval_skill_optimizer.candidate_quality import (
     CandidateQualityReport,
 )
 from agentskill_eval_skill_optimizer.evolution import FailureEvidenceBundle
-from agentskill_eval_skill_optimizer.proposal import RealLLMProposalService
+from agentskill_eval_skill_optimizer.proposal import RealLLMProposalError, RealLLMProposalService
 from agentskill_eval_skill_optimizer.real_evaluator import (
     RealAgentCandidateEvaluator,
     RealCandidateEvaluationError,
@@ -292,7 +292,13 @@ class OptimizationV2Planner:
             agent_spec = RealAgentEvidenceSpec.load(spec.real_agent_config_path)
             dataset = DatasetLoader().load(spec.validation_search_path)
             bundle = FailureEvidenceBundle.load(spec.failure_bundle_path)
-        except (CandidateQualityError, OptimizationV2Error, ValueError, OSError) as exc:
+        except (
+            CandidateQualityError,
+            OptimizationV2Error,
+            RealLLMProposalError,
+            ValueError,
+            OSError,
+        ) as exc:
             raise OptimizationV2Error(str(exc)) from exc
 
         reasons = []
