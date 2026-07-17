@@ -1,0 +1,19 @@
+{
+  "schema_version": "ase/deepseek-proposal-v5-guided-preflight/v1alpha1",
+  "proposal_job_id": "a9593db6-dda3-5925-86bf-526cbf460357",
+  "provider": "deepseek",
+  "model": "deepseek-v4-pro",
+  "generator_version": "proposal-execution-loop-v1",
+  "prompt_sha256": "979ba36859ff615784a72348f2c25457827f740177aaa2464780676b2383680c",
+  "output_schema_sha256": "40bf0f1d93d59ab2a73e61409901d040dfafeb38bd5080c8c31f70e6cdca7ee5",
+  "request_sha256": "4bbb56826e9eda540b6befd9cfd66d19df49592f675cafb9a5dc8215c7e29d28",
+  "base_skill_sha256": "5ff780e023c00cd08232688ec013a47f51926b4e1c8a5171465085ee967bc5d6",
+  "failure_bundle_sha256": "7021d3a794102e619b859d9621f397dd50fd613baf78cedfd9c22fe6c23fc677",
+  "planned_calls": 1,
+  "candidate_count": 4,
+  "estimated_max_cost_microusd": 4143,
+  "request_contains_sanitized_train_evidence_only": true,
+  "real_call_executed": false,
+  "simulated": false,
+  "claim_limit": "Preflight only; no guided Proposal v5 candidates or Skill improvement claim."
+}

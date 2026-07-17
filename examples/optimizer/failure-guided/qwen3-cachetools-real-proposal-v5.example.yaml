@@ -17,6 +17,11 @@ generator:
   input_cache_miss_microusd_per_million: 435000
   input_cache_hit_microusd_per_million: 3625
   output_microusd_per_million: 870000
+  prompt_guidance: >-
+    Prefer hypotheses that make the Agent complete an executable repair loop: reproduce the
+    targeted failure, inspect the implementation path, apply a verified edit, rerun the targeted
+    test, and recover from a failed attempt. Keep the guidance general and do not mention any
+    case-specific answer, patch, repository, or hidden test.
 claim_limit: >-
   Proposal v5 may use only the base Skill and the sanitized observed train failure bundle.
   It must produce structured, testable hypotheses for the execution loop; it must not include

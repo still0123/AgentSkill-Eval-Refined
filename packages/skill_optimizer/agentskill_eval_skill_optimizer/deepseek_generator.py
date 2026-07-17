@@ -162,7 +162,7 @@ class DeepSeekHypothesisGenerator:
 
     @property
     def prompt_sha256(self) -> str:
-        return hashlib.sha256(_SYSTEM_PROMPT.encode("utf-8")).hexdigest()
+        return hashlib.sha256(self._system_prompt().encode("utf-8")).hexdigest()
 
     @property
     def output_schema_sha256(self) -> str:
@@ -296,7 +296,7 @@ class DeepSeekHypothesisGenerator:
         return {
             "model": self.spec.model,
             "messages": [
-                {"role": "system", "content": _SYSTEM_PROMPT},
+                {"role": "system", "content": self._system_prompt()},
                 {
                     "role": "user",
                     "content": canonical_json(user_payload).decode("utf-8"),
@@ -308,6 +308,15 @@ class DeepSeekHypothesisGenerator:
             "thinking": {"type": "disabled"},
             "stream": False,
         }
+
+    def _system_prompt(self) -> str:
+        if not self.spec.prompt_guidance.strip():
+            return _SYSTEM_PROMPT
+        return (
+            _SYSTEM_PROMPT
+            + "\nAdditional frozen generation guidance for this proposal version:\n"
+            + self.spec.prompt_guidance.strip()
+        )
 
     def _cost(self, input_tokens: int, cached_input_tokens: int, output_tokens: int) -> int:
         cache_hit = min(input_tokens, cached_input_tokens)

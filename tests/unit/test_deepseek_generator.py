@@ -163,6 +163,22 @@ def test_deepseek_generator_calls_fake_api_and_records_usage(
     assert b"fake-api-key" not in body
 
 
+def test_deepseek_generator_includes_frozen_version_guidance(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("OPENAI_API_KEY", "fake-api-key")
+    guidance = "Prefer reproduce, edit, rerun, and recover."
+    spec = _spec("http://localhost:1").model_copy(update={"prompt_guidance": guidance})
+    generator = DeepSeekHypothesisGenerator(spec, None)
+    payload = generator._api_payload(_request())
+    system_prompt = payload["messages"][0]["content"]
+    assert isinstance(system_prompt, str)
+    assert guidance in system_prompt
+    assert generator.prompt_sha256 != DeepSeekHypothesisGenerator(
+        _spec("http://localhost:1"), None
+    ).prompt_sha256
+
+
 def test_deepseek_generator_budget_gate_prevents_api_call(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

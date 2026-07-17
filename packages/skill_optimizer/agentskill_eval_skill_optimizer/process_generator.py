@@ -44,6 +44,7 @@ class HypothesisGeneratorSpec(FrozenModel):
     input_cache_miss_microusd_per_million: int = Field(default=435_000, ge=0)
     input_cache_hit_microusd_per_million: int = Field(default=3_625, ge=0)
     output_microusd_per_million: int = Field(default=870_000, ge=0)
+    prompt_guidance: str = Field(default="", max_length=4_000)
 
     @model_validator(mode="after")
     def process_fields_and_environment_are_safe(self) -> "HypothesisGeneratorSpec":
