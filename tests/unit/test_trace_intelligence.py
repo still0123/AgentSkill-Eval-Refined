@@ -112,6 +112,31 @@ def test_rule_diagnoser_is_deterministic_and_abstains_without_evidence() -> None
     assert success.status == "no_failure"
 
 
+def test_rule_diagnoser_classifies_observed_verification_failure() -> None:
+    now = datetime(2026, 7, 13, tzinfo=timezone.utc)
+    trace = TraceManifest(
+        run_id=uuid4(),
+        attempt_id=uuid4(),
+        capabilities=(),
+        events=(
+            TraceEvent(
+                sequence_no=1,
+                occurred_at=now,
+                kind="verification.test",
+                source="runner",
+                status="failed",
+                summary={"status": "fail"},
+            ),
+        ),
+    )
+
+    diagnosis = RuleFailureDiagnoser().diagnose(trace, EvaluationOutcome.FAIL)
+
+    assert diagnosis.status == "diagnosed"
+    assert diagnosis.findings[0].label == FailureLabel.VERIFICATION
+    assert diagnosis.findings[0].evidence_sequence_nos == (1,)
+
+
 def test_pair_trace_diff_uses_event_counts_and_sequence_edit_distance() -> None:
     now = datetime(2026, 7, 13, tzinfo=timezone.utc)
 

@@ -266,8 +266,9 @@ def test_executor_persists_paired_outcomes_attempts_and_order(tmp_path: Path) ->
         )
         assert any(event.kind == "runner.started" for event in trace.events)
         if run.variant_id == arms[0].id:
-            assert diagnosis.status == "abstained"
-            assert diagnosis.findings[0].label.value == "UNKNOWN"
+            assert diagnosis.status == "diagnosed"
+            assert diagnosis.findings[0].label.value == "VERIFICATION"
+            assert any(event.kind == "verification.test" for event in trace.events)
         else:
             assert diagnosis.status == "no_failure"
         layout = ExperimentLayout(store.workspace, experiment_id)

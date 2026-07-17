@@ -1,0 +1,16 @@
+schema_version: ase/failure-evidence-review/v1alpha1
+decisions:
+  - run_id: 5d5854ea-54d4-52ef-aa87-b7ee827c7dc0
+    rule_id: rule.insufficient_observable_trace
+    action: include
+    override_label: VERIFICATION
+    reason: >-
+      Human review matched the persisted runner benchmark result to a deterministic regression
+      test failure; include it as verification evidence rather than infrastructure noise.
+  - run_id: 1b4b569e-c8eb-5cfa-b669-0083b29e7125
+    rule_id: rule.insufficient_observable_trace
+    action: include
+    override_label: VERIFICATION
+    reason: >-
+      Human review matched the persisted runner benchmark result to a deterministic regression
+      test failure; include it as verification evidence rather than infrastructure noise.

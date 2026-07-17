@@ -1,0 +1,23 @@
+schema_version: ase/real-llm-proposal-spec/v1alpha1
+name: python-bug-fix-cachetools-real-proposal-v2
+base_skill_path: /Users/bytedance/Documents/skill/examples/skills/python-bug-fix-v1
+failure_bundle_path: /Users/bytedance/.codex/workspaces/qwen3-coder-evolution-search-v3/reviewed-cachetools-failures.yaml
+input_evidence_class: observed_train
+generator:
+  type: deepseek
+  name: deepseek-skill-proposal
+  version: proposal-only-prompt-v1
+  max_hypotheses: 4
+  base_url: https://api.deepseek.com
+  model: deepseek-v4-pro
+  temperature: 0.0
+  max_output_tokens: 2000
+  secret_env_name: OPENAI_API_KEY
+  timeout_seconds: 60
+  input_cache_miss_microusd_per_million: 435000
+  input_cache_hit_microusd_per_million: 3625
+  output_microusd_per_million: 870000
+claim_limit: >-
+  One human-reviewed observed train failure is used to generate auditable hypotheses. Candidates
+  remain unvalidated until validation_search and regression_dev; confirmation and locked test are
+  withheld and no Skill v2 publication claim is supported.

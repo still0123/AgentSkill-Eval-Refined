@@ -438,6 +438,17 @@ class LocalExperimentExecutor:
                 ExecutionStatus.INFRA_FAILED,
                 evaluation_outcome=EvaluationOutcome.INVALID,
             )
+        if result.status in {RunnerStatus.PASS, RunnerStatus.FAIL}:
+            trace_collector.record(
+                "verification.test",
+                source="runner",
+                status="completed" if result.status == RunnerStatus.PASS else "failed",
+                summary={
+                    "status": "pass" if result.status == RunnerStatus.PASS else "fail",
+                    "runner_status": result.status.value,
+                    "exit_reason": result.exit_reason.value,
+                },
+            )
         measurement = self._measurement(run, attempt, result)
         trace_collector.record(
             "platform.run_terminal",

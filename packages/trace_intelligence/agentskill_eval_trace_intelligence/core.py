@@ -216,6 +216,30 @@ class RuleFailureDiagnoser:
                     ),
                 ),
             )
+        verification_events = tuple(
+            event
+            for event in trace.events
+            if event.status == "failed"
+            and ("verification" in event.kind or event.kind.startswith("test."))
+        )
+        if verification_events:
+            return FailureDiagnosis(
+                run_id=trace.run_id,
+                attempt_id=trace.attempt_id,
+                status="diagnosed",
+                findings=(
+                    DiagnosticFinding(
+                        label=FailureLabel.VERIFICATION,
+                        role=AttributionRole.ROOT_CAUSE,
+                        confidence=0.8,
+                        rule_id="rule.observed_verification_failure",
+                        evidence_sequence_nos=tuple(
+                            event.sequence_no for event in verification_events
+                        ),
+                        rationale="The Runner recorded a failed deterministic verification step.",
+                    ),
+                ),
+            )
         return FailureDiagnosis(
             run_id=trace.run_id,
             attempt_id=trace.attempt_id,
