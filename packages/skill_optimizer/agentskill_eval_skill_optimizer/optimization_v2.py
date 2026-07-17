@@ -101,7 +101,9 @@ class OptimizationV2Preflight(FrozenModel):
     evidence_provider: Optional[str] = None
     evidence_model: Optional[str] = None
     planned_agent_runs: int = Field(ge=0, le=12)
+    expected_new_agent_runs: int = Field(ge=0, le=12)
     estimated_cost_microusd: int = Field(ge=0)
+    estimated_new_cost_microusd: int = Field(ge=0)
     simulated: Literal[False] = False
     search_executed: Literal[False] = False
     regression_executed: Literal[False] = False
@@ -124,6 +126,14 @@ class OptimizationV2CandidateResult(FrozenModel):
     skill_sha256: str
     baseline_results: Tuple[SearchCaseResult, ...]
     evaluation: CandidateEvaluation
+    baseline_pass_rate: float
+    candidate_pass_rate: float
+    absolute_gain: float
+    wtl: Dict[str, int]
+    invalid_runs: int
+    token_summary: Dict[str, int]
+    latency_summary: Dict[str, int]
+    cost_summary: Dict[str, Optional[int]]
     newly_consumed_agent_runs: int
     newly_observed_cost_microusd: int
 
@@ -141,6 +151,7 @@ class OptimizationV2ScreeningReport(FrozenModel):
     case_ids: Tuple[str, ...]
     candidates: Tuple[OptimizationV2CandidateResult, ...]
     planned_agent_runs: int
+    expected_new_agent_runs: int
     observed_agent_runs: int
     observed_cost_microusd: int
     baseline_reused_runs: int
@@ -206,6 +217,13 @@ class OptimizationV2Planner:
             reasons.append("offline quality gate produced no accepted candidate")
         planned_runs = len(quality.accepted_candidate_ids) * len(spec.case_ids) * 2
         estimated_cost = planned_runs * agent_spec.pricing.estimated_cost_per_run_microusd
+        expected_new_runs = (
+            0
+            if not quality.accepted_candidate_ids
+            else len(spec.case_ids) * 2
+            + max(0, len(quality.accepted_candidate_ids) - 1) * len(spec.case_ids)
+        )
+        estimated_new_cost = expected_new_runs * agent_spec.pricing.estimated_cost_per_run_microusd
         if planned_runs > spec.max_agent_runs:
             reasons.append("planned Agent Runs exceed the 12-Run Optimization v2 cap")
 
@@ -230,7 +248,9 @@ class OptimizationV2Planner:
             evidence_provider=bundle.agent_provider,
             evidence_model=bundle.agent_model,
             planned_agent_runs=planned_runs,
+            expected_new_agent_runs=expected_new_runs,
             estimated_cost_microusd=estimated_cost,
+            estimated_new_cost_microusd=estimated_new_cost,
         )
         report_path = self.workspace / "optimization-v2-preflight.json"
         html_path = self.workspace / "optimization-v2-preflight.html"
@@ -295,6 +315,7 @@ th,td{{border:1px solid #aaa;padding:6px;text-align:left}}
 <dt>Evidence provider/model</dt><dd>{esc(report.evidence_provider or 'unavailable')} /
 {esc(report.evidence_model or 'unavailable')}</dd>
 <dt>Planned new Agent Runs</dt><dd>{report.planned_agent_runs}</dd>
+<dt>Expected new Agent Runs with v1 reuse</dt><dd>{report.expected_new_agent_runs}</dd>
 <dt>Estimated cost (microusd)</dt><dd>{report.estimated_cost_microusd}</dd></dl>
 <table><thead><tr><th>Candidate</th><th>Accepted</th>
 <th>Skill SHA-256</th><th>Reasons</th></tr></thead>
@@ -372,12 +393,56 @@ class OptimizationV2ScreeningRunner:
                 raise OptimizationV2Error(str(exc)) from exc
             if not baseline_results:
                 baseline_results.update(evaluator.baseline_results)
+            baseline_tuple = tuple(baseline_results[item] for item in spec.case_ids)
+            baseline_pass_rate = sum(item.passed for item in baseline_tuple) / len(
+                baseline_tuple
+            )
+            wtl = {"win": 0, "tie": 0, "loss": 0}
+            for baseline, treatment in zip(baseline_tuple, evaluation.results):
+                if treatment.passed and not baseline.passed:
+                    wtl["win"] += 1
+                elif treatment.passed == baseline.passed:
+                    wtl["tie"] += 1
+                else:
+                    wtl["loss"] += 1
+            baseline_costs = [item.cost_microusd for item in baseline_tuple]
+            treatment_costs = [item.cost_microusd for item in evaluation.results]
             candidate_results.append(
                 OptimizationV2CandidateResult(
                     candidate_id=candidate_id,
                     skill_sha256=candidate.skill_sha256,
-                    baseline_results=tuple(baseline_results[item] for item in spec.case_ids),
+                    baseline_results=baseline_tuple,
                     evaluation=evaluation,
+                    baseline_pass_rate=baseline_pass_rate,
+                    candidate_pass_rate=evaluation.pass_rate,
+                    absolute_gain=evaluation.pass_rate - baseline_pass_rate,
+                    wtl=wtl,
+                    invalid_runs=sum(
+                        item.outcome == "invalid"
+                        for item in baseline_tuple + evaluation.results
+                    ),
+                    token_summary={
+                        "baseline": sum(
+                            item.input_tokens + item.output_tokens for item in baseline_tuple
+                        ),
+                        "candidate": evaluation.total_tokens,
+                    },
+                    latency_summary={
+                        "baseline": sum(item.latency_ms for item in baseline_tuple),
+                        "candidate": evaluation.total_latency_ms,
+                    },
+                    cost_summary={
+                        "baseline": (
+                            None
+                            if any(item is None for item in baseline_costs)
+                            else sum(item for item in baseline_costs if item is not None)
+                        ),
+                        "candidate": (
+                            None
+                            if any(item is None for item in treatment_costs)
+                            else sum(item for item in treatment_costs if item is not None)
+                        ),
+                    },
                     newly_consumed_agent_runs=authorization.consumed_agent_runs - prior_runs,
                     newly_observed_cost_microusd=(
                         authorization.consumed_cost_microusd - prior_cost
@@ -404,6 +469,7 @@ class OptimizationV2ScreeningRunner:
             case_ids=spec.case_ids,
             candidates=tuple(candidate_results),
             planned_agent_runs=preflight.report.planned_agent_runs,
+            expected_new_agent_runs=preflight.report.expected_new_agent_runs,
             observed_agent_runs=authorization.consumed_agent_runs,
             observed_cost_microusd=authorization.consumed_cost_microusd,
             baseline_reused_runs=max(0, authorization.consumed_agent_runs - 4),
@@ -434,19 +500,23 @@ class OptimizationV2ScreeningRunner:
 
         rows = []
         for candidate in report.candidates:
-            baseline_rate = sum(item.passed for item in candidate.baseline_results) / max(
-                1, len(candidate.baseline_results)
-            )
             traces = ", ".join(
                 item.trace_ref or "unavailable" for item in candidate.evaluation.results
             )
+            tokens = candidate.token_summary
+            latency = candidate.latency_summary
             rows.append(
                 "<tr>"
                 f"<td>{esc(candidate.candidate_id)}</td>"
-                f"<td>{candidate.evaluation.pass_rate:.3f}</td>"
-                f"<td>{baseline_rate:.3f}</td>"
+                f"<td>{candidate.candidate_pass_rate:.3f}</td>"
+                f"<td>{candidate.baseline_pass_rate:.3f}</td>"
+                f"<td>{candidate.absolute_gain:+.3f}</td>"
+                f"<td>{esc(candidate.wtl)}</td>"
+                f"<td>{candidate.invalid_runs}</td>"
+                f"<td>{tokens['baseline']} / {tokens['candidate']}</td>"
+                f"<td>{latency['baseline']} / {latency['candidate']}</td>"
+                f"<td>{esc(candidate.cost_summary)}</td>"
                 f"<td>{candidate.newly_consumed_agent_runs}</td>"
-                f"<td>{candidate.newly_observed_cost_microusd}</td>"
                 f"<td>{esc(traces)}</td>"
                 "</tr>"
             )
@@ -466,10 +536,13 @@ th,td{{border:1px solid #aaa;padding:6px;text-align:left}}
 <dl>
 <dt>Provider/model</dt><dd>{esc(report.provider)} / {esc(report.model)}</dd>
 <dt>Planned Agent Runs</dt><dd>{report.planned_agent_runs}</dd>
+<dt>Expected new Agent Runs</dt><dd>{report.expected_new_agent_runs}</dd>
 <dt>Observed Agent Runs</dt><dd>{report.observed_agent_runs}</dd>
 <dt>Observed cost (microusd)</dt><dd>{report.observed_cost_microusd}</dd>
 <dt>Reused baseline Runs</dt><dd>{report.baseline_reused_runs}</dd>
 </dl>
 <table><thead><tr><th>Candidate</th><th>Candidate pass rate</th>
-<th>v1 pass rate</th><th>New Runs</th><th>Cost</th><th>Trace refs</th>
+<th>v1 pass rate</th><th>Gain</th><th>W/T/L</th><th>Invalid</th>
+<th>Tokens v1/candidate</th><th>Latency v1/candidate (ms)</th>
+<th>Cost v1/candidate</th><th>New Runs</th><th>Trace refs</th>
 </tr></thead><tbody>{''.join(rows)}</tbody></table></body></html>"""
