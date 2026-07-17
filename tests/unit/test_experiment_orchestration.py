@@ -215,7 +215,7 @@ def test_executor_persists_paired_outcomes_attempts_and_order(tmp_path: Path) ->
             status=RunnerStatus.FAIL,
             exit_reason=ExitReason.CASE_FAILED,
             process_exit_code=1,
-            grading={"score": 0.25},
+            grading={"score": 0.25, "assertion_results": [{"passed": False}]},
         ),
         f"golden-pass:{arms[1].id}": RunnerResult(
             execution_id="configured",

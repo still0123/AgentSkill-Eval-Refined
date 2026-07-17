@@ -406,6 +406,9 @@ class LocalExperimentExecutor:
         security_scan: SecurityScanEvidence,
         trace_collector: TraceCollector,
     ) -> ExecutionRecord:
+        simulated_result = bool(
+            isinstance(result.grading, dict) and result.grading.get("simulated") is True
+        )
         if result.status in {RunnerStatus.PASS, RunnerStatus.FAIL}:
             attempt = self._terminal_attempt(attempt, AttemptStatus.COMPLETED)
             outcome = (
@@ -438,7 +441,18 @@ class LocalExperimentExecutor:
                 ExecutionStatus.INFRA_FAILED,
                 evaluation_outcome=EvaluationOutcome.INVALID,
             )
-        if result.status in {RunnerStatus.PASS, RunnerStatus.FAIL}:
+        has_verification_evidence = bool(
+            isinstance(result.raw_result, dict)
+            and isinstance(result.raw_result.get("case_results"), list)
+        ) or bool(
+            isinstance(result.grading, dict)
+            and isinstance(result.grading.get("assertion_results"), list)
+        )
+        if (
+            result.status in {RunnerStatus.PASS, RunnerStatus.FAIL}
+            and not simulated_result
+            and has_verification_evidence
+        ):
             trace_collector.record(
                 "verification.test",
                 source="runner",
