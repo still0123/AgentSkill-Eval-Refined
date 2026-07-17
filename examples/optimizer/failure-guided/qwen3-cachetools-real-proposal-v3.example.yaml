@@ -6,7 +6,7 @@ input_evidence_class: observed_train
 generator:
   type: deepseek
   name: deepseek-skill-proposal
-  version: proposal-aligned-observed-summary-v2
+  version: proposal-aligned-observed-summary-v3
   max_hypotheses: 4
   base_url: https://api.deepseek.com
   model: deepseek-v4-pro

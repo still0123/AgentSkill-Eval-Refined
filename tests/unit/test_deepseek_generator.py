@@ -156,6 +156,8 @@ def test_deepseek_generator_calls_fake_api_and_records_usage(
     encoded = body.decode("utf-8")
     assert "observed_summary" in encoded
     assert "failed targeted check" in encoded
+    assert "Every object MUST include" in encoded
+    assert "all ids must be unique" in encoded
     assert "validation_search" not in body.decode("utf-8")
     assert "locked_test" not in body.decode("utf-8")
     assert b"fake-api-key" not in body
