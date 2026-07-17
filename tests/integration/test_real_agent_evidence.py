@@ -584,13 +584,18 @@ def test_real_candidate_evaluator_reuses_v1_baseline_across_candidates(
     )
     candidate_one = tmp_path / "candidate-one"
     candidate_two = tmp_path / "candidate-two"
+    candidate_three = tmp_path / "candidate-three"
     candidate_one.mkdir()
     candidate_two.mkdir()
+    candidate_three.mkdir()
     candidate_one.joinpath("SKILL.md").write_bytes(
         SKILL.joinpath("SKILL.md").read_bytes() + b"\n- Verify once.\n"
     )
     candidate_two.joinpath("SKILL.md").write_bytes(
         SKILL.joinpath("SKILL.md").read_bytes() + b"\n- Retry once.\n"
+    )
+    candidate_three.joinpath("SKILL.md").write_bytes(
+        SKILL.joinpath("SKILL.md").read_bytes() + b"\n- Re-check twice.\n"
     )
 
     def write_config(path: Path, skill: Path) -> None:
@@ -639,5 +644,24 @@ def test_real_candidate_evaluator_reuses_v1_baseline_across_candidates(
     assert all(item.outcome == "pass" for item in first.results + second.results)
     assert len(baseline_cache) == len(CASE_IDS)
     assert all(len(key) == 64 for key in baseline_cache)
-    assert counter.read_text(encoding="utf-8") == "6"
-    assert authorization.consumed_agent_runs == 6
+    third_config = tmp_path / "candidate-three.yaml"
+    write_config(third_config, candidate_three)
+    third = RealAgentCandidateEvaluator(
+        third_config,
+        tmp_path / "reuse-workspace",
+        authorization,
+        baseline_skill_path=SKILL,
+        baseline_replay_cache=baseline_cache,
+    ).evaluate(
+        candidate_three / "SKILL.md",
+        published_dataset / "dataset.yaml",
+        DatasetLoader().load(published_dataset).dataset_sha256,
+        cases,
+        SearchEvaluationStage.FULL,
+        30,
+    )
+
+    assert all(item.outcome == "pass" for item in third.results)
+    # 4 first-pair Runs + 2 treatment Runs per later candidate.
+    assert counter.read_text(encoding="utf-8") == "8"
+    assert authorization.consumed_agent_runs == 8

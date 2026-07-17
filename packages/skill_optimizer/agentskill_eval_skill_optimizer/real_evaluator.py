@@ -179,7 +179,19 @@ class RealAgentCandidateEvaluator:
         dataset_sha256: str,
         cases: Tuple[SearchCase, SearchCase],
     ) -> Tuple[SearchCaseResult, SearchCaseResult]:
-        planned_runs = 4
+        # A candidate pair has two logical baseline Runs and two treatment Runs.
+        # Once the immutable v1 baseline is cached, only the treatment Runs are
+        # new external calls.  The global authorization must therefore reserve
+        # the number of uncached baseline/treatment Runs, not the logical pair
+        # size.  The underlying evidence runner still receives a four-Run
+        # logical cap because replayed baseline Runs remain in its audit plan.
+        baseline_replay_namespace = self._baseline_replay_namespace(dataset_sha256)
+        reused_baselines = sum(
+            self._baseline_cache_key(baseline_replay_namespace, case.id)
+            in self.baseline_replay_cache
+            for case in cases
+        )
+        planned_runs = len(cases) * 2 - reused_baselines
         estimated_cost = planned_runs * self.template.pricing.estimated_cost_per_run_microusd
         if self.authorization.remaining_runs() < planned_runs:
             raise RealCandidateEvaluationError("real optimizer Agent Run budget exhausted")
@@ -196,21 +208,21 @@ class RealAgentCandidateEvaluator:
             }
         )
         runner = RealAgentEvidenceRunner(self.workspace)
+        logical_pair_runs = len(cases) * 2
+        logical_pair_cost = (
+            logical_pair_runs * self.template.pricing.estimated_cost_per_run_microusd
+        )
         result = asyncio.run(
             runner.run(
                 spec,
                 RealRunMode.SMOKE,
                 confirm_real_run=True,
-                max_cost_microusd=self.authorization.remaining_cost(),
-                max_agent_runs=self.authorization.remaining_runs(),
-                baseline_replay_cache=self.baseline_replay_cache,
-                baseline_replay_namespace=stable_sha256(
-                    {
-                        "baseline_skill_sha256": self._skill_sha(self.baseline_skill_path),
-                        "dataset_sha256": dataset_sha256,
-                        "evaluator_sha256": self.evaluator_sha256,
-                    }
+                max_cost_microusd=max(
+                    logical_pair_cost, self.authorization.remaining_cost()
                 ),
+                max_agent_runs=max(4, self.authorization.remaining_runs()),
+                baseline_replay_cache=self.baseline_replay_cache,
+                baseline_replay_namespace=baseline_replay_namespace,
             )
         )
         if result.manifest.status != RealEvidenceStatus.COMPLETED:
@@ -229,6 +241,19 @@ class RealAgentCandidateEvaluator:
         for item in baseline:
             self._baseline_results.setdefault(item.case_id, item)
         return treatment
+
+    def _baseline_replay_namespace(self, dataset_sha256: str) -> str:
+        return stable_sha256(
+            {
+                "baseline_skill_sha256": self._skill_sha(self.baseline_skill_path),
+                "dataset_sha256": dataset_sha256,
+                "evaluator_sha256": self.evaluator_sha256,
+            }
+        )
+
+    @staticmethod
+    def _baseline_cache_key(namespace: str, case_id: str) -> str:
+        return stable_sha256({"namespace": namespace, "case_id": case_id})
 
     def _variant_results(
         self, experiment_id: UUID, dataset_root: Path, case_ids: Tuple[str, str]
