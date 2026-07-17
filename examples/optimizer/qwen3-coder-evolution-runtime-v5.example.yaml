@@ -1,0 +1,24 @@
+schema_version: ase/real-evolution-runtime-spec/v1alpha1
+name: qwen3-coder-python-bug-fix-adaptive-execution-v5
+execution_plan_directory: /Users/bytedance/.codex/workspaces/qwen3-evolution-plan-v5/evolution-execution-plans/433a8350-8c2f-5a96-a680-74af35e19689
+dry_run_directory: /Users/bytedance/.codex/workspaces/qwen3-evolution-dry-run-v5/evolution-dry-runs/0876a438-76cc-56fd-b1b0-59f7b300ab72
+benchmark_workspace: /Users/bytedance/.codex/worktrees/fb0a/stage3b-offline-evidence/.agentskill-eval/stage2-reproduction
+proposal_directory: /Users/bytedance/.codex/workspaces/qwen3-cachetools-real-proposal-v3/proposal-jobs/bc14d137-fc22-516e-a346-cbc87a887acd
+base_skill_path: /Users/bytedance/Documents/skill/examples/skills/python-bug-fix-v1
+manual_skill_path: /Users/bytedance/Documents/skill/examples/skills/python-bug-fix-v1
+real_agent_config_path: /Users/bytedance/Documents/skill/examples/real-agent-evidence/qwen3-coder-validation-search.yaml
+search:
+  algorithm: successive_halving
+  subset_size: 2
+  promote_search_candidates: 2
+  random_seed: 2026
+constraints:
+  max_skill_bytes: 20000
+  max_loss_cases: 0
+  max_token_overhead_ratio: 0.5
+timeout_seconds: 1800
+claim_limit: >-
+  Qwen3-Coder observed-Agent adaptive evidence using the four real DeepSeek Proposal v3
+  candidates. Search and regression_dev may select a provisional winner; validation_confirm and
+  locked_test remain withheld, and no Skill v2 publication claim is supported until the final
+  independent gates and human review complete.
