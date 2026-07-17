@@ -1,0 +1,33 @@
+{
+  "schema_version": "ase/deepseek-proposal-v5-guided/v1alpha1",
+  "proposal_job_id": "a9593db6-dda3-5925-86bf-526cbf460357",
+  "manifest_sha256": "9dc7d8aa474132207201d8589145c636fda289313c7d281d8251fb97f25e6793",
+  "report_sha256": "bfe5b782e56f144a58e4d69f38b25dacfbe569e8611dc882f5d2846ab3d4b470",
+  "proposals_sha256": "c7ce3780124878bf5e08b9847ccb107573919ba7286dd4411a417ec6dd27508b",
+  "provider": "deepseek",
+  "model": "deepseek-v4-pro",
+  "generator_version": "proposal-execution-loop-v1",
+  "prompt_sha256": "979ba36859ff615784a72348f2c25457827f740177aaa2464780676b2383680c",
+  "output_schema_sha256": "40bf0f1d93d59ab2a73e61409901d040dfafeb38bd5080c8c31f70e6cdca7ee5",
+  "request_sha256": "4bbb56826e9eda540b6befd9cfd66d19df49592f675cafb9a5dc8215c7e29d28",
+  "proposal_sha256": "9ef5035a3de514ecccb3d33f3238193547b86b02a113c45f6f26ffecd937ddd5",
+  "proposal_count": 4,
+  "candidate_ids": [
+    "inspect-tool-schema-before-edit",
+    "verify-edit-result-and-retry",
+    "map-edit-operation-to-tool-args",
+    "use-edit-tool-wrapper"
+  ],
+  "input_tokens": 966,
+  "cached_input_tokens": 0,
+  "output_tokens": 568,
+  "reasoning_tokens": 0,
+  "observed_cost_microusd": 915,
+  "real_run_confirmed": true,
+  "simulated": false,
+  "search_executed": false,
+  "locked_test_accessed": false,
+  "hidden_reasoning_stored": false,
+  "secret_value_stored": false,
+  "claim_limit": "Unvalidated guided Proposal v5 hypotheses only; no Agent quality, Skill improvement, confirmation, locked-test, or Skill v2 publication claim."
+}
