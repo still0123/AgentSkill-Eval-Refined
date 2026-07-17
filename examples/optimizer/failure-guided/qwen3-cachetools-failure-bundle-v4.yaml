@@ -1,0 +1,23 @@
+schema_version: ase/failure-evidence-bundle/v1alpha1
+name: optimizer-cachetools-observed-train-failures-v4
+split: train
+diagnoses:
+  - schema_version: ase/v1alpha1
+    run_id: 1b4b569e-c8eb-5cfa-b669-0083b29e7125
+    attempt_id: ae1e3cae-fee9-4075-9625-94ca6a690302
+    status: diagnosed
+    findings:
+      - label: TOOL_ARGUMENT
+        role: root_cause
+        confidence: 0.9
+        rule_id: rule.insufficient_observable_trace
+        evidence_sequence_nos:
+          - 7
+        rationale: >-
+          The Agent emitted a replace_in_file call using file, pattern, and
+          replacement fields, but the exposed tool contract requires path, old,
+          and new. After the rejected call it did not obtain a successful tool
+          result or complete the edit contract. Generalize this into a Skill
+          instruction to inspect the exposed tool schema and use the exact
+          argument names before calling an edit tool; after each edit, require a
+          successful result and continue until the requested change is verified.

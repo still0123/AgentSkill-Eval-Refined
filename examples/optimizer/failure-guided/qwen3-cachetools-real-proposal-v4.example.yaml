@@ -1,0 +1,24 @@
+schema_version: ase/real-llm-proposal-spec/v1alpha1
+name: python-bug-fix-cachetools-real-proposal-v4
+base_skill_path: /Users/bytedance/Documents/skill/examples/skills/python-bug-fix-v1
+failure_bundle_path: /Users/bytedance/Documents/skill/examples/optimizer/failure-guided/qwen3-cachetools-failure-bundle-v4.yaml
+input_evidence_class: observed_train
+generator:
+  type: deepseek
+  name: deepseek-skill-proposal
+  version: proposal-concrete-tool-contract-v1
+  max_hypotheses: 4
+  base_url: https://api.deepseek.com
+  model: deepseek-v4-pro
+  temperature: 0.0
+  max_output_tokens: 2200
+  secret_env_name: OPENAI_API_KEY
+  timeout_seconds: 60
+  input_cache_miss_microusd_per_million: 435000
+  input_cache_hit_microusd_per_million: 3625
+  output_microusd_per_million: 870000
+claim_limit: >-
+  Proposal v4 uses only the base Skill and a sanitized, human-reviewed observed
+  train failure describing a concrete tool-contract mismatch. The generated
+  candidates are unvalidated hypotheses; no validation_search, regression_dev,
+  confirmation, locked test, or Skill v2 publication claim is supported.
