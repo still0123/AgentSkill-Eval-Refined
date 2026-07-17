@@ -1,0 +1,48 @@
+{
+  "schema_version": "ase/deepseek-proposal-v7-validation-search-sanitized/v1alpha1",
+  "provider": "deepseek",
+  "model": "deepseek-v4-pro",
+  "case_ids": [
+    "more-itertools-last-reversed-none",
+    "cachetools-cachedmethod-autospec"
+  ],
+  "planned_logical_agent_runs": 16,
+  "observed_agent_runs": 6,
+  "baseline_reused_runs": 2,
+  "observed_cost_microusd": 145739,
+  "evaluated_candidate_count": 2,
+  "unevaluated_candidate_count": 2,
+  "simulated": false,
+  "search_executed": true,
+  "regression_executed": false,
+  "confirmation_executed": false,
+  "locked_test_accessed": false,
+  "status": "FAILED_FAST",
+  "invalid_runs": 1,
+  "invalid_reason": "loop_detected / read_file_loop",
+  "candidates": [
+    {
+      "candidate_id": "enforce-post-edit-test-rerun",
+      "baseline_pass_rate": 0.0,
+      "candidate_pass_rate": 0.5,
+      "absolute_gain": 0.5,
+      "wins": 1,
+      "ties": 1,
+      "losses": 0,
+      "invalid_runs": 0
+    },
+    {
+      "candidate_id": "validate-test-coverage",
+      "baseline_pass_rate": 0.0,
+      "candidate_pass_rate": 0.5,
+      "absolute_gain": 0.5,
+      "wins": 1,
+      "ties": 1,
+      "losses": 0,
+      "invalid_runs": 1
+    }
+  ],
+  "claim_limit": "Partial validation-search evidence only; no winner, Skill improvement, regression, confirmation, locked-test, generalization, or Skill v2 release claim.",
+  "secret_value_stored": false,
+  "hidden_reasoning_stored": false
+}
