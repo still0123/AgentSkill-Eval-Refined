@@ -55,6 +55,7 @@ def test_screening_spec_allows_four_generated_candidates() -> None:
     [
         ("DeepSeek HTTP 402 Insufficient Balance", "insufficient_balance"),
         ("DeepSeek HTTP 429 rate limited", "rate_limited"),
+        ("diagnosis receipt sha256=c4024024a9d1", "agent_invalid"),
         ("provider request timed out", "provider_timeout"),
         ("real optimizer cost budget exhausted", "budget_exhausted"),
         ("unexpected runner failure", "agent_invalid"),

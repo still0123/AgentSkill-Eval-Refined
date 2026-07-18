@@ -24,6 +24,7 @@ from agentskill_eval_contracts import (
     RealEvidenceStatus,
     RealRunMode,
     ReviewDecision,
+    SearchCaseResult,
     SearchEvaluationStage,
 )
 from agentskill_eval_experiment import LocalExperimentStore, ReplayBundleWriter
@@ -880,6 +881,120 @@ def test_optimization_v2_classifies_deepseek_402_without_skill_win(
     assert candidate.wtl == {"win": 0, "tie": 0, "loss": 0}
     assert report.observed_cost_microusd == 0
     assert counter.read_text(encoding="utf-8") == "4"
+
+
+def test_optimization_v2_explicit_resume_rearms_retryable_provider_block(
+    published_dataset: Path, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    counter = tmp_path / "retryable-provider-calls.txt"
+    _set_fake_secrets(monkeypatch, counter)
+    spec, runner, _config_path, _proposal_manifest = _resume_test_context(
+        tmp_path, monkeypatch, published_dataset, model="fake-402-once"
+    )
+
+    blocked, _report_path, _html_path = runner.run(
+        spec,
+        confirm_real_run=True,
+        max_cost_microusd=10_000,
+        max_agent_runs=4,
+    )
+    assert blocked.status == "BLOCKED"
+    assert blocked.provider_blocked_candidate_ids == ("candidate-alpha",)
+    assert counter.read_text(encoding="utf-8") == "4"
+
+    # `resume`, unlike `run`, is an explicit new authorization.  It receives a
+    # fresh runner identity and can therefore call the provider after the
+    # external balance/rate issue is resolved.
+    resumed, _report_path, _html_path = runner.resume(
+        spec,
+        confirm_real_run=True,
+        max_cost_microusd=10_000,
+        max_agent_runs=4,
+    )
+    assert resumed.status == "BUDGET_EXHAUSTED"
+    assert resumed.completed_candidate_ids == ("candidate-alpha",)
+    assert resumed.remaining_candidate_ids == ("candidate-bravo", "candidate-charlie")
+    assert counter.read_text(encoding="utf-8") == "8"
+    session = runner._load_session()
+    alpha = session.candidates[0]
+    assert alpha.attempt_count == 2
+    assert alpha.error_history == ("insufficient_balance",)
+
+
+def test_optimization_v2_invalid_baseline_blocks_paired_claims(
+    published_dataset: Path, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    counter = tmp_path / "baseline-invalid-calls.txt"
+    _set_fake_secrets(monkeypatch, counter)
+    spec, runner, _config_path, _proposal_manifest = _resume_test_context(
+        tmp_path, monkeypatch, published_dataset
+    )
+
+    original_baseline = RealAgentCandidateEvaluator.baseline_results.fget
+    assert original_baseline is not None
+
+    def invalid_baseline(self: RealAgentCandidateEvaluator) -> dict[str, SearchCaseResult]:
+        return {
+            case_id: result.model_copy(update={"outcome": "invalid", "passed": False})
+            for case_id, result in original_baseline(self).items()
+        }
+
+    monkeypatch.setattr(
+        RealAgentCandidateEvaluator, "baseline_results", property(invalid_baseline)
+    )
+    report, _report_path, _html_path = runner.run(
+        spec,
+        confirm_real_run=True,
+        max_cost_microusd=10_000,
+        max_agent_runs=4,
+    )
+
+    candidate = report.candidates[0]
+    assert report.status == "PARTIAL"
+    assert candidate.status == "INVALID"
+    assert candidate.baseline_pass_rate is None
+    assert candidate.candidate_pass_rate is None
+    assert candidate.absolute_gain is None
+    assert candidate.wtl == {"win": 0, "tie": 0, "loss": 0}
+    assert candidate.error_types == ("agent_invalid",)
+    assert counter.read_text(encoding="utf-8") == "4"
+
+
+def test_optimization_v2_partial_pair_reconciles_observed_cost_without_replay(
+    published_dataset: Path, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    counter = tmp_path / "partial-pair-calls.txt"
+    _set_fake_secrets(monkeypatch, counter)
+    spec, runner, _config_path, _proposal_manifest = _resume_test_context(
+        tmp_path, monkeypatch, published_dataset, model="fake-expensive"
+    )
+    report, _report_path, _html_path = runner.run(
+        spec,
+        confirm_real_run=True,
+        max_cost_microusd=1_000,
+        max_agent_runs=4,
+    )
+
+    assert report.status == "BUDGET_EXHAUSTED"
+    assert report.observed_agent_runs == 1
+    assert report.observed_cost_microusd == 1_000
+    assert report.invalid_candidate_ids == ("candidate-alpha",)
+    assert report.candidates[0].error_types == ("budget_exhausted",)
+    assert counter.read_text(encoding="utf-8") == "1"
+
+    # The partially observed immutable pair is terminal.  A later resume may
+    # continue other pending candidates but must not invoke alpha again.
+    resumed, _report_path, _html_path = runner.resume(
+        spec,
+        confirm_real_run=True,
+        max_cost_microusd=10_000,
+        max_agent_runs=4,
+    )
+    assert resumed.invalid_candidate_ids == ("candidate-alpha",)
+    persisted = runner._load_session().candidates[0]
+    assert persisted.attempt_count == 1
+    assert persisted.newly_consumed_agent_runs == 1
+    assert int(counter.read_text(encoding="utf-8")) > 1
 
 
 def test_optimization_v2_resume_rejects_drift_and_tampered_inputs(

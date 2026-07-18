@@ -403,6 +403,19 @@ def test_derived_bundle_binds_parent_and_rejects_source_hash_drift(tmp_path: Pat
     ).hexdigest()
     assert parent.read_bytes() == parent_before
     assert bridge.verify_derived(experiment_id, parent, derived) == result.bundle
+    derived_before = derived.read_bytes()
+
+    # Keeping the same parent hash/provenance is not enough: the optimizer must
+    # consume exactly the deterministic sanitized findings derived from it.
+    tampered = yaml.safe_load(derived.read_text(encoding="utf-8"))
+    tampered["diagnoses"][0]["findings"][0]["rationale"] = "tampered rationale"
+    derived.write_text(yaml.safe_dump(tampered, sort_keys=False), encoding="utf-8")
+    with pytest.raises(FailureBridgeError, match="deterministic parent derivation"):
+        bridge.verify_derived(experiment_id, parent, derived)
+
+    # Restore the original derived evidence before checking source identity
+    # drift independently.
+    derived.write_bytes(derived_before)
 
     report = workspace / "experiments" / str(experiment_id) / "reports" / "report.json"
     report.write_text('{"fixture":"tampered"}\n', encoding="utf-8")

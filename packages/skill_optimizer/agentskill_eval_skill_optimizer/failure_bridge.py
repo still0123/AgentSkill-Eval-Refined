@@ -407,7 +407,13 @@ class ObservedFailureEvidenceBridge:
         parent_bundle_path: Path,
         derived_bundle_path: Path,
     ) -> FailureEvidenceBundle:
-        """Revalidate the source identities and parent hash of an existing derived bundle."""
+        """Revalidate the source, parent and deterministic derived content.
+
+        A parent hash alone is insufficient: an editor could retain it while
+        changing the sanitized findings consumed by the optimizer.  The
+        derived bundle must therefore equal the deterministic transformation
+        of the supplied parent evidence.
+        """
         source = self._source(experiment_id)
         parent_path = parent_bundle_path.expanduser().resolve(strict=True)
         parent = FailureEvidenceBundle.load(parent_path)
@@ -420,6 +426,16 @@ class ObservedFailureEvidenceBridge:
             raise FailureBridgeError("derived bundle parent hash does not match supplied parent")
         self._validate_parent_bundle(source, parent)
         self._validate_provenance(source, provenance)
+        expected_name = f"{parent.name} derived observed provenance"
+        expected_diagnoses = self._sanitize_diagnoses(parent.diagnoses)
+        if derived.name != expected_name:
+            raise FailureBridgeError("derived bundle name does not match its parent derivation")
+        if derived.split != parent.split:
+            raise FailureBridgeError("derived bundle split does not match its parent")
+        if derived.diagnoses != expected_diagnoses:
+            raise FailureBridgeError(
+                "derived bundle diagnoses do not match the deterministic parent derivation"
+            )
         return derived
 
     def _source(self, experiment_id: UUID) -> ObservedFailureSource:
