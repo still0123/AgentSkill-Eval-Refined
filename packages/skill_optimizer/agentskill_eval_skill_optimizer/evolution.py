@@ -58,6 +58,49 @@ class EvolutionError(RuntimeError):
     """Raised when an evolution input violates isolation, integrity, or quality gates."""
 
 
+class FailureBundleSecretScan(FrozenModel):
+    """Secret-scan receipt without retaining Secret values."""
+
+    configured_secret_count: int = Field(ge=0)
+    matched_secret_names: Tuple[str, ...] = ()
+    clean: Literal[True] = True
+    exact_values_available: bool
+    source_attempt_scan_verified: bool
+
+    @model_validator(mode="after")
+    def clean_scan_has_no_matches(self) -> "FailureBundleSecretScan":
+        if self.matched_secret_names:
+            raise ValueError("clean failure bundle Secret scan cannot report matches")
+        if not self.exact_values_available and not self.source_attempt_scan_verified:
+            raise ValueError(
+                "unavailable exact Secret values require verified clean source attempt scans"
+            )
+        return self
+
+
+class ObservedFailureProvenance(FrozenModel):
+    """Immutable source binding for a real observed train failure bundle."""
+
+    schema_version: Literal["ase/observed-failure-provenance/v1alpha1"] = (
+        "ase/observed-failure-provenance/v1alpha1"
+    )
+    source_experiment_id: UUID
+    source_experiment_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    source_real_run_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    source_report_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    parent_bundle_sha256: Optional[str] = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    provider: str = Field(min_length=1)
+    model: str = Field(min_length=1)
+    runner_version: str = Field(min_length=1)
+    runner_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    agent_config_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    dataset_version_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    evidence_class: Literal["observed_agent"] = "observed_agent"
+    simulated: Literal[False] = False
+    secret_scan: FailureBundleSecretScan
+    secret_value_stored: Literal[False] = False
+
+
 class FailureEvidenceBundle(FrozenModel):
     schema_version: Literal["ase/failure-evidence-bundle/v1alpha1"]
     name: str = Field(min_length=1)
@@ -65,6 +108,17 @@ class FailureEvidenceBundle(FrozenModel):
     diagnoses: Tuple[FailureDiagnosis, ...] = Field(min_length=1)
     agent_provider: Optional[str] = Field(default=None, min_length=1)
     agent_model: Optional[str] = Field(default=None, min_length=1)
+    provenance: Optional[ObservedFailureProvenance] = None
+
+    @model_validator(mode="after")
+    def provenance_matches_agent_identity(self) -> "FailureEvidenceBundle":
+        if self.provenance is None:
+            return self
+        if self.agent_provider != self.provenance.provider:
+            raise ValueError("failure bundle provider must match observed provenance")
+        if self.agent_model != self.provenance.model:
+            raise ValueError("failure bundle model must match observed provenance")
+        return self
 
     @classmethod
     def load(cls, path: Path) -> "FailureEvidenceBundle":
@@ -72,6 +126,32 @@ class FailureEvidenceBundle(FrozenModel):
             return cls.model_validate(yaml.safe_load(path.read_text(encoding="utf-8")))
         except (OSError, yaml.YAMLError, ValueError) as exc:
             raise EvolutionError(f"invalid train failure bundle {path}: {exc}") from exc
+
+    def require_observed_provenance(
+        self,
+        *,
+        provider: str,
+        model: str,
+        proposal_bundle_sha256: Optional[str] = None,
+        bundle_sha256: Optional[str] = None,
+    ) -> ObservedFailureProvenance:
+        """Require immutable real-source provenance before a real evaluation can use this."""
+        provenance = self.provenance
+        if provenance is None:
+            raise EvolutionError("observed train failure bundle is missing immutable provenance")
+        if provenance.provider != provider or provenance.model != model:
+            raise EvolutionError("observed train failure provenance provider/model mismatch")
+        if self.agent_provider != provider or self.agent_model != model:
+            raise EvolutionError("observed train failure bundle provider/model mismatch")
+        if (
+            proposal_bundle_sha256 is not None
+            and proposal_bundle_sha256
+            not in {bundle_sha256, provenance.parent_bundle_sha256}
+        ):
+            raise EvolutionError(
+                "derived failure bundle parent hash does not match the Proposal input bundle"
+            )
+        return provenance
 
 
 EXCLUDED_PROPOSAL_FAILURES = {

@@ -37,7 +37,7 @@ from agentskill_eval_skill_optimizer.candidate_quality import (
     CandidateQualityGate,
     CandidateQualityReport,
 )
-from agentskill_eval_skill_optimizer.evolution import FailureEvidenceBundle
+from agentskill_eval_skill_optimizer.evolution import EvolutionError, FailureEvidenceBundle
 from agentskill_eval_skill_optimizer.proposal import RealLLMProposalError, RealLLMProposalService
 from agentskill_eval_skill_optimizer.real_evaluator import (
     RealAgentCandidateEvaluator,
@@ -319,10 +319,15 @@ class OptimizationV2Planner:
             reasons.append("validation dataset does not contain exactly the planned Cases")
         if proposal.manifest.input_evidence_class != "observed_train":
             reasons.append("Proposal input is not observed train evidence")
-        if bundle.agent_provider != spec.target_provider:
-            reasons.append("train failure evidence provider is missing or mismatched")
-        if bundle.agent_model != spec.target_model:
-            reasons.append("train failure evidence model is missing or mismatched")
+        try:
+            bundle.require_observed_provenance(
+                provider=spec.target_provider,
+                model=spec.target_model,
+                proposal_bundle_sha256=proposal.manifest.failure_bundle_sha256,
+                bundle_sha256=self._sha(spec.failure_bundle_path.read_bytes()),
+            )
+        except EvolutionError as exc:
+            reasons.append(str(exc))
         if not quality.accepted_candidate_ids:
             reasons.append("offline quality gate produced no accepted candidate")
         planned_runs = len(quality.accepted_candidate_ids) * len(spec.case_ids) * 2

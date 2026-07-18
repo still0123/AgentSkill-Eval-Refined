@@ -8,18 +8,21 @@ from pathlib import Path
 from typing import Mapping, Tuple
 from uuid import UUID, uuid4
 
+import pytest
 import yaml
 from typer.testing import CliRunner
 
 from agentskill_eval_cli.main import app
 from agentskill_eval_contracts import (
     AgentSnapshot,
+    ExecutableSnapshot,
     ExperimentManifest,
     ExperimentStatus,
     ExperimentVariant,
     RealEvidenceClass,
     RealEvidenceRunManifest,
     RealEvidenceStatus,
+    RealPreflightReport,
     RealRunMode,
     RunnerSnapshot,
     SandboxSnapshot,
@@ -49,6 +52,7 @@ from agentskill_eval_runner_adapters import (
 )
 from agentskill_eval_runner_adapters.contracts import TraceEventSink, null_event_sink
 from agentskill_eval_skill_optimizer import (
+    FailureBridgeError,
     FailureEvidenceBundle,
     ObservedFailureEvidenceBridge,
 )
@@ -165,7 +169,9 @@ def _case(case_id: str) -> CaseExecutionSpec:
     )
 
 
-def _observed_workspace(tmp_path: Path) -> Tuple[Path, UUID]:
+def _observed_workspace(
+    tmp_path: Path, secret_env_names: Tuple[str, ...] = ()
+) -> Tuple[Path, UUID]:
     workspace = tmp_path / "workspace"
     store = LocalExperimentStore(workspace)
     experiment_id = uuid4()
@@ -209,12 +215,40 @@ def _observed_workspace(tmp_path: Path) -> Tuple[Path, UUID]:
     LocalExperimentPlanner(store).persist(plan)
     summary = asyncio.run(LocalExperimentExecutor(store, ObservedFixtureAdapter()).execute(plan))
     now = datetime.now(timezone.utc)
-    RealEvidenceStore(workspace).save_run(
+    real_store = RealEvidenceStore(workspace)
+    preflight = RealPreflightReport(
+        config_sha256="c" * 64,
+        dataset_version_id=experiment.dataset_version_id,
+        dataset_name="observed-fixture",
+        dataset_version="1",
+        dataset_sha256=experiment.dataset_sha256,
+        case_ids=tuple(CASE_KINDS),
+        skill_sha256=DIGEST_B,
+        runner=ExecutableSnapshot(
+            name="runner", version="1", path="/fixture/runner", sha256="0" * 64
+        ),
+        agent=ExecutableSnapshot(
+            name="agent", version="1", path="/fixture/agent", sha256="1" * 64
+        ),
+        provider="fixture",
+        model="fixture-model",
+        simulated=False,
+        evidence_class=RealEvidenceClass.OBSERVED_AGENT,
+        smoke_runs=10,
+        evidence_runs=30,
+        estimated_input_tokens_per_run=1,
+        estimated_output_tokens_per_run=1,
+        estimated_cost_per_run_microusd=1,
+        secret_env_names=secret_env_names,
+        checked_at=now,
+    )
+    real_store.save_preflight(experiment_id, preflight)
+    real_store.save_run(
         RealEvidenceRunManifest(
             experiment_id=experiment_id,
             mode=RealRunMode.EVIDENCE,
             status=RealEvidenceStatus.COMPLETED,
-            config_sha256="c" * 64,
+            config_sha256=preflight.config_sha256,
             preflight_sha256="d" * 64,
             simulated=False,
             evidence_class=RealEvidenceClass.OBSERVED_AGENT,
@@ -231,6 +265,10 @@ def _observed_workspace(tmp_path: Path) -> Tuple[Path, UUID]:
             completed_at=now,
             claim_limit="local observed fixture for bridge integration only",
         )
+    )
+    store.writer.write(
+        workspace / "experiments" / str(experiment_id) / "reports" / "report.json",
+        b'{"fixture":"observed-source-report"}\n',
     )
     return workspace, experiment_id
 
@@ -255,6 +293,11 @@ def test_observed_failures_become_trace_linked_train_bundle(tmp_path: Path) -> N
     assert all(item.observed_summary for item in result.report.eligible)
     assert len(result.report.clusters) == 3
     assert FailureEvidenceBundle.load(output) == result.bundle
+    assert result.bundle is not None and result.bundle.provenance is not None
+    assert result.bundle.agent_provider == "fixture"
+    assert result.bundle.agent_model == "fixture-model"
+    assert result.bundle.provenance.runner_sha256 == "0" * 64
+    assert result.bundle.provenance.dataset_version_sha256 == DIGEST_A
 
 
 def test_review_can_exclude_and_override_only_task_failures(tmp_path: Path) -> None:
@@ -338,3 +381,78 @@ def test_prepare_failures_cli_reports_paths_and_counts(tmp_path: Path) -> None:
     assert payload["eligible_findings"] == 3
     assert Path(payload["bundle"]).is_file()
     assert Path(payload["audit_report"]).is_file()
+
+
+def test_derived_bundle_binds_parent_and_rejects_source_hash_drift(tmp_path: Path) -> None:
+    workspace, experiment_id = _observed_workspace(tmp_path)
+    bridge = ObservedFailureEvidenceBridge(workspace)
+    parent = tmp_path / "legacy-parent.yaml"
+    bridge.prepare(experiment_id, parent)
+    parent_before = parent.read_bytes()
+    legacy_payload = yaml.safe_load(parent.read_text(encoding="utf-8"))
+    legacy_payload.pop("provenance")
+    parent.write_text(yaml.safe_dump(legacy_payload, sort_keys=False), encoding="utf-8")
+    parent_before = parent.read_bytes()
+    derived = tmp_path / "derived.yaml"
+
+    result = bridge.derive(experiment_id, parent, derived)
+
+    assert result.bundle is not None and result.bundle.provenance is not None
+    assert result.bundle.provenance.parent_bundle_sha256 == hashlib.sha256(
+        parent_before
+    ).hexdigest()
+    assert parent.read_bytes() == parent_before
+    assert bridge.verify_derived(experiment_id, parent, derived) == result.bundle
+
+    report = workspace / "experiments" / str(experiment_id) / "reports" / "report.json"
+    report.write_text('{"fixture":"tampered"}\n', encoding="utf-8")
+    with pytest.raises(FailureBridgeError, match="hash or identity drifted"):
+        bridge.verify_derived(experiment_id, parent, derived)
+
+
+def test_derived_bundle_secret_scan_and_cli_are_safe(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    secret = "exact-fixture-secret"
+    monkeypatch.setenv("FIXTURE_PROVENANCE_SECRET", secret)
+    workspace, experiment_id = _observed_workspace(
+        tmp_path, secret_env_names=("FIXTURE_PROVENANCE_SECRET",)
+    )
+    bridge = ObservedFailureEvidenceBridge(workspace)
+    parent = tmp_path / "parent.yaml"
+    bridge.prepare(experiment_id, parent)
+    legacy = yaml.safe_load(parent.read_text(encoding="utf-8"))
+    legacy.pop("provenance")
+    legacy["diagnoses"][0]["findings"][0]["rationale"] = secret
+    unsafe_parent = tmp_path / "unsafe-parent.yaml"
+    unsafe_parent.write_text(yaml.safe_dump(legacy, sort_keys=False), encoding="utf-8")
+    unsafe_output = tmp_path / "unsafe-derived.yaml"
+    with pytest.raises(FailureBridgeError, match="configured Secret"):
+        bridge.derive(experiment_id, unsafe_parent, unsafe_output)
+    assert not unsafe_output.exists()
+
+    safe_parent = tmp_path / "safe-parent.yaml"
+    legacy["diagnoses"][0]["findings"][0]["rationale"] = "verification output was stale"
+    safe_parent.write_text(yaml.safe_dump(legacy, sort_keys=False), encoding="utf-8")
+    output = tmp_path / "cli-derived.yaml"
+    cli = CliRunner().invoke(
+        app,
+        [
+            "optimize",
+            "derive-failures",
+            str(workspace),
+            str(experiment_id),
+            str(safe_parent),
+            "--output",
+            str(output),
+        ],
+        terminal_width=240,
+    )
+    assert cli.exit_code == 0, cli.output
+    payload = json.loads(cli.stdout)
+    assert payload["secret_scan_clean"] is True
+    assert payload["provider"] == "fixture"
+    assert payload["model"] == "fixture-model"
+    persisted = b"".join(path.read_bytes() for path in workspace.rglob("*") if path.is_file())
+    assert secret.encode() not in persisted
+    assert secret.encode() not in output.read_bytes()
