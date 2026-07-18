@@ -30,6 +30,18 @@ agentskill-eval optimize prepare-failures \
 - `train-failures.yaml.audit.json`：记录 eligible/excluded finding、Trace event 引用、聚合结果、
   Skill hash 和来源实验 hash。
 
+新生成的 observed bundle 还冻结：
+
+- provider/model；
+- Runner version/SHA-256；
+- Agent config SHA-256；
+- DatasetVersion SHA-256；
+- source experiment、real-run 和 report SHA-256；
+- 非 Secret 的 Secret-scan receipt。
+
+缺少这些 provenance，或 source experiment/report/Runner/Agent/Dataset 的绑定发生漂移时，
+真实 Proposal 和 Optimization v2 preflight 会拒绝继续执行。
+
 如果 Skill treatment arm 没有可优化的 task failure，命令返回 `INSUFFICIENT`，只生成审计报告，
 不会把 infra failure 伪造成优化输入。
 
@@ -60,6 +72,21 @@ agentskill-eval optimize prepare-failures WORKSPACE EXPERIMENT_ID \
 
 Review 不能让 `INVALID` Run 进入优化。每个决定以 `run_id + rule_id` 定位，审计报告会标记
 `review_applied=true`。
+
+## 派生旧证据
+
+旧 bundle 是不可变输入。不要补写其中的 provider/model 或 provenance。使用以下命令从其关联的
+完成态 observed-Agent experiment 派生一个新 bundle：
+
+```bash
+agentskill-eval optimize derive-failures WORKSPACE EXPERIMENT_ID PARENT_BUNDLE \
+  --output derived-train-failures.yaml
+```
+
+派生 bundle 在 provenance 中记录 `parent_bundle_sha256`，并验证 parent 中的每个 diagnosis
+都对应 source experiment 的 task-failed Skill treatment Run 和选中 Attempt。输出路径不能覆盖
+parent；重复同一输入只接受字节完全相同的已有输出。该命令重新进行 exact Secret scan，但不保存
+Secret 值。
 
 ## 真实实验验证
 

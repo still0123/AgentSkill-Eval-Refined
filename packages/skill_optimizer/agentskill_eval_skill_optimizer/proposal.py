@@ -20,6 +20,7 @@ from agentskill_eval_skill_optimizer.deepseek_generator import (
     DeepSeekHypothesisGenerator,
 )
 from agentskill_eval_skill_optimizer.evolution import (
+    EvolutionError,
     FailureEvidenceBundle,
     HypothesisArtifact,
     ImprovementHypothesis,
@@ -204,6 +205,15 @@ class RealLLMProposalService:
         bundle = FailureEvidenceBundle.load(spec.failure_bundle_path)
         base_sha = self._sha(base_skill.read_bytes())
         bundle_sha = self._sha(spec.failure_bundle_path.read_bytes())
+        if spec.input_evidence_class == "observed_train":
+            try:
+                bundle.require_observed_provenance(
+                    provider="deepseek",
+                    model=str(spec.generator.model),
+                    bundle_sha256=bundle_sha,
+                )
+            except EvolutionError as exc:
+                raise RealLLMProposalError(str(exc)) from exc
         decisions = classify_failure_bundle(bundle)
         eligible = tuple(item for item in decisions if item.eligible)
         excluded = tuple(item for item in decisions if not item.eligible)

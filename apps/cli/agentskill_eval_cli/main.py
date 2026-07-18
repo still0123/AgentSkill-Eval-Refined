@@ -1316,6 +1316,57 @@ def optimize_prepare_failures(
     )
 
 
+@optimize_app.command("derive-failures")
+def optimize_derive_failures(
+    workspace: Path = typer.Argument(  # noqa: B008
+        ..., exists=True, file_okay=False, help="Workspace containing observed source evidence."
+    ),
+    experiment_id: UUID = typer.Argument(  # noqa: B008
+        ..., help="Completed observed-Agent source experiment UUID."
+    ),
+    parent_bundle: Path = typer.Argument(  # noqa: B008
+        ..., exists=True, dir_okay=False, help="Immutable legacy FailureEvidenceBundle YAML."
+    ),
+    output: Path = typer.Option(  # noqa: B008
+        ..., "--output", dir_okay=False, help="New derived provenance bundle YAML."
+    ),
+) -> None:
+    """Derive a provenance-bound bundle without changing the legacy evidence."""
+    try:
+        result = ObservedFailureEvidenceBridge(workspace).derive(
+            experiment_id, parent_bundle, output
+        )
+    except FailureBridgeError as exc:
+        raise typer.BadParameter(str(exc), param_hint="EXPERIMENT_ID") from exc
+    provenance = result.report.provenance
+    typer.echo(
+        json.dumps(
+            {
+                "audit_report": str(result.report_path),
+                "bundle": str(result.bundle_path) if result.bundle_path else None,
+                "bundle_sha256": result.report.bundle_sha256,
+                "parent_bundle_sha256": (
+                    provenance.parent_bundle_sha256 if provenance is not None else None
+                ),
+                "source_experiment_sha256": (
+                    provenance.source_experiment_sha256 if provenance is not None else None
+                ),
+                "source_report_sha256": (
+                    provenance.source_report_sha256 if provenance is not None else None
+                ),
+                "provider": provenance.provider if provenance is not None else None,
+                "model": provenance.model if provenance is not None else None,
+                "secret_scan_clean": (
+                    provenance.secret_scan.clean if provenance is not None else False
+                ),
+                "status": result.report.status,
+            },
+            ensure_ascii=False,
+            sort_keys=True,
+        )
+    )
+
+
 @optimize_app.command("status")
 def optimize_status(
     workspace: Path = typer.Argument(..., exists=True, file_okay=False),  # noqa: B008

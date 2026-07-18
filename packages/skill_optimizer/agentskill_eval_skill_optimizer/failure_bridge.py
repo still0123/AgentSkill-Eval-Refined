@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import hashlib
+import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Literal, Optional, Tuple
+from typing import Dict, Literal, Optional, Sequence, Tuple
 from uuid import UUID
 
 import yaml
@@ -15,6 +16,7 @@ from agentskill_eval_contracts import (
     AttributionRole,
     DiagnosticFinding,
     EvaluationOutcome,
+    ExperimentManifest,
     ExperimentVariant,
     FailureDiagnosis,
     FailureLabel,
@@ -22,16 +24,21 @@ from agentskill_eval_contracts import (
     RealEvidenceClass,
     RealEvidenceRunManifest,
     RealEvidenceStatus,
+    RealExperimentReport,
+    RealPreflightReport,
+    Run,
     TraceEvent,
     TraceManifest,
     VariantRole,
     canonical_json,
-    stable_sha256,
 )
-from agentskill_eval_experiment import LocalExperimentStore
+from agentskill_eval_experiment import ExactSecretScanner, LocalExperimentStore
 from agentskill_eval_experiment.storage import AtomicFileWriter, ExperimentLayout, load_model
 from agentskill_eval_skill_optimizer.evolution import (
+    EvolutionError,
+    FailureBundleSecretScan,
     FailureEvidenceBundle,
+    ObservedFailureProvenance,
     sanitize_observed_summary,
 )
 
@@ -113,16 +120,26 @@ class FailureBridgeReport(FrozenModel):
     clusters: Tuple[FailureEvidenceCluster, ...]
     bundle_path: Optional[str] = None
     bundle_sha256: Optional[str] = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    provenance: Optional[ObservedFailureProvenance] = None
     insufficiency_reason: Optional[str] = None
 
     @model_validator(mode="after")
     def status_matches_bundle(self) -> "FailureBridgeReport":
         if self.status == "READY":
-            if not self.eligible or not self.bundle_path or not self.bundle_sha256:
+            if (
+                not self.eligible
+                or not self.bundle_path
+                or not self.bundle_sha256
+                or self.provenance is None
+            ):
                 raise ValueError("READY reports require eligible evidence and a bundle")
             if self.insufficiency_reason is not None:
                 raise ValueError("READY reports cannot contain insufficiency_reason")
-        elif self.bundle_path is not None or self.bundle_sha256 is not None:
+        elif (
+            self.bundle_path is not None
+            or self.bundle_sha256 is not None
+            or self.provenance is not None
+        ):
             raise ValueError("INSUFFICIENT reports cannot claim a generated bundle")
         elif not self.insufficiency_reason:
             raise ValueError("INSUFFICIENT reports require a reason")
@@ -135,6 +152,22 @@ class FailureBridgeResult:
     report_path: Path
     bundle: Optional[FailureEvidenceBundle]
     bundle_path: Optional[Path]
+
+
+@dataclass(frozen=True)
+class ObservedFailureSource:
+    """Validated, non-secret source identity for a completed observed experiment."""
+
+    experiment: ExperimentManifest
+    real_run: RealEvidenceRunManifest
+    skill_variant: ExperimentVariant
+    experiment_path: Path
+    real_run_path: Path
+    report_path: Path
+    runner_version: str
+    runner_sha256: str
+    secret_env_names: Tuple[str, ...]
+    source_attempt_scan_verified: bool
 
 
 class ObservedFailureEvidenceBridge:
@@ -210,9 +243,9 @@ class ObservedFailureEvidenceBridge:
         *,
         review_path: Optional[Path] = None,
     ) -> FailureBridgeResult:
-        experiment = self.store.load_experiment(experiment_id)
-        real_run = self._load_observed_run(experiment_id)
-        variant = self._skill_variant(experiment_id)
+        source = self._source(experiment_id)
+        experiment = source.experiment
+        variant = source.skill_variant
         skill_snapshot = variant.skill_snapshot
         if skill_snapshot is None:
             raise FailureBridgeError("selected Skill variant has no Skill snapshot")
@@ -291,57 +324,446 @@ class ObservedFailureEvidenceBridge:
                         run_id=diagnosis.run_id,
                         attempt_id=diagnosis.attempt_id,
                         status="diagnosed",
-                        findings=tuple(accepted_findings),
+                        findings=self._sanitize_findings(accepted_findings),
                     )
                 )
 
         clusters = self._clusters(eligible)
         output = output.expanduser().resolve()
         bundle: Optional[FailureEvidenceBundle] = None
-        bundle_path: Optional[Path] = None
-        bundle_sha: Optional[str] = None
+        bundle_bytes: Optional[bytes] = None
         if diagnoses:
-            bundle = FailureEvidenceBundle(
-                schema_version="ase/failure-evidence-bundle/v1alpha1",
+            bundle, bundle_bytes = self._bundle(
+                source,
                 name=f"{experiment.name} observed train failures",
-                split="train",
                 diagnoses=tuple(diagnoses),
-                agent_provider=real_run.provider,
-                agent_model=real_run.model,
             )
-            bundle_bytes = yaml.safe_dump(
-                bundle.model_dump(mode="json"), allow_unicode=True, sort_keys=False
-            ).encode("utf-8")
-            self.writer.write(output, bundle_bytes)
-            bundle_path = output
-            bundle_sha = hashlib.sha256(bundle_bytes).hexdigest()
-
-        report_path = output.with_suffix(output.suffix + ".audit.json")
-        status: Literal["READY", "INSUFFICIENT"] = "READY" if diagnoses else "INSUFFICIENT"
-        report = FailureBridgeReport(
-            status=status,
-            experiment_id=experiment_id,
-            experiment_sha256=stable_sha256(experiment.model_dump(mode="json")),
-            real_run_sha256=stable_sha256(real_run.model_dump(mode="json")),
-            skill_variant_id=variant.id,
-            skill_sha256=skill_snapshot.content_sha256,
+        return self._finalize(
+            source,
+            output,
+            bundle=bundle,
+            bundle_bytes=bundle_bytes,
             treatment_run_count=len(treatment_runs),
             task_failed_run_count=task_failed_runs,
             invalid_run_count=invalid_runs,
             unfinished_run_count=unfinished_runs,
+            eligible=eligible,
+            excluded=excluded,
+            clusters=clusters,
+        )
+
+    def derive(
+        self,
+        experiment_id: UUID,
+        parent_bundle_path: Path,
+        output: Path,
+    ) -> FailureBridgeResult:
+        """Attach immutable observed provenance to a legacy reviewed failure bundle."""
+        source = self._source(experiment_id)
+        parent_path = parent_bundle_path.expanduser().resolve(strict=True)
+        output = output.expanduser().resolve()
+        if output == parent_path:
+            raise FailureBridgeError(
+                "derived failure bundle must not overwrite its parent evidence"
+            )
+        try:
+            parent = FailureEvidenceBundle.load(parent_path)
+        except EvolutionError as exc:
+            raise FailureBridgeError(str(exc)) from exc
+        parent_bytes = parent_path.read_bytes()
+        self._validate_parent_bundle(source, parent)
+        diagnoses = self._sanitize_diagnoses(parent.diagnoses)
+        eligible, excluded = self._decisions_for_diagnoses(source, diagnoses)
+        if not eligible:
+            raise FailureBridgeError("parent bundle contains no eligible observed task failures")
+        bundle, bundle_bytes = self._bundle(
+            source,
+            name=f"{parent.name} derived observed provenance",
+            diagnoses=diagnoses,
+            parent_bundle_sha256=self._sha(parent_bytes),
+        )
+        treatment_runs = self._treatment_runs(source)
+        return self._finalize(
+            source,
+            output,
+            bundle=bundle,
+            bundle_bytes=bundle_bytes,
+            treatment_run_count=len(treatment_runs),
+            task_failed_run_count=sum(
+                run.evaluation_outcome == EvaluationOutcome.FAIL for run in treatment_runs
+            ),
+            invalid_run_count=sum(
+                run.evaluation_outcome == EvaluationOutcome.INVALID for run in treatment_runs
+            ),
+            unfinished_run_count=sum(run.evaluation_outcome is None for run in treatment_runs),
+            eligible=eligible,
+            excluded=excluded,
+            clusters=self._clusters(eligible),
+        )
+
+    def verify_derived(
+        self,
+        experiment_id: UUID,
+        parent_bundle_path: Path,
+        derived_bundle_path: Path,
+    ) -> FailureEvidenceBundle:
+        """Revalidate the source identities and parent hash of an existing derived bundle."""
+        source = self._source(experiment_id)
+        parent_path = parent_bundle_path.expanduser().resolve(strict=True)
+        parent = FailureEvidenceBundle.load(parent_path)
+        derived = FailureEvidenceBundle.load(derived_bundle_path.expanduser().resolve(strict=True))
+        provenance = derived.provenance
+        if (
+            provenance is None
+            or provenance.parent_bundle_sha256 != self._sha(parent_path.read_bytes())
+        ):
+            raise FailureBridgeError("derived bundle parent hash does not match supplied parent")
+        self._validate_parent_bundle(source, parent)
+        self._validate_provenance(source, provenance)
+        return derived
+
+    def _source(self, experiment_id: UUID) -> ObservedFailureSource:
+        layout = ExperimentLayout(self.workspace, experiment_id)
+        experiment = self.store.load_experiment(experiment_id)
+        real_run = self._load_observed_run(experiment_id)
+        variant = self._skill_variant(experiment_id)
+        if variant.skill_snapshot is None:
+            raise FailureBridgeError("selected Skill variant has no Skill snapshot")
+        if variant.runner_snapshot.config.get("simulated") is True:
+            raise FailureBridgeError("failure preparation rejects simulated Variant evidence")
+        if variant.agent_snapshot.model != real_run.model:
+            raise FailureBridgeError("treatment Variant model does not match observed run")
+        configured_provider = variant.agent_snapshot.generation_parameters.get("provider")
+        if configured_provider is not None and configured_provider != real_run.provider:
+            raise FailureBridgeError("treatment Variant provider does not match observed run")
+
+        runner_version = variant.runner_snapshot.version
+        runner_sha = variant.runner_snapshot.binary_sha256
+        secret_names: Tuple[str, ...] = ()
+        preflight_path = layout.root / "real-preflight.json"
+        if preflight_path.is_file():
+            try:
+                preflight = load_model(preflight_path.read_bytes(), RealPreflightReport)
+            except (OSError, ValueError) as exc:
+                raise FailureBridgeError(f"invalid observed preflight manifest: {exc}") from exc
+            if (
+                preflight.config_sha256 != real_run.config_sha256
+                or preflight.provider != real_run.provider
+                or preflight.model != real_run.model
+                or preflight.dataset_sha256 != experiment.dataset_sha256
+                or preflight.simulated
+                or preflight.evidence_class != RealEvidenceClass.OBSERVED_AGENT
+            ):
+                raise FailureBridgeError("observed preflight provenance does not match source run")
+            if (
+                preflight.runner.version != variant.runner_snapshot.version
+                or preflight.runner.sha256 != variant.runner_snapshot.binary_sha256
+            ):
+                raise FailureBridgeError(
+                    "source Runner hash/version drifted from treatment Variant"
+                )
+            runner_version = preflight.runner.version
+            runner_sha = preflight.runner.sha256
+            secret_names = preflight.secret_env_names
+
+        report_path = layout.reports / "real-experiment-report.json"
+        if report_path.is_file():
+            try:
+                report = load_model(report_path.read_bytes(), RealExperimentReport)
+            except (OSError, ValueError) as exc:
+                raise FailureBridgeError(f"invalid observed real report: {exc}") from exc
+            if (
+                report.run != real_run
+                or report.dataset_sha256 != experiment.dataset_sha256
+                or report.provider != real_run.provider
+                or report.model != real_run.model
+                or report.simulated
+                or report.evidence_class != RealEvidenceClass.OBSERVED_AGENT
+            ):
+                raise FailureBridgeError(
+                    "observed real report provenance does not match source run"
+                )
+        else:
+            report_path = layout.reports / "report.json"
+            if not report_path.is_file():
+                raise FailureBridgeError("source experiment has no immutable report")
+
+        return ObservedFailureSource(
+            experiment=experiment,
+            real_run=real_run,
+            skill_variant=variant,
+            experiment_path=layout.experiment,
+            real_run_path=layout.root / "real-evidence-run.json",
+            report_path=report_path,
+            runner_version=runner_version,
+            runner_sha256=runner_sha,
+            secret_env_names=secret_names,
+            source_attempt_scan_verified=self._source_attempt_scan_verified(experiment.id),
+        )
+
+    def _bundle(
+        self,
+        source: ObservedFailureSource,
+        *,
+        name: str,
+        diagnoses: Tuple[FailureDiagnosis, ...],
+        parent_bundle_sha256: Optional[str] = None,
+    ) -> Tuple[FailureEvidenceBundle, bytes]:
+        provisional = ObservedFailureProvenance(
+            source_experiment_id=source.experiment.id,
+            source_experiment_sha256=self._sha_file(source.experiment_path),
+            source_real_run_sha256=self._sha_file(source.real_run_path),
+            source_report_sha256=self._sha_file(source.report_path),
+            parent_bundle_sha256=parent_bundle_sha256,
+            provider=source.real_run.provider,
+            model=source.real_run.model,
+            runner_version=source.runner_version,
+            runner_sha256=source.runner_sha256,
+            agent_config_sha256=source.real_run.config_sha256,
+            dataset_version_sha256=source.experiment.dataset_sha256,
+            secret_scan=FailureBundleSecretScan(
+                configured_secret_count=len(source.secret_env_names),
+                exact_values_available=not source.secret_env_names,
+                source_attempt_scan_verified=source.source_attempt_scan_verified,
+            ),
+        )
+        bundle = FailureEvidenceBundle(
+            schema_version="ase/failure-evidence-bundle/v1alpha1",
+            name=name,
+            split="train",
+            diagnoses=diagnoses,
+            agent_provider=source.real_run.provider,
+            agent_model=source.real_run.model,
+            provenance=provisional,
+        )
+        content = self._bundle_bytes(bundle)
+        receipt = self._scan_secrets(source, (("failure-bundle.yaml", content),))
+        provenance = provisional.model_copy(update={"secret_scan": receipt})
+        bundle = bundle.model_copy(update={"provenance": provenance})
+        content = self._bundle_bytes(bundle)
+        self._scan_secrets(source, (("failure-bundle.yaml", content),))
+        return bundle, content
+
+    def _finalize(
+        self,
+        source: ObservedFailureSource,
+        output: Path,
+        *,
+        bundle: Optional[FailureEvidenceBundle],
+        bundle_bytes: Optional[bytes],
+        treatment_run_count: int,
+        task_failed_run_count: int,
+        invalid_run_count: int,
+        unfinished_run_count: int,
+        eligible: Sequence[ObservedFindingDecision],
+        excluded: Sequence[ObservedFindingDecision],
+        clusters: Tuple[FailureEvidenceCluster, ...],
+    ) -> FailureBridgeResult:
+        skill = source.skill_variant.skill_snapshot
+        if skill is None:
+            raise FailureBridgeError("selected Skill variant has no Skill snapshot")
+        ready = bundle is not None and bundle_bytes is not None
+        report = FailureBridgeReport(
+            status="READY" if ready else "INSUFFICIENT",
+            experiment_id=source.experiment.id,
+            experiment_sha256=self._sha_file(source.experiment_path),
+            real_run_sha256=self._sha_file(source.real_run_path),
+            skill_variant_id=source.skill_variant.id,
+            skill_sha256=skill.content_sha256,
+            treatment_run_count=treatment_run_count,
+            task_failed_run_count=task_failed_run_count,
+            invalid_run_count=invalid_run_count,
+            unfinished_run_count=unfinished_run_count,
             eligible=tuple(sorted(eligible, key=self._decision_key)),
             excluded=tuple(sorted(excluded, key=self._decision_key)),
             clusters=clusters,
-            bundle_path=str(bundle_path) if bundle_path else None,
-            bundle_sha256=bundle_sha,
+            bundle_path=str(output) if ready else None,
+            bundle_sha256=self._sha(bundle_bytes) if bundle_bytes is not None else None,
+            provenance=bundle.provenance if bundle is not None else None,
             insufficiency_reason=(
                 None
-                if diagnoses
+                if ready
                 else "no eligible task-failure findings were observed in the Skill treatment arm"
             ),
         )
-        self.writer.write(report_path, canonical_json(report.model_dump(mode="json")) + b"\n")
-        return FailureBridgeResult(report, report_path, bundle, bundle_path)
+        report_path = output.with_suffix(output.suffix + ".audit.json")
+        report_bytes = canonical_json(report.model_dump(mode="json")) + b"\n"
+        payloads = [("failure-bridge-audit.json", report_bytes)]
+        if bundle_bytes is not None:
+            payloads.append(("failure-bundle.yaml", bundle_bytes))
+        self._scan_secrets(source, tuple(payloads))
+        if bundle_bytes is not None:
+            self._write_immutable(output, bundle_bytes)
+        self._write_immutable(report_path, report_bytes)
+        return FailureBridgeResult(
+            report=report,
+            report_path=report_path,
+            bundle=bundle,
+            bundle_path=output if bundle is not None else None,
+        )
+
+    def _validate_parent_bundle(
+        self, source: ObservedFailureSource, parent: FailureEvidenceBundle
+    ) -> None:
+        if parent.agent_provider is not None and parent.agent_provider != source.real_run.provider:
+            raise FailureBridgeError("parent bundle provider does not match observed source")
+        if parent.agent_model is not None and parent.agent_model != source.real_run.model:
+            raise FailureBridgeError("parent bundle model does not match observed source")
+        if parent.provenance is not None:
+            self._validate_provenance(source, parent.provenance)
+        runs = {item.id: item for item in self._treatment_runs(source)}
+        for diagnosis in parent.diagnoses:
+            run = runs.get(diagnosis.run_id)
+            if run is None or run.evaluation_outcome != EvaluationOutcome.FAIL:
+                raise FailureBridgeError(
+                    "parent bundle diagnosis is not a source task-failed treatment Run"
+                )
+            attempt = self.store.load_selected_attempt(source.experiment.id, run)
+            if attempt is None or attempt.id != diagnosis.attempt_id:
+                raise FailureBridgeError(
+                    "parent bundle diagnosis attempt does not match source evidence"
+                )
+
+    def _validate_provenance(
+        self, source: ObservedFailureSource, provenance: ObservedFailureProvenance
+    ) -> None:
+        expected = {
+            "source_experiment_id": source.experiment.id,
+            "source_experiment_sha256": self._sha_file(source.experiment_path),
+            "source_real_run_sha256": self._sha_file(source.real_run_path),
+            "source_report_sha256": self._sha_file(source.report_path),
+            "provider": source.real_run.provider,
+            "model": source.real_run.model,
+            "runner_version": source.runner_version,
+            "runner_sha256": source.runner_sha256,
+            "agent_config_sha256": source.real_run.config_sha256,
+            "dataset_version_sha256": source.experiment.dataset_sha256,
+        }
+        if any(getattr(provenance, field) != value for field, value in expected.items()):
+            raise FailureBridgeError("observed failure provenance source hash or identity drifted")
+
+    def _decisions_for_diagnoses(
+        self,
+        source: ObservedFailureSource,
+        diagnoses: Tuple[FailureDiagnosis, ...],
+    ) -> Tuple[list[ObservedFindingDecision], list[ObservedFindingDecision]]:
+        eligible: list[ObservedFindingDecision] = []
+        excluded: list[ObservedFindingDecision] = []
+        for diagnosis in diagnoses:
+            for finding in diagnosis.findings:
+                accepted = (
+                    diagnosis.status == "diagnosed" and finding.label not in self.EXCLUDED_LABELS
+                )
+                decision = self._decision(
+                    source.experiment.id,
+                    diagnosis,
+                    finding,
+                    eligible=accepted,
+                    reason=(
+                        "derived from immutable observed task-failure evidence"
+                        if accepted
+                        else "derived finding is not eligible for Skill optimization"
+                    ),
+                )
+                (eligible if accepted else excluded).append(decision)
+        return eligible, excluded
+
+    @staticmethod
+    def _sanitize_findings(
+        findings: Sequence[DiagnosticFinding],
+    ) -> Tuple[DiagnosticFinding, ...]:
+        return tuple(
+            item.model_copy(update={"rationale": sanitize_observed_summary(item.rationale)})
+            for item in findings
+        )
+
+    @classmethod
+    def _sanitize_diagnoses(
+        cls, diagnoses: Sequence[FailureDiagnosis]
+    ) -> Tuple[FailureDiagnosis, ...]:
+        return tuple(
+            item.model_copy(update={"findings": cls._sanitize_findings(item.findings)})
+            for item in diagnoses
+        )
+
+    def _scan_secrets(
+        self,
+        source: ObservedFailureSource,
+        payloads: Sequence[Tuple[str, bytes]],
+    ) -> FailureBundleSecretScan:
+        secrets = {
+            name: value
+            for name in source.secret_env_names
+            if (value := os.environ.get(name))
+        }
+        if len(secrets) != len(source.secret_env_names):
+            if not source.source_attempt_scan_verified:
+                raise FailureBridgeError(
+                    "source Secret values are unavailable and source attempt scans are incomplete"
+                )
+            return FailureBundleSecretScan(
+                configured_secret_count=len(source.secret_env_names),
+                exact_values_available=False,
+                source_attempt_scan_verified=True,
+            )
+        result = ExactSecretScanner().scan(payloads, secrets)
+        if not result.clean:
+            raise FailureBridgeError(
+                "derived failure evidence contains a configured Secret: "
+                + ", ".join(result.matched_secret_names)
+            )
+        return FailureBundleSecretScan(
+            configured_secret_count=len(source.secret_env_names),
+            exact_values_available=True,
+            source_attempt_scan_verified=source.source_attempt_scan_verified,
+        )
+
+    def _source_attempt_scan_verified(self, experiment_id: UUID) -> bool:
+        runs = self.store.list_runs(experiment_id)
+        if not runs:
+            return False
+        for run in runs:
+            attempt = self.store.load_selected_attempt(experiment_id, run)
+            if attempt is None:
+                return False
+            try:
+                scan = self.store.load_security_scan(experiment_id, run.id, attempt.attempt_no)
+            except (OSError, ValueError):
+                return False
+            if scan.status != "clean" or scan.matched_secret_names:
+                return False
+        return True
+
+    def _treatment_runs(self, source: ObservedFailureSource) -> Tuple[Run, ...]:
+        return tuple(
+            item
+            for item in self.store.list_runs(source.experiment.id)
+            if item.variant_id == source.skill_variant.id
+        )
+
+    @staticmethod
+    def _bundle_bytes(bundle: FailureEvidenceBundle) -> bytes:
+        return yaml.safe_dump(
+            bundle.model_dump(mode="json"), allow_unicode=True, sort_keys=False
+        ).encode("utf-8")
+
+    def _write_immutable(self, path: Path, content: bytes) -> None:
+        if path.exists():
+            if path.read_bytes() != content:
+                raise FailureBridgeError(f"immutable failure evidence already differs: {path}")
+            return
+        self.writer.write(path, content)
+
+    @staticmethod
+    def _sha(content: bytes) -> str:
+        return hashlib.sha256(content).hexdigest()
+
+    @classmethod
+    def _sha_file(cls, path: Path) -> str:
+        try:
+            return cls._sha(path.read_bytes())
+        except OSError as exc:
+            raise FailureBridgeError(f"cannot hash provenance source {path}: {exc}") from exc
 
     def _load_observed_run(self, experiment_id: UUID) -> RealEvidenceRunManifest:
         path = ExperimentLayout(self.workspace, experiment_id).root / "real-evidence-run.json"
