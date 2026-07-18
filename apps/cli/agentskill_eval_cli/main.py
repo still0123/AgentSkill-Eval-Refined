@@ -331,8 +331,11 @@ def real_preflight(
     spec_path: Path = typer.Argument(..., exists=True, dir_okay=False),  # noqa: B008
 ) -> None:
     """Validate immutable inputs and print cost estimates without invoking an Agent."""
-    spec = RealAgentEvidenceSpec.load(spec_path)
-    report = RealAgentEvidenceRunner(Path(".")).preflight(spec)
+    try:
+        spec = RealAgentEvidenceSpec.load(spec_path)
+        report = RealAgentEvidenceRunner(Path(".")).preflight(spec)
+    except (OSError, RuntimeError, ValueError) as exc:
+        raise typer.BadParameter(str(exc), param_hint="CONFIG") from exc
     typer.echo(json.dumps(report.model_dump(mode="json"), ensure_ascii=False, sort_keys=True))
 
 

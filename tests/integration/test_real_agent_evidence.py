@@ -308,6 +308,25 @@ def test_real_cli_preflight_and_authorization_boundary(
     assert not (tmp_path / "cli-calls.txt").exists()
 
 
+def test_real_cli_preflight_reports_missing_secret_without_traceback(
+    published_dataset: Path, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.delenv("FAKE_PROVIDER_API_KEY", raising=False)
+    monkeypatch.delenv("FAKE_AGENT_COUNTER_FILE", raising=False)
+    config = tmp_path / "missing-secret.yaml"
+    config.write_text(
+        yaml.safe_dump(_spec(published_dataset).model_dump(mode="json"), sort_keys=False),
+        encoding="utf-8",
+    )
+
+    result = CliRunner().invoke(app, ["real", "preflight", str(config)])
+
+    assert result.exit_code == 2
+    assert "Secret" in result.output
+    assert "FAKE_PROVIDER_API_KEY" in result.output
+    assert "Traceback" not in result.output
+
+
 def test_fake_process_smoke_is_auditable_secret_safe_and_idempotent(
     published_dataset: Path, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
