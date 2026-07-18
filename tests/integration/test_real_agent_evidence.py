@@ -38,6 +38,7 @@ from agentskill_eval_real_evidence import (
     RealEvidenceError,
     RealEvidencePreflight,
     RealEvidenceReportWriter,
+    RealEvidenceStore,
     RealPreflightError,
     RunnerSpec,
 )
@@ -448,6 +449,25 @@ def test_budget_exhaustion_stops_new_agent_runs(
     assert result.manifest.status == RealEvidenceStatus.BUDGET_EXHAUSTED
     assert int(counter.read_text(encoding="utf-8")) < 4
     assert result.report is None
+    workspace = tmp_path / "budget-workspace"
+    store = RealEvidenceStore(workspace)
+    store.save_run(result.manifest)
+    assert store.run_path(result.manifest.experiment_id).is_file()
+    report = CliRunner().invoke(
+        app,
+        [
+            "real",
+            "report",
+            str(workspace),
+            str(result.manifest.experiment_id),
+        ],
+    )
+    assert report.exit_code == 1
+    assert "Traceback" not in report.output
+    assert report.stdout, repr(report.exception)
+    payload = json.loads(report.stdout)
+    assert payload["status"] == "BUDGET_EXHAUSTED"
+    assert payload["report_available"] is False
 
 
 def test_invalid_process_results_never_become_success_evidence(

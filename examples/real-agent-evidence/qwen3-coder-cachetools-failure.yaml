@@ -17,11 +17,11 @@ runner:
   version_args: [--version]
 agent:
   path: /Users/bytedance/Documents/skill/examples/real-agent-evidence/qwen_openai_process_agent.py
-  expected_sha256: 2b8f66074f30f8ac7cd12ae4b9d3f4484efe17dcd1c484c79419577c9e741db9
-  expected_version: qwen-openai-process-agent version 0.1.1
+  expected_sha256: 0f7d7db41861363277efe10a7dd14483e5355ea3b67b42de8d5b16158c5554de
+  expected_version: qwen-openai-process-agent version 0.1.2
   version_args: [--version]
   engine: qwen_openai_process
-  engine_version: 0.1.1
+  engine_version: 0.1.2
   provider: qwen-local
   engine_provider: openai
   model: qwen3-coder-local
@@ -49,6 +49,14 @@ agent:
         - 'http://127.0.0.1:18002/v1'
         - --model
         - qwen3-coder-local
+        - --max-turns
+        - '16'
+        - --max-tool-calls
+        - '32'
+        - --max-total-input-tokens
+        - '32768'
+        - --max-total-output-tokens
+        - '1024'
       input_file: '${input_file}'
       output_file: '${output_file}'
 pricing:
