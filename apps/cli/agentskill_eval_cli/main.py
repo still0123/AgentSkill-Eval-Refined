@@ -21,6 +21,8 @@ from agentskill_eval_benchmark_gen import (
     DemoRunConfig,
     OptimizationBenchmarkPlan,
     OptimizationBenchmarkPublisher,
+    RegressionDevRevisionPlan,
+    RegressionDevRevisionPublisher,
 )
 from agentskill_eval_cli import __version__
 from agentskill_eval_contracts import (
@@ -114,6 +116,10 @@ benchmark_split_app = typer.Typer(
     help="Validate and publish the immutable five-way optimization benchmark."
 )
 benchmark_app.add_typer(benchmark_split_app, name="split")
+benchmark_regression_app = typer.Typer(
+    help="Publish an independent regression_dev candidate DatasetVersion."
+)
+benchmark_app.add_typer(benchmark_regression_app, name="regression-dev")
 optimize_app = typer.Typer(help="Search validation data for a frozen Skill candidate.")
 app.add_typer(optimize_app, name="optimize")
 optimization_v2_app = typer.Typer(
@@ -339,7 +345,7 @@ def real_smoke(
     max_cost_microusd: int = typer.Option(..., "--max-cost-microusd", min=1),  # noqa: B008
     max_agent_runs: int = typer.Option(..., "--max-agent-runs", min=1),  # noqa: B008
 ) -> None:
-    """Run two cases once per arm after explicit budget authorization."""
+    """Run each configured case once per arm after explicit budget authorization."""
     _run_observed_evidence(
         spec_path,
         workspace,
@@ -2103,6 +2109,116 @@ def inspect_optimization_benchmark_split(
 ) -> None:
     """Print the immutable release without opening withheld DatasetVersion paths."""
     release = OptimizationBenchmarkPublisher.load_release(release_path)
+    typer.echo(release.model_dump_json(indent=2))
+
+
+@benchmark_regression_app.command("validate")
+def validate_regression_dev_revision(
+    plan_path: Path = typer.Argument(..., exists=True, dir_okay=False),  # noqa: B008
+    workspace: Path = typer.Option(  # noqa: B008
+        Path(".agentskill-eval-workspace"), "--workspace", file_okay=False
+    ),  # noqa: B008
+) -> None:
+    """Validate an independent four-Case regression_dev candidate plan."""
+    plan = RegressionDevRevisionPlan.load(plan_path)
+    publisher = RegressionDevRevisionPublisher(workspace)
+    base, spec = publisher.validate_plan(plan, plan_path)
+    typer.echo(
+        json.dumps(
+            {
+                "name": plan.name,
+                "version": plan.version,
+                "case_count": len(spec.candidates),
+                "repository_lineages": [
+                    source.fork_lineage for source in spec.repository_sources()
+                ],
+                "base_release_sha256": base.content_sha256,
+                "required_observed_baseline_failures": (
+                    plan.required_observed_baseline_failures
+                ),
+                "offline_command_count": len(spec.candidates) * 12,
+                "model_calls": 0,
+                "agent_runs": 0,
+                "paid_cost_microusd": 0,
+            },
+            ensure_ascii=False,
+            sort_keys=True,
+        )
+    )
+
+
+@benchmark_regression_app.command("publish")
+def publish_regression_dev_revision(
+    plan_path: Path = typer.Argument(..., exists=True, dir_okay=False),  # noqa: B008
+    workspace: Path = typer.Option(  # noqa: B008
+        Path(".agentskill-eval-workspace"), "--workspace", file_okay=False
+    ),  # noqa: B008
+    reviewer: str = typer.Option(..., "--reviewer"),  # noqa: B008
+    publisher_name: str = typer.Option(..., "--publisher"),  # noqa: B008
+    confirm: bool = typer.Option(False, "--confirm-offline-publication"),  # noqa: B008
+) -> None:
+    """Run offline verification and publish a regression_dev candidate DatasetVersion."""
+    if not confirm:
+        raise typer.BadParameter(
+            "publication requires --confirm-offline-publication (no model calls or fees)"
+        )
+    plan = RegressionDevRevisionPlan.load(plan_path)
+    release, directory = RegressionDevRevisionPublisher(workspace).publish(
+        plan,
+        plan_path,
+        reviewer=reviewer,
+        publisher=publisher_name,
+    )
+    typer.echo(
+        json.dumps(
+            {
+                "release": str(directory / "release-manifest.json"),
+                "content_sha256": release.content_sha256,
+                "dataset_version_id": str(release.dataset_version_id),
+                "case_count": len(release.case_ids),
+                "status": release.status,
+                "model_calls": 0,
+                "agent_runs": 0,
+                "paid_cost_microusd": 0,
+            },
+            ensure_ascii=False,
+            sort_keys=True,
+        )
+    )
+
+
+@benchmark_regression_app.command("verify")
+def verify_regression_dev_revision(
+    release_path: Path = typer.Argument(..., exists=True, dir_okay=False),  # noqa: B008
+    workspace: Path = typer.Option(..., "--workspace", exists=True, file_okay=False),  # noqa: B008
+    plan_path: Path = typer.Option(..., "--plan", exists=True, dir_okay=False),  # noqa: B008
+) -> None:
+    """Verify the candidate release, DatasetVersion and repository isolation."""
+    plan = RegressionDevRevisionPlan.load(plan_path)
+    publisher = RegressionDevRevisionPublisher(workspace)
+    release = publisher.load_release(release_path)
+    publisher.verify(release, plan)
+    typer.echo(
+        json.dumps(
+            {
+                "verified": True,
+                "content_sha256": release.content_sha256,
+                "dataset_content_sha256": release.dataset_content_sha256,
+                "status": release.status,
+                "validation_confirm_accessed": release.validation_confirm_accessed,
+                "locked_test_accessed": release.locked_test_accessed,
+            },
+            sort_keys=True,
+        )
+    )
+
+
+@benchmark_regression_app.command("inspect")
+def inspect_regression_dev_revision(
+    release_path: Path = typer.Argument(..., exists=True, dir_okay=False),  # noqa: B008
+) -> None:
+    """Print the candidate release manifest without opening hidden final data."""
+    release = RegressionDevRevisionPublisher.load_release(release_path)
     typer.echo(release.model_dump_json(indent=2))
 
 

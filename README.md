@@ -24,6 +24,10 @@ Evolution Evidence Release CLI，
 以及完整的项目收口证据和答辩演示；
 未完成能力会在下文明确标记。
 
+最新的数据集里程碑：已从独立的 `Suor/funcy` Git 历史发布 4 个真实 Python Bug Fix Case 的
+`regression_dev` DatasetVersion。该版本完成了离线 oracle 质量验证，下一步仍需先观察
+Skill v1 的真实 baseline；详见 [`docs/regression-dev-v2-dataset.md`](./docs/regression-dev-v2-dataset.md)。
+
 ## 项目的核心方向
 
 这个项目的最终目标不是建立更多评分指标，而是让 Skill 能够被持续改进：

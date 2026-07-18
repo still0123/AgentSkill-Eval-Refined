@@ -1,0 +1,155 @@
+schema_version: ase/benchmark-generation/v1alpha1
+name: python-bug-fix-regression-dev-v2-funcy-candidates
+version: "2026.07.15.1"
+repository_path: /absolute/path/to/offline/funcy
+repository_url: https://github.com/Suor/funcy.git
+fork_lineage: github.com/Suor/funcy
+license_spdx: BSD-3-Clause
+license_path: LICENSE
+contamination_risk: high
+target_split: regression_dev
+generator_profile: local-git-history/v2
+verifier_profile: deterministic-subprocess/v2
+quality_gate:
+  repeat_count: 3
+  timeout_seconds: 30
+  mutation_required: true
+  alternative_required: true
+  prohibit_network_time_random: true
+  prohibit_patch_leakage: true
+  max_repository_files: 5000
+  max_repository_bytes: 50000000
+budget:
+  max_candidates: 4
+  max_commands: 48
+  wall_seconds: 1200
+candidates:
+  - key: funcy-throttle-timedelta
+    provenance_family: throttle-timedelta-period
+    before_commit: e5090591930fffdde1688fa086274b7b0e6ccc06
+    after_commit: 6c111987f25eb8371e33b71f8b76e2975c30617d
+    task: >-
+      Fix throttle so a datetime.timedelta period is converted to seconds and behaves like the
+      equivalent numeric period without changing numeric-period behavior.
+    issue_url: https://github.com/Suor/funcy/commit/6c111987f25eb8371e33b71f8b76e2975c30617d
+    production_paths: [funcy/flow.py]
+    regression_test_paths: [tests/test_flow.py]
+    test_command:
+      - "${PYTHON}"
+      - -m
+      - pytest
+      - -q
+      - tests/test_flow.py::test_throttle
+    alternative_patch: |
+      diff --git a/funcy/flow.py b/funcy/flow.py
+      --- a/funcy/flow.py
+      +++ b/funcy/flow.py
+      @@ -197,7 +197,7 @@ def limit_error_rate(fails, timeout, exception=ErrorRateExceeded):
+       def throttle(period):
+           """Allows only one run in a period, the rest is skipped"""
+           if isinstance(period, timedelta):
+      -        period = timedelta.total_seconds()
+      +        period = period / timedelta(seconds=1)
+
+           def decorator(func):
+               func.blocked_until = None
+    category: positive
+    tags: [python, regression, datetime, decorator]
+
+  - key: funcy-cache-invalidate-idempotent
+    provenance_family: cache-invalidate-idempotency
+    before_commit: c33f69dc7cf811f524a791a477775228ce7025cc
+    after_commit: a96b449ee08d7355805e4c6037e9782e74241ff7
+    task: >-
+      Make cache.invalidate idempotent so repeated invalidation of the same key does not raise
+      KeyError, while preserving normal cache invalidation behavior.
+    issue_url: https://github.com/Suor/funcy/commit/a96b449ee08d7355805e4c6037e9782e74241ff7
+    production_paths: [funcy/calc.py]
+    regression_test_paths: [tests/test_calc.py]
+    test_command:
+      - "${PYTHON}"
+      - -m
+      - pytest
+      - -q
+      - tests/test_calc.py::test_cache_invalidate
+    alternative_patch: |
+      diff --git a/funcy/calc.py b/funcy/calc.py
+      --- a/funcy/calc.py
+      +++ b/funcy/calc.py
+      @@ -123,7 +123,9 @@ def cache(timeout, key_func=None):
+                   return result
+
+               def invalidate(*args, **kwargs):
+      -            cache.pop(key_func(*args, **kwargs))
+      +            key = key_func(*args, **kwargs)
+      +            if key in cache:
+      +                del cache[key]
+               wrapper.invalidate = invalidate
+
+               def invalidate_all():
+    category: robustness
+    tags: [python, regression, cache, idempotency]
+
+  - key: funcy-retry-list-errors
+    provenance_family: retry-list-error-types
+    before_commit: 70b71bc8f711b218800976846be1562b639fc134
+    after_commit: aa5c165709de9e7d4d9f91c77ef0e93f731807a1
+    task: >-
+      Fix retry so a list of exception classes is accepted like a tuple and matching exceptions
+      are retried instead of causing an invalid except-clause TypeError.
+    issue_url: https://github.com/Suor/funcy/commit/aa5c165709de9e7d4d9f91c77ef0e93f731807a1
+    production_paths: [funcy/flow.py]
+    regression_test_paths: [tests/test_flow.py]
+    test_command:
+      - "${PYTHON}"
+      - -m
+      - pytest
+      - -q
+      - tests/test_flow.py::test_retry_many_errors
+    alternative_patch: |
+      diff --git a/funcy/flow.py b/funcy/flow.py
+      --- a/funcy/flow.py
+      +++ b/funcy/flow.py
+      @@ -72,6 +72,8 @@ except ImportError:
+
+       @decorator
+       def retry(call, tries, errors=Exception, timeout=0):
+      +    if isinstance(errors, list):
+      +        errors = tuple(error for error in errors)
+           for attempt in xrange(tries):
+               try:
+                   return call()
+    category: positive
+    tags: [python, regression, retry, exception]
+
+  - key: funcy-cache-mixed-arguments
+    provenance_family: cache-mixed-call-arguments
+    before_commit: 00ef09286883f7e9648e04cae82a7ac5791bb54a
+    after_commit: 592b6eaa3b004885ed0f4f1cbde81ffef3d91c87
+    task: >-
+      Fix cached calls that mix positional and keyword arguments so the wrapped function receives
+      its original arguments rather than the normalized cache key.
+    issue_url: https://github.com/Suor/funcy/commit/592b6eaa3b004885ed0f4f1cbde81ffef3d91c87
+    production_paths: [funcy/calc.py]
+    regression_test_paths: [tests/test_calc.py]
+    test_command:
+      - "${PYTHON}"
+      - -m
+      - pytest
+      - -q
+      - tests/test_calc.py::test_cache_mixed_args
+    alternative_patch: |
+      diff --git a/funcy/calc.py b/funcy/calc.py
+      --- a/funcy/calc.py
+      +++ b/funcy/calc.py
+      @@ -118,6 +118,7 @@ def cache(timeout, key_func=None):
+                       else:
+                           del cache[key]
+
+      -            result = func(*key, **kwargs)
+      +            call_args = tuple(args)
+      +            result = func(*call_args, **kwargs)
+                   cache[key] = result, datetime.now()
+                   return result
+    category: complex
+    tags: [python, regression, cache, arguments]

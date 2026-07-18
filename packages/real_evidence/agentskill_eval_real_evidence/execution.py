@@ -379,9 +379,12 @@ class RealAgentEvidenceRunner:
         variants, runtimes, experiment = self._experiment_inputs(
             spec, mode, preflight, dataset, manifest.experiment_id
         )
+        dataset_identity = (
+            dataset.dataset_version.id if dataset.dataset_version else dataset.dataset_id
+        )
         selected_ids = set(spec.case_ids)
         cases = tuple(
-            item.execution_spec(dataset.dataset_id, dataset.root / "evals")
+            item.execution_spec(dataset_identity, dataset.root / "evals")
             for item in dataset.cases
             if item.metadata.case_id in selected_ids
         )
@@ -678,11 +681,14 @@ class RealAgentEvidenceRunner:
         if existing.exists():
             experiment = self.experiment_store.load_experiment(experiment_id)
         else:
+            dataset_identity = (
+                dataset.dataset_version.id if dataset.dataset_version else dataset.dataset_id
+            )
             experiment = ExperimentManifest(
                 id=experiment_id,
                 name=f"{spec.name} ({mode.value})",
                 code_revision=self._code_revision(),
-                dataset_version_id=dataset.dataset_id,
+                dataset_version_id=dataset_identity,
                 dataset_sha256=dataset.dataset_sha256,
                 protocol_snapshot={
                     "simulated": spec.simulated,

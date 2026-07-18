@@ -35,6 +35,12 @@ from agentskill_eval_benchmark_gen.optimization_split import (
     SourceBundle,
     SplitDatasetReference,
 )
+from agentskill_eval_benchmark_gen.regression_revision import (
+    RegressionDevCandidateRelease,
+    RegressionDevRevisionError,
+    RegressionDevRevisionPlan,
+    RegressionDevRevisionPublisher,
+)
 from agentskill_eval_benchmark_gen.spec import (
     BenchmarkGenerationSpec,
     BudgetSpec,
@@ -97,6 +103,10 @@ __all__ = [
     "QualityGateSpec",
     "PROTECTED_SPLITS",
     "REQUIRED_SPLITS",
+    "RegressionDevCandidateRelease",
+    "RegressionDevRevisionError",
+    "RegressionDevRevisionPlan",
+    "RegressionDevRevisionPublisher",
     "SPLIT_EXPOSURE_ZONES",
     "RepositorySourceSpec",
     "SpecError",

@@ -1,0 +1,20 @@
+schema_version: ase/regression-dev-revision-plan/v1alpha1
+name: python-bug-fix-regression-dev-v2-funcy
+version: "2026.07.15.1"
+base_release_manifest: /absolute/path/to/stage2-reproduction/optimization-benchmark-releases/python-bug-fix-optimization-v1/2026.07.14.1/release-manifest.json
+base_benchmark_workspace: /absolute/path/to/stage2-reproduction
+source_spec: funcy-candidate-pool.yaml
+candidate_keys:
+  - funcy-throttle-timedelta
+  - funcy-cache-invalidate-idempotent
+  - funcy-retry-list-errors
+  - funcy-cache-mixed-arguments
+bundles:
+  - source_key: primary
+    path: ../funcy.bundle
+    sha256: 3da2875f00495bb523447ec1ade7bc121e7329ec4bcfc663637ae1a7b6e291fa
+required_observed_baseline_failures: 1
+claim_limit: >-
+  Offline reconstruction of an independent regression_dev candidate DatasetVersion only. The
+  DatasetVersion still requires observed Skill v1 baseline screening and cannot establish Skill
+  improvement, confirmation, locked-test performance, or publication readiness.
