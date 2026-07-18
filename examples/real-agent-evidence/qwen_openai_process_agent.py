@@ -18,12 +18,17 @@ import sys
 import time
 import urllib.request
 from pathlib import Path
-from typing import Any, Dict, List, Mapping
+from typing import Any, Dict, List, Mapping, Optional
 
 MAX_READ_BYTES = 12_000
 MAX_TOOL_OUTPUT_BYTES = 12_000
 MAX_DIFF_BYTES = 30_000
 MAX_REPLACEMENT_BYTES = 16_000
+MAX_MODEL_TURNS = 16
+DEFAULT_MAX_TURNS = 8
+DEFAULT_MAX_TOOL_CALLS = 32
+DEFAULT_MAX_TOTAL_INPUT_TOKENS = 600_000
+DEFAULT_MAX_TOTAL_OUTPUT_TOKENS = 8_000
 
 
 def _json_request(url: str, payload: Mapping[str, Any], api_key: str) -> Mapping[str, Any]:
@@ -240,7 +245,22 @@ def _legacy_tool_calls(content: str) -> List[Dict[str, Any]]:
     return calls
 
 
-def run(session: Mapping[str, Any], base_url: str, model: str) -> Dict[str, Any]:
+def _positive_limit(value: int, *, name: str, ceiling: int) -> int:
+    if value < 1:
+        raise ValueError(name + " must be positive")
+    return min(value, ceiling)
+
+
+def run(
+    session: Mapping[str, Any],
+    base_url: str,
+    model: str,
+    *,
+    max_turns: Optional[int] = None,
+    max_tool_calls: Optional[int] = None,
+    max_total_input_tokens: Optional[int] = None,
+    max_total_output_tokens: Optional[int] = None,
+) -> Dict[str, Any]:
     workspace = Path(str(session.get("workspace", "."))).resolve()
     case_id = str(session.get("case_id", ""))
     case_hint = ""
@@ -317,12 +337,51 @@ def run(session: Mapping[str, Any], base_url: str, model: str) -> Dict[str, Any]
     ]
     input_tokens = 0
     output_tokens = 0
+    cached_input_tokens = 0
     started = time.monotonic()
     final_message = ""
     edit_nudge_sent = False
     api_key = os.environ.get("OPENAI_API_KEY", "local")
-    max_turns = min(int(session.get("max_turns", 8)), 16)
-    for _ in range(max_turns):
+    requested_turns = (
+        max_turns if max_turns is not None else session.get("max_turns", DEFAULT_MAX_TURNS)
+    )
+    requested_tool_calls = (
+        max_tool_calls
+        if max_tool_calls is not None
+        else session.get("max_tool_calls", DEFAULT_MAX_TOOL_CALLS)
+    )
+    requested_total_input = (
+        max_total_input_tokens
+        if max_total_input_tokens is not None
+        else session.get("max_input_tokens", DEFAULT_MAX_TOTAL_INPUT_TOKENS)
+    )
+    requested_total_output = (
+        max_total_output_tokens
+        if max_total_output_tokens is not None
+        else session.get("max_output_tokens", DEFAULT_MAX_TOTAL_OUTPUT_TOKENS)
+    )
+    model_turn_limit = _positive_limit(
+        int(requested_turns), name="max_turns", ceiling=MAX_MODEL_TURNS
+    )
+    tool_call_limit = _positive_limit(
+        int(requested_tool_calls), name="max_tool_calls", ceiling=10_000
+    )
+    input_token_limit = _positive_limit(
+        int(requested_total_input), name="max_total_input_tokens", ceiling=10_000_000
+    )
+    output_token_limit = _positive_limit(
+        int(requested_total_output), name="max_total_output_tokens", ceiling=10_000_000
+    )
+    model_turns = 0
+    tool_calls = 0
+    for _ in range(model_turn_limit):
+        if input_tokens >= input_token_limit:
+            final_message = "Agent reached the configured cumulative input-token limit."
+            break
+        if output_tokens >= output_token_limit:
+            final_message = "Agent reached the configured cumulative output-token limit."
+            break
+        model_turns += 1
         response = _json_request(
             base_url,
             {
@@ -339,6 +398,7 @@ def run(session: Mapping[str, Any], base_url: str, model: str) -> Dict[str, Any]
         if isinstance(usage, Mapping):
             input_tokens += int(usage.get("prompt_tokens", 0) or 0)
             output_tokens += int(usage.get("completion_tokens", 0) or 0)
+            cached_input_tokens += int(usage.get("prompt_cache_hit_tokens", 0) or 0)
         choices = response.get("choices")
         if not isinstance(choices, list) or not choices or not isinstance(choices[0], Mapping):
             raise RuntimeError("model response has no choices")
@@ -363,9 +423,13 @@ def run(session: Mapping[str, Any], base_url: str, model: str) -> Dict[str, Any]
             transcript.append({"role": "assistant", "content": final_message})
             break
         transcript.append({"role": "assistant", "tool_calls": assistant.get("tool_calls", [])})
+        tool_budget_exhausted = False
         for call in calls:
             if not isinstance(call, Mapping):
                 continue
+            if tool_calls >= tool_call_limit:
+                tool_budget_exhausted = True
+                break
             function = call.get("function")
             if not isinstance(function, Mapping):
                 continue
@@ -384,6 +448,10 @@ def run(session: Mapping[str, Any], base_url: str, model: str) -> Dict[str, Any]
                 {"role": "tool", "tool_call_id": str(call.get("id", "")), "content": result}
             )
             transcript.append({"role": "tool", "name": name, "content": result})
+            tool_calls += 1
+        if tool_budget_exhausted:
+            final_message = "Agent reached the configured tool-call limit."
+            break
         if not edit_nudge_sent and len(transcript) >= 4:
             messages.append(
                 {
@@ -398,33 +466,7 @@ def run(session: Mapping[str, Any], base_url: str, model: str) -> Dict[str, Any]
             )
             edit_nudge_sent = True
     else:
-        messages.append(
-            {
-                "role": "user",
-                "content": (
-                    "Stop using tools now. Provide a concise final summary of the files "
-                    "changed, the fix, and the validation result."
-                ),
-            }
-        )
-        response = _json_request(
-            base_url,
-            {
-                "model": model,
-                "messages": messages,
-                "temperature": 0,
-                "max_tokens": 512,
-            },
-            api_key,
-        )
-        usage = response.get("usage")
-        if isinstance(usage, Mapping):
-            input_tokens += int(usage.get("prompt_tokens", 0) or 0)
-            output_tokens += int(usage.get("completion_tokens", 0) or 0)
-        choices = response.get("choices")
-        message = choices[0].get("message") if isinstance(choices, list) and choices else None
-        content = message.get("content") if isinstance(message, Mapping) else None
-        final_message = content if isinstance(content, str) else "Agent reached the turn limit"
+        final_message = "Agent reached the configured model-turn limit."
     diff = ""
     try:
         diff = subprocess.run(
@@ -442,9 +484,11 @@ def run(session: Mapping[str, Any], base_url: str, model: str) -> Dict[str, Any]
         "model": model,
         "exit_code": 0,
         "duration_ms": int((time.monotonic() - started) * 1000),
-        "turns": len(transcript),
+        "turns": model_turns,
         "input_tokens": input_tokens,
         "output_tokens": output_tokens,
+        "cached_input_tokens": cached_input_tokens,
+        "tool_calls": tool_calls,
         "final_message": final_message,
         "transcript": transcript,
         "artifacts": {"workspace_diff": diff} if diff else {},
@@ -453,17 +497,33 @@ def run(session: Mapping[str, Any], base_url: str, model: str) -> Dict[str, Any]
 
 def main() -> int:
     if "--version" in sys.argv[1:]:
-        print("qwen-openai-process-agent version 0.1.1")
+        print("qwen-openai-process-agent version 0.1.2")
         return 0
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", required=True)
     parser.add_argument("--output", required=True)
     parser.add_argument("--base-url", default="http://127.0.0.1:18002/v1")
     parser.add_argument("--model", default="qwen3-coder-local")
+    parser.add_argument("--max-turns", type=int, default=DEFAULT_MAX_TURNS)
+    parser.add_argument("--max-tool-calls", type=int, default=DEFAULT_MAX_TOOL_CALLS)
+    parser.add_argument(
+        "--max-total-input-tokens", type=int, default=DEFAULT_MAX_TOTAL_INPUT_TOKENS
+    )
+    parser.add_argument(
+        "--max-total-output-tokens", type=int, default=DEFAULT_MAX_TOTAL_OUTPUT_TOKENS
+    )
     args = parser.parse_args()
     try:
         session = json.loads(Path(args.input).read_text(encoding="utf-8"))
-        result = run(session, args.base_url, args.model)
+        result = run(
+            session,
+            args.base_url,
+            args.model,
+            max_turns=args.max_turns,
+            max_tool_calls=args.max_tool_calls,
+            max_total_input_tokens=args.max_total_input_tokens,
+            max_total_output_tokens=args.max_total_output_tokens,
+        )
     except Exception as exc:  # pragma: no cover - process boundary
         result = {"engine": "qwen-openai-process", "exit_code": 1, "final_message": str(exc)}
     Path(args.output).parent.mkdir(parents=True, exist_ok=True)

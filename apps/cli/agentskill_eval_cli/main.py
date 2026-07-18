@@ -27,6 +27,7 @@ from agentskill_eval_benchmark_gen import (
 from agentskill_eval_cli import __version__
 from agentskill_eval_contracts import (
     RealEvidenceClass,
+    RealEvidenceStatus,
     RealRunMode,
     ReviewDecision,
     export_schema_bundle,
@@ -394,6 +395,23 @@ def real_report(
 ) -> None:
     """Locate and validate a completed offline real-evidence report."""
     store = RealEvidenceStore(workspace)
+    run = store.load_run(experiment_id)
+    if run.status != RealEvidenceStatus.COMPLETED:
+        typer.echo(
+            json.dumps(
+                {
+                    "claim_limit": run.claim_limit,
+                    "completed_runs": run.completed_runs,
+                    "experiment_id": str(experiment_id),
+                    "invalid_runs": run.invalid_runs,
+                    "report_available": False,
+                    "status": run.status.value,
+                },
+                ensure_ascii=False,
+                sort_keys=True,
+            )
+        )
+        raise typer.Exit(code=1)
     report = store.load_report(experiment_id)
     typer.echo(
         json.dumps(

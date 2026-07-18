@@ -24,6 +24,11 @@ overflow。Custom Engine 仍使用同一个模型、同一个 GPU 服务和同�
 只是把 Agent 工具面冻结为更小、可审计的集合。配置示例见
 [`qwen3-coder-custom.example.yaml`](../examples/real-agent-evidence/qwen3-coder-custom.example.yaml)，
 脚本为 [`qwen_openai_process_agent.py`](../examples/real-agent-evidence/qwen_openai_process_agent.py)。
+Custom Engine 配置必须把冻结的 `agent.max_turns` 与 `agent.max_tool_calls` 同步传给该脚本的
+`--max-turns`、`--max-tool-calls` 参数；脚本分别记录模型请求次数和实际工具调用次数，到达任一上限
+后在本地停止，不额外发送“总结”模型请求。`--max-total-input-tokens` 与
+`--max-total-output-tokens` 则限制一个 Run 的累计 Provider usage，必须与 `pricing` 中的累计预算
+假设一致。
 
 ## 安装、Secret 与真实 Benchmark
 
@@ -75,7 +80,8 @@ agentskill-eval real preflight /absolute/path/to/observed-agent.yaml
 ```
 
 Preflight 不调用 Agent，但会验证 Case、Skill、Secret、可执行文件哈希和版本，并输出 smoke/evidence
-Run 数和单 Run 估算 Token/费用。
+Run 数和单 Run 估算 Token/费用。`pricing.estimated_*_tokens_per_run` 表示**整个多轮 Run 的累计值**，
+不是单次模型请求的值；若 Provider 没有返回 cache-hit usage，预算必须按 cache miss 估算。
 
 ## 预算安全门与运行
 
@@ -93,6 +99,9 @@ agentskill-eval real run CONFIG \
 授权、哈希/版本漂移或 Secret 缺失都会失败。达到预算后不再创建新 Run；一次已在飞行中的请求可能
 使实测费用最多超出一个 Run，所以还须在 Agent 侧设置单次 Token 上限。真实失败不回退 Mock 或
 simulation。已完成实验幂等读取，不再次收费；未完成的付费实验禁止自动恢复。
+
+`agentskill-eval real report` 只对 `COMPLETED` 实验生成正式 JSON/HTML 报告。若预算耗尽或取消，
+它会返回结构化状态、完成 Run 数和 claim limit，而不会把部分结果当作可发布证据。
 
 对于支持缓存计费的 Provider，价格表必须分别记录 cache miss/cache hit 单价及预计命中 Token。
 Qwen Code 的 Runner 适配器会汇总隔离 HOME 下本 Run 的本地 usage 记录，包括主 Agent 与子 Agent，

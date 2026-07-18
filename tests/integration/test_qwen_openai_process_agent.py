@@ -137,3 +137,148 @@ def test_run_processes_structured_tools_and_preserves_large_file(
     assert result["final_message"] == "Applied the focused fix."
     assert source.read_text(encoding="utf-8").endswith("value = 2\n")
     assert len(result["transcript"]) >= 3
+    assert result["turns"] == 3
+    assert result["tool_calls"] == 2
+
+
+def test_run_honors_explicit_model_turn_limit_and_returns_cache_usage(
+    monkeypatch, tmp_path: Path
+) -> None:
+    module = _module()
+    (tmp_path / "module.py").write_text("value = 1\n", encoding="utf-8")
+    calls = 0
+
+    def fake_request(*_args, **_kwargs):
+        nonlocal calls
+        calls += 1
+        return {
+            "usage": {
+                "prompt_tokens": 17,
+                "completion_tokens": 3,
+                "prompt_cache_hit_tokens": 11,
+            },
+            "choices": [
+                {
+                    "message": {
+                        "role": "assistant",
+                        "tool_calls": [
+                            {
+                                "id": "read-1",
+                                "type": "function",
+                                "function": {
+                                    "name": "read_file",
+                                    "arguments": '{"path":"module.py"}',
+                                },
+                            }
+                        ],
+                    }
+                }
+            ],
+        }
+
+    monkeypatch.setattr(module, "_json_request", fake_request)
+    result = module.run(
+        {"workspace": str(tmp_path), "case_id": "generic-case", "max_turns": 8},
+        "http://fake",
+        "fake-model",
+        max_turns=1,
+    )
+
+    assert calls == 1
+    assert result["turns"] == 1
+    assert result["tool_calls"] == 1
+    assert result["input_tokens"] == 17
+    assert result["cached_input_tokens"] == 11
+    assert result["final_message"] == "Agent reached the configured model-turn limit."
+
+
+def test_run_honors_explicit_tool_call_limit(monkeypatch, tmp_path: Path) -> None:
+    module = _module()
+    (tmp_path / "module.py").write_text("value = 1\n", encoding="utf-8")
+    response = {
+        "usage": {"prompt_tokens": 10, "completion_tokens": 2},
+        "choices": [
+            {
+                "message": {
+                    "role": "assistant",
+                    "tool_calls": [
+                        {
+                            "id": "read-1",
+                            "type": "function",
+                            "function": {
+                                "name": "read_file",
+                                "arguments": '{"path":"module.py"}',
+                            },
+                        },
+                        {
+                            "id": "read-2",
+                            "type": "function",
+                            "function": {
+                                "name": "read_file",
+                                "arguments": '{"path":"missing.py"}',
+                            },
+                        },
+                    ],
+                }
+            }
+        ],
+    }
+    monkeypatch.setattr(module, "_json_request", lambda *_args, **_kwargs: response)
+
+    result = module.run(
+        {"workspace": str(tmp_path), "case_id": "generic-case"},
+        "http://fake",
+        "fake-model",
+        max_turns=4,
+        max_tool_calls=1,
+    )
+
+    assert result["turns"] == 1
+    assert result["tool_calls"] == 1
+    assert result["final_message"] == "Agent reached the configured tool-call limit."
+
+
+def test_run_stops_before_a_second_request_at_cumulative_input_limit(
+    monkeypatch, tmp_path: Path
+) -> None:
+    module = _module()
+    (tmp_path / "module.py").write_text("value = 1\n", encoding="utf-8")
+    calls = 0
+
+    def fake_request(*_args, **_kwargs):
+        nonlocal calls
+        calls += 1
+        return {
+            "usage": {"prompt_tokens": 17, "completion_tokens": 3},
+            "choices": [
+                {
+                    "message": {
+                        "role": "assistant",
+                        "tool_calls": [
+                            {
+                                "id": "read-1",
+                                "type": "function",
+                                "function": {
+                                    "name": "read_file",
+                                    "arguments": '{"path":"module.py"}',
+                                },
+                            }
+                        ],
+                    }
+                }
+            ],
+        }
+
+    monkeypatch.setattr(module, "_json_request", fake_request)
+    result = module.run(
+        {"workspace": str(tmp_path), "case_id": "generic-case"},
+        "http://fake",
+        "fake-model",
+        max_turns=4,
+        max_total_input_tokens=10,
+    )
+
+    assert calls == 1
+    assert result["turns"] == 1
+    assert result["input_tokens"] == 17
+    assert result["final_message"] == "Agent reached the configured cumulative input-token limit."

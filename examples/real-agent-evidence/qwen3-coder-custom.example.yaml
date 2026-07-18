@@ -17,10 +17,10 @@ runner:
 agent:
   path: /absolute/path/to/examples/real-agent-evidence/qwen_openai_process_agent.py
   expected_sha256: 0000000000000000000000000000000000000000000000000000000000000000
-  expected_version: qwen-openai-process-agent version 0.1.1
+  expected_version: qwen-openai-process-agent version 0.1.2
   version_args: [--version]
   engine: qwen_openai_process
-  engine_version: 0.1.1
+  engine_version: 0.1.2
   provider: qwen-local
   engine_provider: openai
   model: qwen3-coder-local
@@ -42,7 +42,9 @@ agent:
     local:
       command: /absolute/path/to/examples/real-agent-evidence/qwen_openai_process_agent.py
       args: [--input, '${input_file}', --output, '${output_file}', --base-url,
-             'http://127.0.0.1:18002/v1', --model, qwen3-coder-local]
+             'http://127.0.0.1:18002/v1', --model, qwen3-coder-local,
+             --max-turns, '12', --max-tool-calls, '32',
+             --max-total-input-tokens, '32768', --max-total-output-tokens, '1024']
       input_file: '${input_file}'
       output_file: '${output_file}'
 pricing:
