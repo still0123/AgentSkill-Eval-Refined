@@ -2,7 +2,6 @@ schema_version: ase/real-agent-evidence/v1alpha1
 name: funcy-regression-dev-v2-baseline
 dataset_path: /absolute/path/to/funcy-regression-dev-v2-dataset-version
 skill_path: /absolute/path/to/AgentSkill-Eval/examples/skills/python-bug-fix-v1
-compatibility_config_path: ../skill-families/python-bug-fix-observed.example.yaml
 case_ids:
   - funcy-throttle-timedelta
   - funcy-cache-invalidate-idempotent
