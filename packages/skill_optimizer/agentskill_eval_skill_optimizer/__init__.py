@@ -104,12 +104,16 @@ from agentskill_eval_skill_optimizer.final_spec import (
 )
 from agentskill_eval_skill_optimizer.optimization_v2 import (
     OptimizationV2CandidateResult,
+    OptimizationV2CandidateState,
     OptimizationV2Error,
+    OptimizationV2InputSnapshot,
+    OptimizationV2LedgerEntry,
     OptimizationV2Planner,
     OptimizationV2Preflight,
     OptimizationV2PreflightResult,
     OptimizationV2ScreeningReport,
     OptimizationV2ScreeningRunner,
+    OptimizationV2Session,
     OptimizationV2Spec,
 )
 from agentskill_eval_skill_optimizer.process_generator import (
@@ -249,11 +253,15 @@ __all__ = [
     "OptimizationContext",
     "OptimizationV2Error",
     "OptimizationV2CandidateResult",
+    "OptimizationV2CandidateState",
+    "OptimizationV2InputSnapshot",
+    "OptimizationV2LedgerEntry",
     "OptimizationV2Planner",
     "OptimizationV2Preflight",
     "OptimizationV2PreflightResult",
     "OptimizationV2ScreeningReport",
     "OptimizationV2ScreeningRunner",
+    "OptimizationV2Session",
     "OptimizationV2Spec",
     "OptimizationStore",
     "ObservedFailureEvidenceBridge",

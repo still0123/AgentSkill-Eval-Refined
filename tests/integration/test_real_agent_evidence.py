@@ -18,6 +18,7 @@ from agentskill_eval_benchmark_gen import (
 )
 from agentskill_eval_cli.main import app
 from agentskill_eval_contracts import (
+    FailureLabel,
     RealAttemptEvidence,
     RealEvidenceClass,
     RealEvidenceStatus,
@@ -40,10 +41,18 @@ from agentskill_eval_real_evidence import (
     RunnerSpec,
 )
 from agentskill_eval_skill_optimizer import (
+    CandidateQualityGate,
     RealAgentCandidateEvaluator,
     RealCandidateEvaluationError,
     RealEvaluationAuthorization,
     SearchCase,
+)
+from agentskill_eval_skill_optimizer.evolution import ImprovementHypothesis
+from agentskill_eval_skill_optimizer.optimization_v2 import (
+    OptimizationV2Preflight,
+    OptimizationV2PreflightResult,
+    OptimizationV2ScreeningRunner,
+    OptimizationV2Spec,
 )
 
 PROJECT = Path(__file__).resolve().parents[2]
@@ -665,3 +674,271 @@ def test_real_candidate_evaluator_reuses_v1_baseline_across_candidates(
     # 4 first-pair Runs + 2 treatment Runs per later candidate.
     assert counter.read_text(encoding="utf-8") == "8"
     assert authorization.consumed_agent_runs == 8
+
+
+def _resume_test_context(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    published_dataset: Path,
+    *,
+    model: str = "fake-agent",
+) -> tuple[OptimizationV2Spec, OptimizationV2ScreeningRunner, Path, Path]:
+    workspace = tmp_path / "optimization-v2-workspace"
+    quality_root = workspace / "preflight" / "candidate-quality"
+    proposal = tmp_path / "proposal"
+    proposal.mkdir()
+    proposal_manifest = proposal / "proposal-manifest.json"
+    proposal_manifest.write_text('{"fixture":"resume"}\n', encoding="utf-8")
+    failure_bundle = tmp_path / "failure-bundle.yaml"
+    failure_bundle.write_text("fixture: resume\n", encoding="utf-8")
+    observed = _spec(published_dataset, model=model).model_copy(
+        update={"evidence_class": RealEvidenceClass.OBSERVED_AGENT, "simulated": False}
+    )
+    config_path = tmp_path / "observed-agent.yaml"
+    config_path.write_text(
+        yaml.safe_dump(observed.model_dump(mode="json"), sort_keys=False), encoding="utf-8"
+    )
+    hypotheses = tuple(
+        ImprovementHypothesis(
+            id=candidate_id,
+            failure_label=FailureLabel.VERIFICATION,
+            hypothesis="Verification discipline reduces unsupported completion claims.",
+            instruction=instruction,
+            evidence_refs=("train-evidence-ref",),
+        )
+        for candidate_id, instruction in (
+            (
+                "candidate-alpha",
+                "Inspect the result and verify the targeted outcome before closing.",
+            ),
+            ("candidate-bravo", "Validate the observed result before making a completion claim."),
+            ("candidate-charlie", "Check the executed outcome and retry only with new evidence."),
+        )
+    )
+    CandidateQualityGate(quality_root).materialize_hypotheses(
+        proposal_job_id="resume-fixture",
+        proposal_manifest_sha256=_sha(proposal_manifest),
+        parent_content=(SKILL / "SKILL.md").read_bytes(),
+        hypotheses=hypotheses,
+        max_candidates=3,
+    )
+    spec = OptimizationV2Spec(
+        schema_version="ase/optimization-evaluation-v2/v1alpha1",
+        name="fake-process-resume",
+        base_skill_path=SKILL,
+        proposal_directory=proposal,
+        failure_bundle_path=failure_bundle,
+        real_agent_config_path=config_path,
+        validation_search_path=published_dataset,
+        case_ids=CASE_IDS,
+        target_provider="fake-provider",
+        target_model=model,
+        max_candidates=3,
+        max_agent_runs=12,
+    )
+    dataset_sha = DatasetLoader().load(published_dataset).dataset_sha256
+    parent_sha = _sha(SKILL / "SKILL.md")
+
+    def prepared(
+        _self: OptimizationV2ScreeningRunner, current: OptimizationV2Spec
+    ) -> tuple[OptimizationV2PreflightResult, object, RealAgentEvidenceSpec]:
+        verified = CandidateQualityGate(quality_root).verify(
+            quality_root / "candidate-quality-report.json"
+        )
+        agent = RealAgentEvidenceSpec.load(current.real_agent_config_path)
+        report = OptimizationV2Preflight(
+            name=current.name,
+            status="READY",
+            proposal_job_id="resume-fixture",
+            proposal_manifest_sha256=_sha(proposal_manifest),
+            parent_skill_sha256=parent_sha,
+            candidate_quality_report_sha256=_sha(
+                quality_root / "candidate-quality-report.json"
+            ),
+            accepted_candidate_ids=verified.accepted_candidate_ids,
+            rejected_candidate_ids=verified.rejected_candidate_ids,
+            dataset_sha256=dataset_sha,
+            case_ids=current.case_ids,
+            provider=agent.agent.provider,
+            model=agent.agent.model,
+            planned_agent_runs=12,
+            expected_new_agent_runs=8,
+            estimated_cost_microusd=3_000,
+            estimated_new_cost_microusd=2_000,
+        )
+        return OptimizationV2PreflightResult(
+            report=report,
+            candidate_quality=verified,
+            report_path=quality_root / "fixture-preflight.json",
+            html_path=quality_root / "fixture-preflight.html",
+        ), verified, agent
+
+    monkeypatch.setattr(OptimizationV2ScreeningRunner, "_prepared_inputs", prepared)
+    return spec, OptimizationV2ScreeningRunner(workspace), config_path, proposal_manifest
+
+
+def test_optimization_v2_resume_reuses_completed_work_and_exposes_cli_status(
+    published_dataset: Path, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    counter = tmp_path / "resume-calls.txt"
+    secret = _set_fake_secrets(monkeypatch, counter)
+    spec, runner, _config_path, _proposal_manifest = _resume_test_context(
+        tmp_path, monkeypatch, published_dataset, model="fake-invalid-after-four"
+    )
+    partial, report_path, html_path = runner.run(
+        spec,
+        confirm_real_run=True,
+        max_cost_microusd=10_000,
+        max_agent_runs=8,
+    )
+
+    assert partial.status == "PARTIAL"
+    assert partial.completed_candidate_ids == ("candidate-alpha",)
+    assert partial.invalid_candidate_ids == ("candidate-bravo",)
+    assert partial.remaining_candidate_ids == ("candidate-charlie",)
+    assert partial.error_counts["agent_invalid"] >= 1
+    assert counter.read_text(encoding="utf-8") == "6"
+    assert report_path.is_file() and html_path.is_file()
+    assert "Remaining candidates" in html_path.read_text(encoding="utf-8")
+
+    resumed, _report_path, _html_path = runner.resume(
+        spec,
+        confirm_real_run=True,
+        max_cost_microusd=10_000,
+        max_agent_runs=2,
+    )
+    assert resumed.status == "PARTIAL"
+    assert resumed.completed_candidate_ids == ("candidate-alpha", "candidate-charlie")
+    assert resumed.invalid_candidate_ids == ("candidate-bravo",)
+    assert resumed.remaining_candidate_ids == ()
+    assert resumed.baseline_reused_runs == 4
+    assert counter.read_text(encoding="utf-8") == "8"
+
+    replay, _report_path, _html_path = runner.resume(
+        spec,
+        confirm_real_run=True,
+        max_cost_microusd=1,
+        max_agent_runs=1,
+    )
+    assert replay.remaining_candidate_ids == ()
+    assert counter.read_text(encoding="utf-8") == "8"
+
+    cli = CliRunner()
+    status = cli.invoke(app, ["optimize", "v2", "status", str(runner.workspace)])
+    assert status.exit_code == 0, status.output
+    assert json.loads(status.stdout)["remaining_candidate_ids"] == []
+    spec_path = tmp_path / "optimization-v2.yaml"
+    spec_path.write_text(
+        yaml.safe_dump(spec.model_dump(mode="json"), sort_keys=False), encoding="utf-8"
+    )
+    resumed_cli = cli.invoke(
+        app,
+        [
+            "optimize",
+            "v2",
+            "resume",
+            str(spec_path),
+            "--workspace",
+            str(runner.workspace),
+            "--confirm-real-run",
+            "--max-agent-runs",
+            "1",
+            "--max-cost-microusd",
+            "1",
+        ],
+    )
+    assert resumed_cli.exit_code == 0, resumed_cli.output
+    assert counter.read_text(encoding="utf-8") == "8"
+
+    persisted = b"".join(
+        path.read_bytes() for path in runner.workspace.rglob("*") if path.is_file()
+    )
+    assert secret.encode() not in persisted
+    assert str(counter).encode() not in persisted
+
+
+def test_optimization_v2_classifies_deepseek_402_without_skill_win(
+    published_dataset: Path, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    counter = tmp_path / "balance-calls.txt"
+    _set_fake_secrets(monkeypatch, counter)
+    spec, runner, _config_path, _proposal_manifest = _resume_test_context(
+        tmp_path, monkeypatch, published_dataset, model="fake-402"
+    )
+    report, _report_path, _html_path = runner.run(
+        spec,
+        confirm_real_run=True,
+        max_cost_microusd=10_000,
+        max_agent_runs=4,
+    )
+
+    candidate = report.candidates[0]
+    assert report.status == "BLOCKED"
+    assert report.provider_blocked_candidate_ids == ("candidate-alpha",)
+    assert report.error_counts["insufficient_balance"] >= 1
+    assert candidate.error_types == ("insufficient_balance",)
+    assert candidate.wtl == {"win": 0, "tie": 0, "loss": 0}
+    assert report.observed_cost_microusd == 0
+    assert counter.read_text(encoding="utf-8") == "4"
+
+
+def test_optimization_v2_resume_rejects_drift_and_tampered_inputs(
+    published_dataset: Path, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    counter = tmp_path / "drift-calls.txt"
+    _set_fake_secrets(monkeypatch, counter)
+    spec, runner, config_path, proposal_manifest = _resume_test_context(
+        tmp_path, monkeypatch, published_dataset, model="fake-invalid-after-four"
+    )
+    runner.run(
+        spec,
+        confirm_real_run=True,
+        max_cost_microusd=10_000,
+        max_agent_runs=8,
+    )
+    calls_before = counter.read_text(encoding="utf-8")
+
+    payload = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    payload["name"] = "drifted-agent-config"
+    config_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+    with pytest.raises(RuntimeError, match="resume rejected"):
+        runner.resume(
+            spec,
+            confirm_real_run=True,
+            max_cost_microusd=10_000,
+            max_agent_runs=2,
+        )
+    assert counter.read_text(encoding="utf-8") == calls_before
+
+    payload["name"] = "fake process real-evidence integration"
+    config_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+    proposal_manifest.write_text('{"fixture":"tampered"}\n', encoding="utf-8")
+    with pytest.raises(RuntimeError, match="resume rejected"):
+        runner.resume(
+            spec,
+            confirm_real_run=True,
+            max_cost_microusd=10_000,
+            max_agent_runs=2,
+        )
+    assert counter.read_text(encoding="utf-8") == calls_before
+
+    proposal_manifest.write_text('{"fixture":"resume"}\n', encoding="utf-8")
+    candidate_skill = (
+        runner.workspace
+        / "preflight"
+        / "candidate-quality"
+        / "candidate-skills"
+        / "candidate-charlie"
+        / "SKILL.md"
+    )
+    candidate_skill.write_text(
+        candidate_skill.read_text(encoding="utf-8") + "\nTampered.\n", encoding="utf-8"
+    )
+    with pytest.raises(RuntimeError, match="candidate hash mismatch"):
+        runner.resume(
+            spec,
+            confirm_real_run=True,
+            max_cost_microusd=10_000,
+            max_agent_runs=2,
+        )
+    assert counter.read_text(encoding="utf-8") == calls_before

@@ -15,16 +15,31 @@ def main() -> int:
         print("fake-process-agent 1.0.0")
         return 0
     counter_file = os.environ.get("FAKE_AGENT_COUNTER_FILE")
+    call_number = 1
     if counter_file:
         path = Path(counter_file)
         current = int(path.read_text(encoding="utf-8")) if path.exists() else 0
-        path.write_text(str(current + 1), encoding="utf-8")
+        call_number = current + 1
+        path.write_text(str(call_number), encoding="utf-8")
     request = json.load(sys.stdin)
     model = request["engine"]["model"]["name"]
     if model == "fake-timeout":
         time.sleep(5)
     skill_loaded = bool(request["skill_loaded"])
-    status = "error" if model == "fake-invalid" else ("pass" if skill_loaded else "fail")
+    invalid_from = int(os.environ.get("FAKE_AGENT_INVALID_FROM_CALL", "0"))
+    provider_errors = {
+        "fake-402": "DeepSeek HTTP 402 Insufficient Balance",
+        "fake-429": "DeepSeek HTTP 429 rate limited",
+        "fake-provider-timeout": "DeepSeek provider timeout",
+    }
+    error = provider_errors.get(model)
+    if (
+        model == "fake-invalid"
+        or (invalid_from and call_number >= invalid_from)
+        or (model == "fake-invalid-after-four" and 5 <= call_number <= 6)
+    ):
+        error = "synthetic process Agent invalid result"
+    status = "error" if error else ("pass" if skill_loaded else "fail")
     result = {
         "status": status,
         "response": (
@@ -38,13 +53,15 @@ def main() -> int:
         "output_tokens": 30,
         "cached_input_tokens": 0,
         "tool_calls": 3,
-        "cost_microusd": 250,
+        "cost_microusd": 0 if error in provider_errors.values() else 250,
         "trace_events": [
             {"kind": "file.read", "payload": {"path": "production.py"}},
             {"kind": "command.run", "payload": {"command": "targeted offline test"}},
             {"kind": "test.result", "payload": {"passed": skill_loaded}},
         ],
     }
+    if error:
+        result["error"] = error
     json.dump(result, sys.stdout)
     return 0
 
