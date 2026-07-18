@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import html
+import re
 from contextlib import suppress
 from datetime import datetime, timezone
 from pathlib import Path
@@ -149,7 +150,19 @@ class OptimizationV2CandidateResult(FrozenModel):
     cost_summary: Dict[str, Optional[int]] = Field(default_factory=dict)
     newly_consumed_agent_runs: int = Field(default=0, ge=0)
     newly_observed_cost_microusd: int = Field(default=0, ge=0)
+    reused_baseline_runs: int = Field(default=0, ge=0)
     error_types: Tuple[
+        Literal[
+            "task_failed",
+            "agent_invalid",
+            "insufficient_balance",
+            "rate_limited",
+            "provider_timeout",
+            "budget_exhausted",
+        ],
+        ...,
+    ] = ()
+    error_history: Tuple[
         Literal[
             "task_failed",
             "agent_invalid",
@@ -197,6 +210,7 @@ class OptimizationV2LedgerEntry(FrozenModel):
     status: Literal["PENDING", "COMPLETED", "INVALID", "PROVIDER_BLOCKED"]
     result: Optional[SearchCaseResult] = None
     error_type: Optional[OptimizationV2ErrorType] = None
+    error_history: Tuple[OptimizationV2ErrorType, ...] = ()
 
 
 class OptimizationV2CandidateState(FrozenModel):
@@ -206,7 +220,15 @@ class OptimizationV2CandidateState(FrozenModel):
     evaluation: Optional[CandidateEvaluation] = None
     newly_consumed_agent_runs: int = Field(default=0, ge=0)
     newly_observed_cost_microusd: int = Field(default=0, ge=0)
+    reused_baseline_runs: int = Field(default=0, ge=0)
     error_types: Tuple[OptimizationV2ErrorType, ...] = ()
+    error_history: Tuple[OptimizationV2ErrorType, ...] = ()
+    attempt_count: int = Field(default=0, ge=0)
+    # A provider block that completed an auditable pair can be retried only by
+    # the explicit `resume` command with a fresh authorization.  Partial pairs
+    # are deliberately non-retryable: rerunning their immutable pair could
+    # duplicate provider work.
+    retryable_provider_error: bool = False
 
 
 class OptimizationV2Session(FrozenModel):
@@ -499,9 +521,13 @@ class OptimizationV2ScreeningRunner:
             spec, preflight, quality, agent_spec, require_existing=require_existing
         )
         if session.status == "BLOCKED":
-            raise OptimizationV2Error(
-                "session is provider-blocked; do not retry provider-rejected work automatically"
-            )
+            if not require_existing:
+                raise OptimizationV2Error(
+                    "session is provider-blocked; use the explicit resume command with a new "
+                    "authorization after resolving the provider issue"
+                )
+            session = self._rearm_retryable_provider_blocks(session)
+            self._save_session(session)
         authorization = RealEvaluationAuthorization(
             confirm_real_run=confirm_real_run,
             max_cost_microusd=max_cost_microusd,
@@ -521,7 +547,9 @@ class OptimizationV2ScreeningRunner:
                     "session candidate no longer exists in verified quality report"
                 )
             candidate_path = (quality_root / candidate.skill_path).resolve(strict=True).parent
-            config_path = self._candidate_config(agent_spec, candidate_path, state.candidate_id)
+            config_path = self._candidate_config(
+                agent_spec, candidate_path, state.candidate_id, state.attempt_count
+            )
             before_runs = authorization.consumed_agent_runs
             before_cost = authorization.consumed_cost_microusd
             try:
@@ -531,6 +559,7 @@ class OptimizationV2ScreeningRunner:
                     authorization,
                     baseline_skill_path=spec.base_skill_path,
                     baseline_replay_cache=baseline_cache,
+                    attempt_no=state.attempt_count + 1,
                 )
                 evaluation = evaluator.evaluate(
                     candidate_path / "SKILL.md",
@@ -542,7 +571,11 @@ class OptimizationV2ScreeningRunner:
                 )
             except RealCandidateEvaluationError as exc:
                 error_type = self._classify_error_text(str(exc))
-                if error_type == "budget_exhausted":
+                partial_baseline = exc.baseline_results
+                partial_treatment = exc.treatment_results
+                consumed_runs = authorization.consumed_agent_runs - before_runs
+                consumed_cost = authorization.consumed_cost_microusd - before_cost
+                if error_type == "budget_exhausted" and not exc.has_observed_work:
                     session = session.model_copy(
                         update={
                             "status": "BUDGET_EXHAUSTED",
@@ -552,28 +585,76 @@ class OptimizationV2ScreeningRunner:
                     )
                     self._save_session(session)
                     return self._write_report(session)
+                error_types = tuple(
+                    sorted(
+                        {
+                            error_type,
+                            *self._evaluation_error_types(partial_baseline),
+                            *self._evaluation_error_types(partial_treatment),
+                        }
+                    )
+                )
+                terminal_status: Literal["INVALID", "PROVIDER_BLOCKED"]
+                terminal_status = (
+                    "PROVIDER_BLOCKED"
+                    if self._provider_blocked(error_type)
+                    else "INVALID"
+                )
                 session = self._replace_candidate(
                     session,
                     state.model_copy(
                         update={
-                            "status": "PROVIDER_BLOCKED"
-                            if self._provider_blocked(error_type)
-                            else "INVALID",
-                            "error_types": (error_type,),
+                            "status": terminal_status,
+                            "newly_consumed_agent_runs": consumed_runs,
+                            "newly_observed_cost_microusd": consumed_cost,
+                            "reused_baseline_runs": exc.reused_baseline_runs,
+                            "error_types": error_types,
+                            "attempt_count": state.attempt_count + 1,
+                            "retryable_provider_error": (
+                                terminal_status == "PROVIDER_BLOCKED"
+                                and not exc.has_observed_work
+                            ),
                         }
                     ),
                     authorization,
                     before_runs,
                     before_cost,
                 )
+                session = self._record_evaluation_entries(
+                    session,
+                    state.candidate_id,
+                    {item.case_id: item for item in partial_baseline},
+                    partial_treatment,
+                )
                 session = self._replace_candidate_entries_without_results(
                     session, state.candidate_id, error_type
                 )
-                session = self._terminal_partial_status(session, error_type)
+                if error_type == "budget_exhausted":
+                    session = session.model_copy(
+                        update={
+                            "status": "BUDGET_EXHAUSTED",
+                            "last_error_type": error_type,
+                            "updated_at": self._now(),
+                        }
+                    )
+                else:
+                    session = self._terminal_partial_status(session, error_type)
                 self._save_session(session)
                 return self._write_report(session)
 
-            error_types = self._evaluation_error_types(evaluation.results)
+            baseline_results = tuple(
+                evaluator.baseline_results[case_id]
+                for case_id in spec.case_ids
+                if case_id in evaluator.baseline_results
+            )
+            error_types = tuple(
+                sorted(
+                    set(
+                        self._evaluation_error_types(baseline_results)
+                        + self._evaluation_error_types(evaluation.results)
+                    )
+                )
+            )
             candidate_status: Literal["COMPLETED", "INVALID", "PROVIDER_BLOCKED"]
             if any(self._provider_blocked(item) for item in error_types):
                 candidate_status = "PROVIDER_BLOCKED"
@@ -590,7 +671,13 @@ class OptimizationV2ScreeningRunner:
                 newly_observed_cost_microusd=(
                     authorization.consumed_cost_microusd - before_cost
                 ),
+                reused_baseline_runs=evaluator.reused_baseline_runs,
                 error_types=error_types,
+                error_history=state.error_history,
+                attempt_count=state.attempt_count + 1,
+                retryable_provider_error=(
+                    candidate_status == "PROVIDER_BLOCKED"
+                ),
             )
             session = self._replace_candidate(
                 session, updated, authorization, before_runs, before_cost
@@ -603,7 +690,8 @@ class OptimizationV2ScreeningRunner:
             )
             if candidate_status != "COMPLETED":
                 session = self._terminal_partial_status(
-                    session, error_types[0] if error_types else "agent_invalid"
+                    session,
+                    error_types[0] if error_types else "agent_invalid",
                 )
                 self._save_session(session)
                 return self._write_report(session)
@@ -797,12 +885,85 @@ class OptimizationV2ScreeningRunner:
     ) -> OptimizationV2Session:
         status = self._entry_status(error_type)
         entries = tuple(
-            item.model_copy(update={"status": status, "error_type": error_type})
+            item.model_copy(
+                update={
+                    "status": status,
+                    "error_type": error_type,
+                }
+            )
             if item.candidate_id == candidate_id and item.status == "PENDING"
             else item
             for item in session.ledger
         )
         return session.model_copy(update={"ledger": entries, "updated_at": self._now()})
+
+    def _rearm_retryable_provider_blocks(
+        self, session: OptimizationV2Session
+    ) -> OptimizationV2Session:
+        """Re-open only a provider-rejected candidate on an explicit resume.
+
+        This is intentionally not used by :meth:`run`.  The prior rejected
+        result remains in the state/ledger history while the next attempt gets
+        a new immutable runner configuration identity.
+        """
+        retryable_ids = {
+            state.candidate_id
+            for state in session.candidates
+            if state.status == "PROVIDER_BLOCKED" and state.retryable_provider_error
+        }
+        pending_exists = any(state.status == "PENDING" for state in session.candidates)
+        if not retryable_ids and not pending_exists:
+            raise OptimizationV2Error(
+                "session is provider-blocked by partially observed work; automatic pair replay "
+                "is forbidden"
+            )
+        candidates = []
+        for state in session.candidates:
+            if state.candidate_id not in retryable_ids:
+                candidates.append(state)
+                continue
+            candidates.append(
+                state.model_copy(
+                    update={
+                        "status": "PENDING",
+                        "evaluation": None,
+                        "newly_consumed_agent_runs": 0,
+                        "newly_observed_cost_microusd": 0,
+                        "reused_baseline_runs": 0,
+                        "error_history": state.error_history + state.error_types,
+                        "error_types": (),
+                        "retryable_provider_error": False,
+                    }
+                )
+            )
+        entries = []
+        for entry in session.ledger:
+            should_rearm = entry.status == "PROVIDER_BLOCKED" and (
+                entry.arm == "baseline" or entry.candidate_id in retryable_ids
+            )
+            if not should_rearm:
+                entries.append(entry)
+                continue
+            entries.append(
+                entry.model_copy(
+                    update={
+                        "status": "PENDING",
+                        "result": None,
+                        "error_history": entry.error_history
+                        + ((entry.error_type,) if entry.error_type is not None else ()),
+                        "error_type": None,
+                    }
+                )
+            )
+        return session.model_copy(
+            update={
+                "status": "PARTIAL",
+                "candidates": tuple(candidates),
+                "ledger": tuple(entries),
+                "last_error_type": None,
+                "updated_at": self._now(),
+            }
+        )
 
     def _replace_candidate(
         self,
@@ -832,7 +993,9 @@ class OptimizationV2ScreeningRunner:
         )
 
     def _terminal_partial_status(
-        self, session: OptimizationV2Session, error_type: OptimizationV2ErrorType
+        self,
+        session: OptimizationV2Session,
+        error_type: OptimizationV2ErrorType,
     ) -> OptimizationV2Session:
         return session.model_copy(
             update={
@@ -941,23 +1104,21 @@ class OptimizationV2ScreeningRunner:
         baseline_by_case = {
             item.case_id: item.result
             for item in session.ledger
-            if item.arm == "baseline" and item.status == "COMPLETED" and item.result is not None
+            if item.arm == "baseline" and item.result is not None
         }
         candidates = tuple(
             self._candidate_report(session, state, baseline_by_case)
             for state in session.candidates
         )
-        logical_runs = sum(
-            len(session.case_ids) * 2 for state in session.candidates if state.status != "PENDING"
-        )
         errors = tuple(
             item
             for state in session.candidates
-            for item in state.error_types
+            for item in state.error_history + state.error_types
         ) + tuple(
-            item.error_type
+            error
             for item in session.ledger
-            if item.error_type is not None
+            for error in item.error_history
+            + ((item.error_type,) if item.error_type is not None else ())
         )
         error_counts: Dict[str, int] = {}
         for error in sorted(set(errors)):
@@ -977,7 +1138,9 @@ class OptimizationV2ScreeningRunner:
             expected_new_agent_runs=session.expected_new_agent_runs,
             observed_agent_runs=session.observed_agent_runs,
             observed_cost_microusd=session.observed_cost_microusd,
-            baseline_reused_runs=max(0, logical_runs - session.observed_agent_runs),
+            baseline_reused_runs=sum(
+                item.reused_baseline_runs for item in session.candidates
+            ),
             completed_candidate_ids=tuple(
                 item.candidate_id for item in session.candidates if item.status == "COMPLETED"
             ),
@@ -1016,7 +1179,13 @@ class OptimizationV2ScreeningRunner:
             baseline_by_case[case_id] for case_id in session.case_ids if case_id in baseline_by_case
         )
         evaluation = state.evaluation
-        if evaluation is None or len(baseline) != len(session.case_ids):
+        baseline_is_valid = all(item.outcome != "invalid" for item in baseline)
+        if (
+            evaluation is None
+            or state.status != "COMPLETED"
+            or len(baseline) != len(session.case_ids)
+            or not baseline_is_valid
+        ):
             return OptimizationV2CandidateResult(
                 candidate_id=state.candidate_id,
                 skill_sha256=state.skill_sha256,
@@ -1025,11 +1194,14 @@ class OptimizationV2ScreeningRunner:
                 evaluation=evaluation,
                 wtl={"win": 0, "tie": 0, "loss": 0},
                 invalid_runs=sum(
-                    item.outcome == "invalid" for item in (evaluation.results if evaluation else ())
+                    item.outcome == "invalid"
+                    for item in baseline + (evaluation.results if evaluation else ())
                 ),
                 newly_consumed_agent_runs=state.newly_consumed_agent_runs,
                 newly_observed_cost_microusd=state.newly_observed_cost_microusd,
+                reused_baseline_runs=state.reused_baseline_runs,
                 error_types=state.error_types,
+                error_history=state.error_history,
                 run_keys=run_keys,
             )
         baseline_pass_rate = sum(item.passed for item in baseline) / len(baseline)
@@ -1078,7 +1250,9 @@ class OptimizationV2ScreeningRunner:
             },
             newly_consumed_agent_runs=state.newly_consumed_agent_runs,
             newly_observed_cost_microusd=state.newly_observed_cost_microusd,
+            reused_baseline_runs=state.reused_baseline_runs,
             error_types=state.error_types,
+            error_history=state.error_history,
             run_keys=run_keys,
         )
 
@@ -1161,9 +1335,17 @@ class OptimizationV2ScreeningRunner:
     @staticmethod
     def _classify_error_text(value: str) -> OptimizationV2ErrorType:
         text = value.lower()
-        if "402" in text or "insufficient balance" in text or "insufficient_balance" in text:
+        if (
+            re.search(r"(?<![0-9a-f])402(?![0-9a-f])", text)
+            or "insufficient balance" in text
+            or "insufficient_balance" in text
+        ):
             return "insufficient_balance"
-        if "429" in text or "rate limit" in text or "rate_limited" in text:
+        if (
+            re.search(r"(?<![0-9a-f])429(?![0-9a-f])", text)
+            or "rate limit" in text
+            or "rate_limited" in text
+        ):
             return "rate_limited"
         if "timeout" in text or "timed out" in text:
             return "provider_timeout"
@@ -1185,14 +1367,20 @@ class OptimizationV2ScreeningRunner:
 
     @staticmethod
     def _candidate_config(
-        agent_spec: RealAgentEvidenceSpec, candidate_path: Path, candidate_id: str
+        agent_spec: RealAgentEvidenceSpec,
+        candidate_path: Path,
+        candidate_id: str,
+        attempt_count: int,
     ) -> Path:
         root = candidate_path.parents[1].parent / "generated-configs"
         root.mkdir(parents=True, exist_ok=True)
         config_path = root / f"{candidate_id}.yaml"
-        payload = agent_spec.model_copy(update={"skill_path": candidate_path}).model_dump(
-            mode="json"
-        )
+        payload = agent_spec.model_copy(
+            update={
+                "name": f"{agent_spec.name} {candidate_id} attempt {attempt_count + 1}",
+                "skill_path": candidate_path,
+            }
+        ).model_dump(mode="json")
         config_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
         return config_path
 

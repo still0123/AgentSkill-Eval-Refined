@@ -17,6 +17,7 @@ from agentskill_eval_benchmark_gen import DatasetLoader
 from agentskill_eval_contracts import (
     CandidateEvaluation,
     EvaluationOutcome,
+    RealEvidenceRunManifest,
     RealEvidenceStatus,
     RealRunMode,
     SearchCaseResult,
@@ -36,6 +37,27 @@ from agentskill_eval_skill_optimizer.spec import SearchCase
 
 class RealCandidateEvaluationError(RuntimeError):
     """Raised when observed candidate evaluation cannot produce auditable results."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        manifest: Optional[RealEvidenceRunManifest] = None,
+        baseline_results: Sequence[SearchCaseResult] = (),
+        treatment_results: Sequence[SearchCaseResult] = (),
+        reused_baseline_runs: int = 0,
+    ) -> None:
+        super().__init__(message)
+        self.manifest = manifest
+        self.baseline_results = tuple(baseline_results)
+        self.treatment_results = tuple(treatment_results)
+        self.reused_baseline_runs = reused_baseline_runs
+
+    @property
+    def has_observed_work(self) -> bool:
+        return self.manifest is not None or bool(
+            self.baseline_results or self.treatment_results
+        )
 
 
 @dataclass
@@ -70,6 +92,7 @@ class RealAgentCandidateEvaluator:
         *,
         baseline_skill_path: Optional[Path] = None,
         baseline_replay_cache: Optional[MutableMapping[str, BaselineReplay]] = None,
+        attempt_no: int = 1,
     ) -> None:
         self.template = RealAgentEvidenceSpec.load(config_path)
         if self.template.simulated:
@@ -78,9 +101,14 @@ class RealAgentCandidateEvaluator:
             raise RealCandidateEvaluationError("real candidate evaluation requires confirmation")
         if authorization.max_agent_runs < 1 or authorization.max_cost_microusd < 1:
             raise RealCandidateEvaluationError("positive Run and cost limits are required")
+        if attempt_no < 1:
+            raise RealCandidateEvaluationError(
+                "candidate evaluation attempt number must be positive"
+            )
         self.workspace = workspace.resolve() / "real-optimizer-evidence"
         self.workspace.mkdir(parents=True, exist_ok=True)
         self.authorization = authorization
+        self.attempt_no = attempt_no
         self.baseline_skill_path = (
             baseline_skill_path.resolve(strict=True) if baseline_skill_path is not None else None
         )
@@ -88,6 +116,7 @@ class RealAgentCandidateEvaluator:
             baseline_replay_cache if baseline_replay_cache is not None else {}
         )
         self._baseline_results: Dict[str, SearchCaseResult] = {}
+        self._reused_baseline_runs = 0
         self.writer = AtomicFileWriter()
         self.cache_path = self.workspace / "candidate-case-cache.json"
         self._cache: Dict[str, object] = self._load_cache()
@@ -112,6 +141,11 @@ class RealAgentCandidateEvaluator:
     def baseline_results(self) -> Dict[str, SearchCaseResult]:
         """Return the first observed v1 result for each Case, never a candidate result."""
         return dict(self._baseline_results)
+
+    @property
+    def reused_baseline_runs(self) -> int:
+        """Actual replay count observed by the evidence runner for this candidate."""
+        return self._reused_baseline_runs
 
     def authorize_plan(self, candidate_case_evaluations: int) -> Tuple[int, int]:
         """Reject the complete plan before the first external Agent call."""
@@ -152,7 +186,14 @@ class RealAgentCandidateEvaluator:
             if cached is None:
                 pending.append(case)
             else:
-                results[case.id] = SearchCaseResult.model_validate(cached)
+                cached_result = SearchCaseResult.model_validate(cached)
+                # Invalid output can represent a transient provider block.  It
+                # is evidence for the prior attempt, but must never suppress a
+                # later *explicitly authorized* retry.
+                if cached_result.outcome == "invalid":
+                    pending.append(case)
+                else:
+                    results[case.id] = cached_result
         if len(pending) % 2:
             raise RealCandidateEvaluationError(
                 "real candidate evaluation requires an even number of uncached cases"
@@ -200,7 +241,10 @@ class RealAgentCandidateEvaluator:
         pair_ids = (cases[0].id, cases[1].id)
         spec = self.template.model_copy(
             update={
-                "name": f"optimizer-{skill_sha[:12]}-{stable_sha256(pair_ids)[:12]}",
+                "name": (
+                    f"optimizer-{skill_sha[:12]}-{stable_sha256(pair_ids)[:12]}"
+                    f"-attempt-{self.attempt_no}"
+                ),
                 "dataset_path": dataset_root,
                 "skill_path": skill_root,
                 "baseline_skill_path": self.baseline_skill_path,
@@ -225,21 +269,47 @@ class RealAgentCandidateEvaluator:
                 baseline_replay_namespace=baseline_replay_namespace,
             )
         )
-        if result.manifest.status != RealEvidenceStatus.COMPLETED:
-            raise RealCandidateEvaluationError(
-                f"real evidence pair ended as {result.manifest.status.value}"
-            )
+        self._reused_baseline_runs += result.manifest.reused_runs
         self.authorization.reserve_completed(
-            result.manifest.completed_runs
-            + result.manifest.invalid_runs
-            - result.manifest.reused_runs,
+            max(
+                0,
+                result.manifest.completed_runs
+                + result.manifest.invalid_runs
+                - result.manifest.reused_runs,
+            ),
             result.manifest.observed_or_reserved_cost_microusd,
         )
-        baseline, treatment = self._variant_results(
-            result.manifest.experiment_id, dataset_root, pair_ids
-        )
-        for item in baseline:
+        try:
+            observed_baseline, observed_treatment = self._observed_variant_results(
+                result.manifest.experiment_id, dataset_root
+            )
+        except RealCandidateEvaluationError as exc:
+            raise RealCandidateEvaluationError(
+                str(exc),
+                manifest=result.manifest,
+                reused_baseline_runs=result.manifest.reused_runs,
+            ) from exc
+        for item in observed_baseline.values():
             self._baseline_results.setdefault(item.case_id, item)
+        if result.manifest.status != RealEvidenceStatus.COMPLETED:
+            raise RealCandidateEvaluationError(
+                f"real evidence pair ended as {result.manifest.status.value}",
+                manifest=result.manifest,
+                baseline_results=tuple(
+                    observed_baseline[case_id]
+                    for case_id in pair_ids
+                    if case_id in observed_baseline
+                ),
+                treatment_results=tuple(
+                    observed_treatment[case_id]
+                    for case_id in pair_ids
+                    if case_id in observed_treatment
+                ),
+                reused_baseline_runs=result.manifest.reused_runs,
+            )
+        baseline, treatment = self._require_complete_pair(
+            observed_baseline, observed_treatment, pair_ids
+        )
         return treatment
 
     def _baseline_replay_namespace(self, dataset_sha256: str) -> str:
@@ -255,12 +325,26 @@ class RealAgentCandidateEvaluator:
     def _baseline_cache_key(namespace: str, case_id: str) -> str:
         return stable_sha256({"namespace": namespace, "case_id": case_id})
 
-    def _variant_results(
-        self, experiment_id: UUID, dataset_root: Path, case_ids: Tuple[str, str]
+    def _require_complete_pair(
+        self,
+        found_baseline: Dict[str, SearchCaseResult],
+        found_treatment: Dict[str, SearchCaseResult],
+        case_ids: Tuple[str, str],
     ) -> Tuple[
         Tuple[SearchCaseResult, SearchCaseResult],
         Tuple[SearchCaseResult, SearchCaseResult],
     ]:
+        expected = set(case_ids)
+        if set(found_baseline) != expected or set(found_treatment) != expected:
+            raise RealCandidateEvaluationError("real evidence returned the wrong paired cases")
+        return (
+            (found_baseline[case_ids[0]], found_baseline[case_ids[1]]),
+            (found_treatment[case_ids[0]], found_treatment[case_ids[1]]),
+        )
+
+    def _observed_variant_results(
+        self, experiment_id: UUID, dataset_root: Path
+    ) -> Tuple[Dict[str, SearchCaseResult], Dict[str, SearchCaseResult]]:
         store = LocalExperimentStore(self.workspace)
         loaded = DatasetLoader().load(dataset_root)
         case_by_uuid = {
@@ -297,7 +381,7 @@ class RealAgentCandidateEvaluator:
             attempt = store.load_selected_attempt(experiment_id, run)
             measurement = store.load_selected_measurement(experiment_id, run)
             if attempt is None:
-                raise RealCandidateEvaluationError(f"treatment Run {run.id} has no Attempt")
+                continue
             outcome = run.evaluation_outcome or EvaluationOutcome.INVALID
             trace = layout.trace_manifest(run.id, attempt.attempt_no)
             diagnosis = layout.failure_diagnosis(run.id, attempt.attempt_no)
@@ -316,13 +400,7 @@ class RealAgentCandidateEvaluator:
                 trace_ref=str(trace) if trace.is_file() else None,
                 failure_diagnosis_ref=str(diagnosis) if diagnosis.is_file() else None,
             )
-        expected = set(case_ids)
-        if set(found["baseline"]) != expected or set(found["treatment"]) != expected:
-            raise RealCandidateEvaluationError("real evidence returned the wrong paired cases")
-        return (
-            (found["baseline"][case_ids[0]], found["baseline"][case_ids[1]]),
-            (found["treatment"][case_ids[0]], found["treatment"][case_ids[1]]),
-        )
+        return found["baseline"], found["treatment"]
 
     def _skill_package(self, skill_file: Path) -> Tuple[Path, str]:
         content = skill_file.read_bytes()

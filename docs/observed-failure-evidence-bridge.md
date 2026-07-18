@@ -86,7 +86,8 @@ agentskill-eval optimize derive-failures WORKSPACE EXPERIMENT_ID PARENT_BUNDLE \
 派生 bundle 在 provenance 中记录 `parent_bundle_sha256`，并验证 parent 中的每个 diagnosis
 都对应 source experiment 的 task-failed Skill treatment Run 和选中 Attempt。输出路径不能覆盖
 parent；重复同一输入只接受字节完全相同的已有输出。该命令重新进行 exact Secret scan，但不保存
-Secret 值。
+Secret 值。验证派生 bundle 时，除了 parent hash 和 source provenance 外，还会重新计算 parent
+的确定性脱敏 diagnosis；因此即使保留原 provenance，手工篡改 finding、split 或派生名称也会被拒绝。
 
 ## 真实实验验证
 

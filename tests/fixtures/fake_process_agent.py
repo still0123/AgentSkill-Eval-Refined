@@ -33,6 +33,8 @@ def main() -> int:
         "fake-provider-timeout": "DeepSeek provider timeout",
     }
     error = provider_errors.get(model)
+    if model == "fake-402-once" and call_number <= 4:
+        error = "DeepSeek HTTP 402 Insufficient Balance"
     if (
         model == "fake-invalid"
         or (invalid_from and call_number >= invalid_from)
@@ -53,7 +55,13 @@ def main() -> int:
         "output_tokens": 30,
         "cached_input_tokens": 0,
         "tool_calls": 3,
-        "cost_microusd": 0 if error in provider_errors.values() else 250,
+        "cost_microusd": (
+            0
+            if error in provider_errors.values()
+            else 1_000
+            if model == "fake-expensive"
+            else 250
+        ),
         "trace_events": [
             {"kind": "file.read", "payload": {"path": "production.py"}},
             {"kind": "command.run", "payload": {"command": "targeted offline test"}},
