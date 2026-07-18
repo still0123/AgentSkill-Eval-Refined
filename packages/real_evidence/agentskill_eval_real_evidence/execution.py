@@ -814,10 +814,15 @@ class RealAgentEvidenceRunner:
     def _claim_limit(spec: RealAgentEvidenceSpec, mode: RealRunMode) -> str:
         if spec.simulated:
             return "Process integration fixture only; not Agent or Skill performance evidence."
+        case_count = len(spec.case_ids)
         if mode == RealRunMode.SMOKE:
-            return "Observed-Agent smoke evidence for two cases; validates the chain only."
+            return (
+                f"Observed-Agent smoke evidence for {case_count} frozen case"
+                f"{'s' if case_count != 1 else ''}; validates the execution chain only."
+            )
         return (
-            "Observed-Agent descriptive evidence for two independent cases; "
+            f"Observed-Agent descriptive evidence for {case_count} frozen case"
+            f"{'s' if case_count != 1 else ''}; "
             "does not support general performance claims."
         )
 

@@ -372,6 +372,9 @@ def test_fake_process_smoke_is_auditable_secret_safe_and_idempotent(
     assert result.manifest.simulated is True
     assert result.manifest.real_run_confirmed is False
     assert result.report is not None
+    assert result.report.claim_limit == (
+        "Process integration fixture only; not Agent or Skill performance evidence."
+    )
     assert result.report.baseline_pass_rate == 0
     assert result.report.treatment_pass_rate == 1
     assert result.report.absolute_gain == 1
@@ -447,6 +450,29 @@ def test_fake_process_smoke_is_auditable_secret_safe_and_idempotent(
     )
     assert replayed.manifest.experiment_id == result.manifest.experiment_id
     assert counter.read_text(encoding="utf-8") == "4"
+
+
+def test_observed_claim_limit_uses_the_frozen_case_count(
+    published_dataset: Path, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    counter = tmp_path / "calls.txt"
+    _set_fake_secrets(monkeypatch, counter)
+    spec = _spec(published_dataset).model_copy(
+        update={
+            "simulated": False,
+            "evidence_class": RealEvidenceClass.OBSERVED_AGENT,
+            "case_ids": CASE_IDS[:1],
+        }
+    )
+
+    assert RealAgentEvidenceRunner._claim_limit(spec, RealRunMode.SMOKE) == (
+        "Observed-Agent smoke evidence for 1 frozen case; "
+        "validates the execution chain only."
+    )
+    assert RealAgentEvidenceRunner._claim_limit(spec, RealRunMode.EVIDENCE) == (
+        "Observed-Agent descriptive evidence for 1 frozen case; "
+        "does not support general performance claims."
+    )
 
 
 def test_budget_exhaustion_stops_new_agent_runs(
