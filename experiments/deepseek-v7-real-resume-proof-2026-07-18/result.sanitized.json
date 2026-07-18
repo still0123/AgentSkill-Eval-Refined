@@ -26,6 +26,8 @@
     "proposal_manifest_sha256": "cdab8d0aafbb67e25f3e22439e42ae0f5a129efd9d3377db9bc7eeb17d129d85",
     "skill_sha256": "5ff780e023c00cd08232688ec013a47f51926b4e1c8a5171465085ee967bc5d6",
     "dataset_sha256": "7f173e954299b6b2054d174ee6bc6d22a1274cf5a4063723b48327428df5e764",
+    "session_agent_config_sha256": "0d663c9e56b04b79a8cc3d75d28e6a97f11aea1a8ff9565e0316bcd5e3a176b0",
+    "session_runner_sha256": "b8473aad3fe997f3aa8de1e9bd9bc127e5254b25371567a0e07143afc809c359",
     "accepted_candidate_count": 4,
     "planned_logical_agent_runs": 16,
     "expected_new_agent_runs": 10,
@@ -40,26 +42,79 @@
     "resume_segment_max_cost_microusd": 1400000
   },
   "real_execution": {
-    "status": "NOT_STARTED",
-    "blocker": "required provider Secret environment variable OPENAI_API_KEY was absent before any provider request",
-    "provider_request_attempted": false,
-    "first_segment_agent_runs": 0,
-    "resume_segment_agent_runs": 0,
-    "total_agent_runs": 0,
-    "total_cost_microusd": 0,
-    "input_tokens": 0,
-    "output_tokens": 0,
-    "latency_ms": 0,
-    "baseline_reused_runs": 0,
-    "completed_candidate_ids": [],
+    "status": "PARTIAL_RESUME_PROOF_COMPLETE",
+    "session_id": "159907907cf896b90c15561c5294725c4c72837ce2f73490cfc901c5cba62ec1",
+    "session_status": "BUDGET_EXHAUSTED",
+    "session_sha256": "75db1eb0692de1e1257a8ada085ce6c6375297a401851d8ff5834a848774f2ea",
+    "screening_report_sha256": "7ea6e0246bae28d3038ca911a8ceced2f16a02822694019719a87d7026511ee8",
+    "screening_html_sha256": "b607c804313cf9dfb05b119c65eee4db90a0cc0316b4a4189a20b715c8576e25",
+    "provider_request_attempted": true,
+    "first_segment": {
+      "status": "BUDGET_EXHAUSTED",
+      "authorized_max_agent_runs": 4,
+      "authorized_max_cost_microusd": 1400000,
+      "agent_runs": 4,
+      "input_tokens": 2462413,
+      "output_tokens": 13210,
+      "latency_ms": 177896,
+      "cost_microusd": 91241
+    },
+    "resume_segment": {
+      "status": "BUDGET_EXHAUSTED",
+      "status_checked_before_resume": true,
+      "authorized_max_agent_runs": 4,
+      "authorized_max_cost_microusd": 1400000,
+      "new_agent_runs": 4,
+      "input_tokens": 2788632,
+      "output_tokens": 14518,
+      "latency_ms": 201735,
+      "cost_microusd": 94257
+    },
+    "actual_provider_run_count": 8,
+    "total_agent_runs": 8,
+    "total_cost_microusd": 185498,
+    "input_tokens": 5251045,
+    "output_tokens": 27728,
+    "latency_ms": 379631,
+    "baseline_reused_runs": 4,
+    "completed_candidate_ids": [
+      "enforce-post-edit-test-rerun",
+      "validate-test-coverage",
+      "parse-test-output-for-failures"
+    ],
     "invalid_candidate_ids": [],
     "provider_blocked_candidate_ids": [],
-    "remaining_candidate_ids": [],
-    "executed_run_keys": [],
+    "remaining_candidate_ids": [
+      "invalidate-test-cache"
+    ],
+    "executed_run_keys": [
+      "ab9577780f8fbcab35c7587238f4f7cb08ab7d84cac1195706d99c716403dc55",
+      "fc7ed0e6c4a913cf9e99e872edcfdb2ed347d953d3c98610bbb834ac7cc4b3a0",
+      "fe694dae733b8ece07f29a27276e933c53c60c7e7eec3a82bb9ae38179b4e5da",
+      "e0946675020d1c1c78489648e10ca500211f77d33ebd6895e02497231d0ba524",
+      "1df8a64de4c53d0cd65665e210d079d48689cb9688e65fd6ea773ae64163a94e",
+      "64aad54109855824f7a7f0d37b942808b6bd6fa4d37e9194f739a5cc3b9a44be",
+      "9d800f415b85d459376e4b08bab6f0fcd9c3e0375a0d54f97afdb127f6f27722",
+      "161713fc1aeb5b02914de911991994c51d10b291b166270dcfb68f017aa852ed"
+    ],
+    "pending_run_keys": [
+      "c77a4036693c848e3974931b00aa49dcf7ae59231e718653197de4ceac76ab05",
+      "b327adfc85f8387fb1932e94d25850f67eb4dd3ff719e2327ded761d958dcd15"
+    ],
     "duplicate_run_keys": [],
+    "runtime_evidence": {
+      "runtime_tree_sha256": "0c860665e0064d589a27c965ef00e31c8b295ec281d95c44b117e195637b1765",
+      "persisted_trace_file_count": 12,
+      "actual_provider_trace_count": 8,
+      "baseline_replay_trace_count": 4,
+      "persisted_security_scan_count": 12,
+      "security_scan_status": "clean",
+      "matched_secret_names": []
+    },
+    "post_result_host_sandbox_notice": "The resume command emitted the durable report before a local /Library/Python sandbox restriction. A separate status reload confirmed the persisted session and no provider or Agent error.",
     "regression_executed": false,
     "confirmation_executed": false,
     "locked_test_accessed": false
   },
-  "claim_limit": "No real interruption/resume was executed. This record proves only provenance derivation and no-cost preflight, not reuse behavior, Skill improvement, a winner, regression, confirmation, locked-test, generalization, or release."
+  "claim_limit": "This record proves only provenance-bound real two-segment resume, baseline reuse, unique executed run keys, and non-duplicated accounting. It does not establish Skill improvement, a winner, regression, confirmation, locked-test behavior, generalization, or release."
 }
