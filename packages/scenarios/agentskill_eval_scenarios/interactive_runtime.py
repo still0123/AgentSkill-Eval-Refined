@@ -44,6 +44,10 @@ from agentskill_eval_memory_rag_lab.evaluation import (
 from agentskill_eval_memory_rag_lab.evaluation import (
     RunOutcome as MemoryRagRunOutcome,
 )
+from agentskill_eval_scenarios.agent_context import (
+    McpAgentCaseInput,
+    MemoryRagAgentCaseInput,
+)
 from agentskill_eval_scenarios.contracts import SkillUnderTest
 from agentskill_eval_scenarios.interactive import (
     InteractionHistoryEvent,
@@ -243,12 +247,7 @@ class InteractiveMcpController:
         lifecycle.start()
         record(McpEventKind.SERVER_CONNECTED, status="connected")
         record(McpEventKind.TOOLS_LISTED, status=",".join(sorted(available)))
-        case_payload: Dict[str, object] = {
-            "task": case.task,
-            "available_tools": [item.model_dump(mode="json") for item in case.available_tools],
-            "max_tool_calls": case.max_tool_calls,
-            "side_effect_policy": case.side_effect_policy.model_dump(mode="json"),
-        }
+        case_payload = McpAgentCaseInput.from_case(case).model_dump(mode="json")
         for step in range(1, client.spec.max_steps + 1):
             action = lifecycle.next_action(step, case_payload)
             target = action.tool
@@ -444,20 +443,9 @@ class InteractiveMemoryRagController:
             )
 
         lifecycle.start()
-        case_payload: Dict[str, object] = {
-            "pair_type": pair_type,
-            "task": case.task,
-            "kind": case.kind,
-            "query": case.query,
-            "k": case.k,
-            "documents": [
-                {"document_id": item.document_id, "text": item.text} for item in case.documents
-            ],
-            "memory_policy": {
-                "forbidden_keys": list(case.forbidden_memory_keys),
-                "sensitive_keys": list(case.sensitive_memory_keys),
-            },
-        }
+        case_payload = MemoryRagAgentCaseInput.from_case(case, pair_type).model_dump(
+            mode="json"
+        )
         for step in range(1, client.spec.max_steps + 1):
             action = lifecycle.next_action(step, case_payload)
             target = action.operation or ("retriever" if action.kind == "retrieve" else None)

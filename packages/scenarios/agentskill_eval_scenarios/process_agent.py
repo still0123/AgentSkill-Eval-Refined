@@ -17,6 +17,10 @@ from agentskill_eval_mcp_lab import AgentPlan as McpAgentPlan
 from agentskill_eval_mcp_lab import McpCase
 from agentskill_eval_memory_rag_lab import AgentPlan as MemoryRagAgentPlan
 from agentskill_eval_memory_rag_lab import MemoryRagCase
+from agentskill_eval_scenarios.agent_context import (
+    McpAgentCaseInput,
+    MemoryRagAgentCaseInput,
+)
 from agentskill_eval_scenarios.contracts import ProcessScenarioAgentSpec, SkillUnderTest
 from agentskill_eval_scenarios.interactive import (
     InteractionHistoryEvent,
@@ -78,12 +82,7 @@ class ProcessScenarioAgentClient:
             "mcp_tool",
             case.case_id,
             variant,
-            {
-                "task": case.task,
-                "available_tools": [tool.model_dump(mode="json") for tool in case.available_tools],
-                "max_tool_calls": case.max_tool_calls,
-                "side_effect_policy": case.side_effect_policy.model_dump(mode="json"),
-            },
+            McpAgentCaseInput.from_case(case).model_dump(mode="json"),
             skill,
         )
         payload = self._execute(request, "mcp_tool", case.case_id, variant, skill)
@@ -103,20 +102,7 @@ class ProcessScenarioAgentClient:
             "memory_rag",
             case.case_id,
             variant,
-            {
-                "pair_type": pair_type,
-                "task": case.task,
-                "kind": case.kind,
-                "query": case.query,
-                "k": case.k,
-                "documents": [
-                    {"document_id": item.document_id, "text": item.text} for item in case.documents
-                ],
-                "memory_policy": {
-                    "forbidden_keys": list(case.forbidden_memory_keys),
-                    "sensitive_keys": list(case.sensitive_memory_keys),
-                },
-            },
+            MemoryRagAgentCaseInput.from_case(case, pair_type).model_dump(mode="json"),
             skill,
         )
         payload = self._execute(request, "memory_rag", case.case_id, variant, skill)

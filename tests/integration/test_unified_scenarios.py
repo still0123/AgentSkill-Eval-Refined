@@ -33,6 +33,9 @@ def test_unified_cli_validates_runs_and_reports(
     assert len(plan["plan_sha256"]) == 64
     assert plan["variants"][0]["skill_sha256"] is None
     assert len(plan["variants"][1]["skill_sha256"]) == 64
+    if scenario in {"mcp_tool", "memory_rag"}:
+        assert "agent_decision" not in plan["trace_capabilities"]
+        assert "agent_observation_loop" not in plan["trace_capabilities"]
 
     denied = runner.invoke(
         app, ["scenario", "run", str(spec), "--workspace", str(tmp_path)]

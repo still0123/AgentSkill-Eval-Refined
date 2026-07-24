@@ -6,7 +6,7 @@ import asyncio
 import json
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, Protocol, Tuple, cast
+from typing import Dict, Optional, Protocol, Tuple, cast
 from uuid import NAMESPACE_URL, uuid5
 
 from pydantic import JsonValue
@@ -57,6 +57,76 @@ def _artifact(kind: str, path: Path) -> ArtifactReference:
     return ArtifactReference(kind=kind, path=str(path.resolve()), sha256=file_sha256(path))
 
 
+def _process_agent_trace_capabilities(spec: UnifiedScenarioSpec) -> Tuple[str, ...]:
+    process_agent = spec.process_agent
+    if process_agent is None:
+        return ()
+    return (
+        "agent_decision",
+        *(("agent_observation_loop",) if process_agent.interaction_mode == "step_loop" else ()),
+    )
+
+
+def _build_lab_plan(
+    spec: UnifiedScenarioSpec,
+    *,
+    native_agent: str,
+    native_model: str,
+    dataset_name: str,
+    dataset_sha256: str,
+    case_count: int,
+    control: str,
+    treatment: str,
+    trace_capabilities: Tuple[str, ...],
+) -> EvaluationPlan:
+    process_agent = spec.process_agent
+    return EvaluationPlan(
+        name=spec.name,
+        scenario=spec.scenario,
+        comparison=spec.comparison,
+        native_config_sha256=file_sha256(spec.native_config),
+        dataset_name=dataset_name,
+        dataset_sha256=dataset_sha256,
+        case_count=case_count,
+        agent=process_agent.name if process_agent else native_agent,
+        model="process-json" if process_agent else native_model,
+        agent_version=process_agent.version if process_agent else None,
+        agent_executable_sha256=process_agent.expected_sha256 if process_agent else None,
+        interaction_mode=process_agent.interaction_mode if process_agent else "plan_once",
+        max_interaction_steps=(
+            process_agent.max_steps
+            if process_agent and process_agent.interaction_mode == "step_loop"
+            else None
+        ),
+        skill_name=spec.skill.name if spec.skill else None,
+        skill_version=spec.skill.version if spec.skill else None,
+        skill_activation_mode=spec.skill.activation_mode if spec.skill else None,
+        variants=_variants(spec, control, treatment),
+        simulated=spec.simulated,
+        evidence_class=spec.evidence_class,
+        trace_capabilities=(*trace_capabilities, *_process_agent_trace_capabilities(spec)),
+        claim_limit=spec.claim_limit,
+    )
+
+
+def _native_artifact_refs(
+    native_workspace: Path,
+    report_json: Path,
+    report_html: Path,
+    client: Optional[ProcessScenarioAgentClient],
+    interactive_evidence: list[InteractiveRunEvidence],
+) -> Tuple[ArtifactReference, ...]:
+    refs = [
+        _artifact("native_report_json", report_json),
+        _artifact("native_report_html", report_html),
+    ]
+    if client is not None:
+        refs.append(_write_decision_evidence(native_workspace, client))
+    if interactive_evidence:
+        refs.append(_write_interactive_evidence(native_workspace, interactive_evidence))
+    return tuple(refs)
+
+
 class McpScenarioAdapter:
     kind = ScenarioKind.MCP_TOOL
 
@@ -69,51 +139,21 @@ class McpScenarioAdapter:
             expected_mode = "process_prompt" if spec.process_agent else "precompiled_plan"
             if spec.skill.activation_mode != expected_mode:
                 raise ValueError(f"MCP Lab Skill activation must be {expected_mode}")
-        agent = spec.process_agent.name if spec.process_agent else config.agent
-        model = "process-json" if spec.process_agent else config.model
-        return EvaluationPlan(
-            name=spec.name,
-            scenario=spec.scenario,
-            comparison=spec.comparison,
-            native_config_sha256=file_sha256(spec.native_config),
+        return _build_lab_plan(
+            spec,
+            native_agent=config.agent,
+            native_model=config.model,
             dataset_name=dataset.name,
             dataset_sha256=file_sha256(config.dataset),
             case_count=len(dataset.cases),
-            agent=agent,
-            model=model,
-            agent_version=spec.process_agent.version if spec.process_agent else None,
-            agent_executable_sha256=(
-                spec.process_agent.expected_sha256 if spec.process_agent else None
-            ),
-            interaction_mode=(
-                spec.process_agent.interaction_mode if spec.process_agent else "plan_once"
-            ),
-            max_interaction_steps=(
-                spec.process_agent.max_steps
-                if spec.process_agent and spec.process_agent.interaction_mode == "step_loop"
-                else None
-            ),
-            skill_name=spec.skill.name if spec.skill else None,
-            skill_version=spec.skill.version if spec.skill else None,
-            skill_activation_mode=spec.skill.activation_mode if spec.skill else None,
-            variants=_variants(
-                spec, "without-skill", spec.skill.name if spec.skill else "treatment"
-            ),
-            simulated=spec.simulated,
-            evidence_class=spec.evidence_class,
+            control="without-skill",
+            treatment=spec.skill.name if spec.skill else "treatment",
             trace_capabilities=(
                 "tool_selection",
                 "tool_parameters",
                 "recovery",
                 "side_effects",
-                *(("agent_decision",) if spec.process_agent else ()),
-                *(
-                    ("agent_observation_loop",)
-                    if spec.process_agent and spec.process_agent.interaction_mode == "step_loop"
-                    else ()
-                ),
             ),
-            claim_limit=spec.claim_limit,
         )
 
     def run(
@@ -156,23 +196,19 @@ class McpScenarioAdapter:
             "losses": metrics.losses,
             "invalid": metrics.invalid,
         }
-        artifact_refs = [
-            _artifact("native_report_json", artifacts.report_json),
-            _artifact("native_report_html", artifacts.report_html),
-        ]
-        if client is not None:
-            artifact_refs.append(_write_decision_evidence(native_workspace, client))
-        if interactive_evidence:
-            artifact_refs.append(
-                _write_interactive_evidence(native_workspace, interactive_evidence)
-            )
         return UnifiedEvaluationResult(
             experiment_id=uuid5(NAMESPACE_URL, f"unified:{plan.plan_sha256}"),
             plan=plan,
             status="completed" if metrics.invalid == 0 else "invalid",
             primary_metrics=primary,
             scenario_metrics=cast(Dict[str, JsonValue], metrics.model_dump(mode="json")),
-            artifacts=tuple(artifact_refs),
+            artifacts=_native_artifact_refs(
+                native_workspace,
+                artifacts.report_json,
+                artifacts.report_html,
+                client,
+                interactive_evidence,
+            ),
             simulated=spec.simulated,
             evidence_class=spec.evidence_class,
             claim_limit=spec.claim_limit,
@@ -191,51 +227,23 @@ class MemoryRagScenarioAdapter:
             expected_mode = "process_prompt" if spec.process_agent else "precompiled_plan"
             if spec.skill.activation_mode != expected_mode:
                 raise ValueError(f"Memory/RAG Lab Skill activation must be {expected_mode}")
-        agent = spec.process_agent.name if spec.process_agent else config.agent
-        model = "process-json" if spec.process_agent else config.model
-        return EvaluationPlan(
-            name=spec.name,
-            scenario=spec.scenario,
-            comparison=spec.comparison,
-            native_config_sha256=file_sha256(spec.native_config),
+        return _build_lab_plan(
+            spec,
+            native_agent=config.agent,
+            native_model=config.model,
             dataset_name=dataset.name,
             dataset_sha256=file_sha256(config.dataset),
             case_count=(
                 len(config.selected_case_ids) if config.selected_case_ids else len(dataset.cases)
             ),
-            agent=agent,
-            model=model,
-            agent_version=spec.process_agent.version if spec.process_agent else None,
-            agent_executable_sha256=(
-                spec.process_agent.expected_sha256 if spec.process_agent else None
-            ),
-            interaction_mode=(
-                spec.process_agent.interaction_mode if spec.process_agent else "plan_once"
-            ),
-            max_interaction_steps=(
-                spec.process_agent.max_steps
-                if spec.process_agent and spec.process_agent.interaction_mode == "step_loop"
-                else None
-            ),
-            skill_name=spec.skill.name if spec.skill else None,
-            skill_version=spec.skill.version if spec.skill else None,
-            skill_activation_mode=spec.skill.activation_mode if spec.skill else None,
-            variants=_variants(spec, "control", spec.skill.name if spec.skill else "treatment"),
-            simulated=spec.simulated,
-            evidence_class=spec.evidence_class,
+            control="control",
+            treatment=spec.skill.name if spec.skill else "treatment",
             trace_capabilities=(
                 "retrieval",
                 "citations",
                 "memory_lifecycle",
                 "memory_safety",
-                *(("agent_decision",) if spec.process_agent else ()),
-                *(
-                    ("agent_observation_loop",)
-                    if spec.process_agent and spec.process_agent.interaction_mode == "step_loop"
-                    else ()
-                ),
             ),
-            claim_limit=spec.claim_limit,
         )
 
     def run(
@@ -306,16 +314,6 @@ class MemoryRagScenarioAdapter:
                 item.termination != "final" for item in interactive_evidence
             ),
         }
-        artifact_refs = [
-            _artifact("native_report_json", artifacts.report_json),
-            _artifact("native_report_html", artifacts.report_html),
-        ]
-        if client is not None:
-            artifact_refs.append(_write_decision_evidence(native_workspace, client))
-        if interactive_evidence:
-            artifact_refs.append(
-                _write_interactive_evidence(native_workspace, interactive_evidence)
-            )
         return UnifiedEvaluationResult(
             experiment_id=uuid5(NAMESPACE_URL, f"unified:{plan.plan_sha256}"),
             plan=plan,
@@ -327,7 +325,13 @@ class MemoryRagScenarioAdapter:
             ),
             primary_metrics=primary,
             scenario_metrics=scenario_metrics,
-            artifacts=tuple(artifact_refs),
+            artifacts=_native_artifact_refs(
+                native_workspace,
+                artifacts.report_json,
+                artifacts.report_html,
+                client,
+                interactive_evidence,
+            ),
             simulated=spec.simulated,
             evidence_class=spec.evidence_class,
             claim_limit=spec.claim_limit,
