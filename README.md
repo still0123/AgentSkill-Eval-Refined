@@ -169,6 +169,33 @@ pnpm test
 pnpm run build
 ```
 
+## 可视化 Dashboard：面试时怎么展示
+
+当前提供的是**本地只读 Dashboard**，不会修改实验数据。运行 `pnpm run dev` 后按终端显示的
+地址打开浏览器，就能从总览一路追到某个失败 Run 的 Trace 和证据文件。
+
+```mermaid
+flowchart LR
+    Overview["① 总览<br/>通过率、增益、费用"] --> Pairs["② 配对 Case<br/>逐题看 WIN/TIE/LOSS"]
+    Pairs --> Trace["③ Trace 与诊断<br/>看 Agent 在哪一步失败"]
+    Trace --> Benchmark["④ Benchmark<br/>看任务如何生成与冻结"]
+    Benchmark --> Search["⑤ 候选搜索<br/>看谁晋级、谁被淘汰"]
+    Search --> Evolution["⑥ Skill 演化<br/>从 v1 追到候选和 v2"]
+    Evolution --> Promotion["⑦ 发布证据<br/>确认、locked、审核与哈希"]
+```
+
+| 页面 | 第一次看项目的人能回答什么 |
+|---|---|
+| Overview | 这次比较了谁？提升多少？花了多少 Token 和费用？ |
+| Paired Cases | 哪些题从失败变成功，哪些题出现回归？ |
+| Trace & Diagnosis | Agent 是任务做错了，还是 Runner、Provider、grader 出问题？ |
+| Benchmark Generation | Case 来自哪个 commit？为什么能证明 before-fail / after-pass？ |
+| Skill Search | 候选基于哪些失败生成？每轮为什么晋级或淘汰？ |
+| Skill Evolution / Promotion | Skill v2 的父版本、diff、独立终评和人工审核在哪里？ |
+
+仓库目前没有托管公共在线站点；Dashboard 读取本地冻结报告，适合离线 Demo 和证据审计。
+启动方式、数据格式和限制见 [Dashboard MVP](./docs/dashboard-mvp.md)。
+
 ## 一个真实实验结果
 
 仓库包含一组 Qwen Code 0.19.9 + DeepSeek V4 Pro 的脱敏实验记录：
