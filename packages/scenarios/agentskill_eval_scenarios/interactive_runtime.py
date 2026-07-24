@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Literal, Mapping, Optional, Tuple, cast
 from uuid import NAMESPACE_URL, uuid5
@@ -82,6 +83,104 @@ def _evidence_event(
     )
 
 
+@dataclass
+class _InteractiveLifecycle:
+    """Shared auditable lifecycle around scenario-specific action execution."""
+
+    scenario: Literal["mcp_tool", "memory_rag"]
+    case_id: str
+    variant: str
+    client: ProcessScenarioAgentClient
+    skill: Optional[SkillUnderTest]
+    audit: List[InteractiveTraceEvent] = field(default_factory=list)
+    history: List[InteractionHistoryEvent] = field(default_factory=list)
+    token_count: int = 0
+    cost_usd: float = 0.0
+    termination: Literal["final", "step_limit", "error"] = "step_limit"
+
+    def start(self) -> None:
+        _evidence_event(self.audit, 0, "agent.session.started", status="started")
+        if self.skill:
+            _evidence_event(
+                self.audit,
+                0,
+                "skill.activated",
+                status="verified",
+                payload=self.skill.expected_sha256,
+            )
+
+    def next_action(
+        self, step: int, case_payload: Mapping[str, object]
+    ) -> InteractiveAgentAction:
+        _evidence_event(self.audit, step, "agent.decision.requested")
+        action = self.client.next_action(
+            self.scenario,
+            self.case_id,
+            self.variant,
+            case_payload,
+            self.history,
+            self.skill,
+            step,
+        )
+        self.token_count += action.token_count
+        self.cost_usd += action.cost_usd
+        return action
+
+    def record_proposed_action(
+        self, step: int, action: InteractiveAgentAction, target: Optional[str]
+    ) -> None:
+        _evidence_event(
+            self.audit,
+            step,
+            "agent.action.proposed",
+            action=action,
+            target=target,
+            payload=action,
+        )
+
+    def finish(self, step: int, action: InteractiveAgentAction) -> None:
+        _evidence_event(self.audit, step, "agent.final", action=action, status="completed")
+        self.termination = "final"
+
+    def record_observation(
+        self,
+        step: int,
+        action: InteractiveAgentAction,
+        target: Optional[str],
+        observation: Dict[str, Any],
+    ) -> None:
+        self.history.append(
+            InteractionHistoryEvent(step=step, action=action, observation=observation)
+        )
+        _evidence_event(
+            self.audit,
+            step,
+            "environment.observation",
+            action=action,
+            target=target,
+            status=str(observation["status"]),
+            payload=observation,
+        )
+
+    def mark_step_limit(self) -> None:
+        _evidence_event(
+            self.audit, self.client.spec.max_steps, "agent.step_limit", status="exhausted"
+        )
+
+    def evidence(self) -> InteractiveRunEvidence:
+        return InteractiveRunEvidence(
+            scenario=self.scenario,
+            case_id=self.case_id,
+            variant=self.variant,
+            skill_present=self.skill is not None,
+            skill_sha256=self.skill.expected_sha256 if self.skill else None,
+            max_steps=self.client.spec.max_steps,
+            completed=self.termination == "final",
+            termination=self.termination,
+            events=tuple(self.audit),
+        )
+
+
 class InteractiveMcpController:
     RETRYABLE = {
         McpFailureKind.TIMEOUT,
@@ -100,13 +199,10 @@ class InteractiveMcpController:
         run_id = uuid5(NAMESPACE_URL, f"agentskill-eval:mcp:{case.case_id}:{variant}")
         attempt_id = uuid5(run_id, "attempt-1")
         trace_events: List[McpTraceEvent] = []
-        audit: List[InteractiveTraceEvent] = []
-        history: List[InteractionHistoryEvent] = []
+        lifecycle = _InteractiveLifecycle("mcp_tool", case.case_id, variant, client, skill)
         definitions = {tool.name: tool for tool in case.available_tools}
         available = {tool.name for tool in adapter.list_tools()}
         calls = 0
-        tokens = 0
-        cost = 0.0
         hard_failure = False
         tool_budget_exhausted = False
         final_response = ""
@@ -144,11 +240,7 @@ class InteractiveMcpController:
                 )
             )
 
-        _evidence_event(audit, 0, "agent.session.started", status="started")
-        if skill:
-            _evidence_event(
-                audit, 0, "skill.activated", status="verified", payload=skill.expected_sha256
-            )
+        lifecycle.start()
         record(McpEventKind.SERVER_CONNECTED, status="connected")
         record(McpEventKind.TOOLS_LISTED, status=",".join(sorted(available)))
         case_payload: Dict[str, object] = {
@@ -157,22 +249,13 @@ class InteractiveMcpController:
             "max_tool_calls": case.max_tool_calls,
             "side_effect_policy": case.side_effect_policy.model_dump(mode="json"),
         }
-        termination: Literal["final", "step_limit", "error"] = "step_limit"
         for step in range(1, client.spec.max_steps + 1):
-            _evidence_event(audit, step, "agent.decision.requested")
-            action = client.next_action(
-                "mcp_tool", case.case_id, variant, case_payload, history, skill, step
-            )
-            tokens += action.token_count
-            cost += action.cost_usd
+            action = lifecycle.next_action(step, case_payload)
             target = action.tool
-            _evidence_event(
-                audit, step, "agent.action.proposed", action=action, target=target, payload=action
-            )
+            lifecycle.record_proposed_action(step, action, target)
             if action.kind == "final":
                 final_response = action.answer or ""
-                _evidence_event(audit, step, "agent.final", action=action, status="completed")
-                termination = "final"
+                lifecycle.finish(step, action)
                 break
             if action.kind != "tool_call":
                 hard_failure = True
@@ -182,14 +265,22 @@ class InteractiveMcpController:
                     "error": "action_not_supported",
                 }
                 _evidence_event(
-                    audit, step, "environment.action.rejected", action=action, status="unsupported"
+                    lifecycle.audit,
+                    step,
+                    "environment.action.rejected",
+                    action=action,
+                    status="unsupported",
                 )
             elif calls >= case.max_tool_calls:
                 hard_failure = True
                 tool_budget_exhausted = True
                 observation = {"ok": False, "status": "rejected", "error": "tool_budget"}
                 _evidence_event(
-                    audit, step, "environment.action.rejected", action=action, status="tool_budget"
+                    lifecycle.audit,
+                    step,
+                    "environment.action.rejected",
+                    action=action,
+                    status="tool_budget",
                 )
             else:
                 action_accepted = False
@@ -242,7 +333,7 @@ class InteractiveMcpController:
                     "message": result.message,
                 }
                 _evidence_event(
-                    audit,
+                    lifecycle.audit,
                     step,
                     (
                         "environment.action.accepted"
@@ -253,20 +344,9 @@ class InteractiveMcpController:
                     target=action.tool,
                     status=observation["status"],
                 )
-            history.append(
-                InteractionHistoryEvent(step=step, action=action, observation=observation)
-            )
-            _evidence_event(
-                audit,
-                step,
-                "environment.observation",
-                action=action,
-                target=target,
-                status=str(observation["status"]),
-                payload=observation,
-            )
+            lifecycle.record_observation(step, action, target, observation)
         else:
-            _evidence_event(audit, client.spec.max_steps, "agent.step_limit", status="exhausted")
+            lifecycle.mark_step_limit()
         trace = McpTrace(
             run_id=run_id, case_id=case.case_id, simulated=True, events=tuple(trace_events)
         )
@@ -276,23 +356,15 @@ class InteractiveMcpController:
             case_id=case.case_id,
             trace=trace,
             final_response=final_response,
-            token_count=tokens,
-            cost_usd=cost,
-            completed=(not hard_failure and last_failure is None and termination == "final"),
-            budget_exhausted=termination == "step_limit" or tool_budget_exhausted,
+            token_count=lifecycle.token_count,
+            cost_usd=lifecycle.cost_usd,
+            completed=(
+                not hard_failure and last_failure is None and lifecycle.termination == "final"
+            ),
+            budget_exhausted=lifecycle.termination == "step_limit" or tool_budget_exhausted,
             simulated=True,
         )
-        return outcome, InteractiveRunEvidence(
-            scenario="mcp_tool",
-            case_id=case.case_id,
-            variant=variant,
-            skill_present=skill is not None,
-            skill_sha256=skill.expected_sha256 if skill else None,
-            max_steps=client.spec.max_steps,
-            completed=termination == "final",
-            termination=termination,
-            events=tuple(audit),
-        )
+        return outcome, lifecycle.evidence()
 
     @staticmethod
     def _authorized(
@@ -332,14 +404,11 @@ class InteractiveMemoryRagController:
         run_id = uuid5(NAMESPACE_URL, f"memory-rag:{case.case_id}:{variant}")
         attempt_id = uuid5(run_id, "attempt-1")
         trace_events: List[MemoryRagTraceEvent] = []
-        audit: List[InteractiveTraceEvent] = []
-        history: List[InteractionHistoryEvent] = []
+        lifecycle = _InteractiveLifecycle("memory_rag", case.case_id, variant, client, skill)
         retrieved: Tuple[RetrievedDocument, ...] = ()
         context: Tuple[str, ...] = ()
         observations: List[MemoryObservation] = []
         generation = GenerationOutput()
-        tokens = 0
-        cost = 0.0
 
         def record(
             kind: MemoryRagEventKind,
@@ -374,11 +443,7 @@ class InteractiveMemoryRagController:
                 )
             )
 
-        _evidence_event(audit, 0, "agent.session.started", status="started")
-        if skill:
-            _evidence_event(
-                audit, 0, "skill.activated", status="verified", payload=skill.expected_sha256
-            )
+        lifecycle.start()
         case_payload: Dict[str, object] = {
             "pair_type": pair_type,
             "task": case.task,
@@ -393,25 +458,16 @@ class InteractiveMemoryRagController:
                 "sensitive_keys": list(case.sensitive_memory_keys),
             },
         }
-        termination: Literal["final", "step_limit", "error"] = "step_limit"
         for step in range(1, client.spec.max_steps + 1):
-            _evidence_event(audit, step, "agent.decision.requested")
-            action = client.next_action(
-                "memory_rag", case.case_id, variant, case_payload, history, skill, step
-            )
-            tokens += action.token_count
-            cost += action.cost_usd
+            action = lifecycle.next_action(step, case_payload)
             target = action.operation or ("retriever" if action.kind == "retrieve" else None)
-            _evidence_event(
-                audit, step, "agent.action.proposed", action=action, target=target, payload=action
-            )
+            lifecycle.record_proposed_action(step, action, target)
             if action.kind == "final":
                 claims = tuple(Claim.model_validate(item) for item in action.claims)
                 generation = GenerationOutput(
                     answer=action.answer or "", citations=action.citations, claims=claims
                 )
-                _evidence_event(audit, step, "agent.final", action=action, status="completed")
-                termination = "final"
+                lifecycle.finish(step, action)
                 break
             if action.kind == "retrieve":
                 record(
@@ -533,31 +589,24 @@ class InteractiveMemoryRagController:
                     "error": "action_not_supported",
                 }
                 _evidence_event(
-                    audit, step, "environment.action.rejected", action=action, status="unsupported"
+                    lifecycle.audit,
+                    step,
+                    "environment.action.rejected",
+                    action=action,
+                    status="unsupported",
                 )
             if action.kind in {"retrieve", "memory"}:
                 _evidence_event(
-                    audit,
+                    lifecycle.audit,
                     step,
                     "environment.action.accepted",
                     action=action,
                     target=target,
                     status=str(observation["status"]),
                 )
-            history.append(
-                InteractionHistoryEvent(step=step, action=action, observation=observation)
-            )
-            _evidence_event(
-                audit,
-                step,
-                "environment.observation",
-                action=action,
-                target=target,
-                status=str(observation["status"]),
-                payload=observation,
-            )
+            lifecycle.record_observation(step, action, target, observation)
         else:
-            _evidence_event(audit, client.spec.max_steps, "agent.step_limit", status="exhausted")
+            lifecycle.mark_step_limit()
         if case.kind == "retrieval_generation":
             record(
                 MemoryRagEventKind.CONTEXT_ASSEMBLED,
@@ -577,21 +626,11 @@ class InteractiveMemoryRagController:
             context_document_ids=context,
             generation=generation,
             memory_observations=tuple(observations),
-            token_count=tokens,
-            cost_usd=cost,
+            token_count=lifecycle.token_count,
+            cost_usd=lifecycle.cost_usd,
             simulated=True,
         )
-        return outcome, InteractiveRunEvidence(
-            scenario="memory_rag",
-            case_id=case.case_id,
-            variant=variant,
-            skill_present=skill is not None,
-            skill_sha256=skill.expected_sha256 if skill else None,
-            max_steps=client.spec.max_steps,
-            completed=termination == "final",
-            termination=termination,
-            events=tuple(audit),
-        )
+        return outcome, lifecycle.evidence()
 
 
 def _memory_kind(operation: str, status: str, ok: bool) -> MemoryRagEventKind:

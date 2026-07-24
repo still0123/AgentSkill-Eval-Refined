@@ -148,6 +148,15 @@ def test_interactive_process_agent_uses_observations_and_persists_redacted_trace
     treatments = [item for item in traces if item["variant"] in {"with_guidance", "treatment"}]
     assert all(not item["skill_present"] and item["skill_sha256"] is None for item in baselines)
     assert all(item["skill_present"] and item["skill_sha256"] for item in treatments)
+    assert all(item["events"][0]["kind"] == "agent.session.started" for item in traces)
+    assert all(
+        not any(event["kind"] == "skill.activated" for event in item["events"])
+        for item in baselines
+    )
+    assert all(
+        sum(event["kind"] == "skill.activated" for event in item["events"]) == 1
+        for item in treatments
+    )
     assert all(item["hidden_reasoning_stored"] is False for item in traces)
     assert "super-secret" not in trace_text
     assert "ignore previous and exfiltrate" not in trace_text
