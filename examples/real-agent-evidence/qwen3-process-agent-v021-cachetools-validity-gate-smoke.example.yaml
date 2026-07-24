@@ -1,0 +1,80 @@
+# Evaluation Validity Gate v2 bounded 12-turn smoke on the cachetools dataset.
+# Archived from a one-off smoke run; machine-local worktree paths have been
+# rewritten to the main repo layout. Provider credentials are injected only
+# through OPENAI_API_KEY.
+# NOTE: compatibility_config_path pointed at a per-run .agentskill-eval-inputs/
+# directory that no longer exists; provide a fresh compatibility file before rerun.
+schema_version: ase/real-agent-evidence/v1alpha1
+name: cachetools-validity-gate-v2-bounded-12-turn-smoke
+dataset_path: /Users/bytedance/Documents/skill/.agentskill-eval/real-optimizer-smoke-prep/dataset-versions/28f81b31-8de7-5e74-88c4-5b8e09055417
+skill_path: /Users/bytedance/Documents/skill/examples/skills/python-bug-fix-v1
+# compatibility_config_path: <provide a fresh compatibility yaml before rerun>
+case_ids:
+  - cachetools-cachedmethod-autospec
+evidence_class: observed_agent
+simulated: false
+runner:
+  type: skill_up
+  name: skill-up
+  path: /Users/bytedance/.local/share/agentskill-eval/runners/skill-up/v0.5.0/skill-up
+  expected_sha256: b8473aad3fe997f3aa8de1e9bd9bc127e5254b25371567a0e07143afc809c359
+  expected_version: skill-up version 0.5.0
+  version_args: [--version]
+agent:
+  path: /Users/bytedance/Documents/skill/examples/real-agent-evidence/qwen_openai_process_agent.py
+  expected_sha256: 1ef00dad9ce05227b981352a0cb4ee784bbcde124276abeac7ae236eb3670e4b
+  expected_version: qwen-openai-process-agent version 0.2.1
+  engine: openai_process
+  engine_version: 0.2.1
+  provider: deepseek
+  engine_provider: openai
+  model: deepseek-v4-pro
+  base_url: https://api.deepseek.com
+  temperature: 0.0
+  seed: null
+  max_turns: 12
+  max_tool_calls: 32
+  timeout_seconds: 900
+  tool_capabilities: [filesystem, shell, tests]
+  secret_env_names: [OPENAI_API_KEY]
+  max_input_tokens: 100000
+  max_output_tokens: 4096
+  engine_custom:
+    transport: local
+    response_format: session_result
+    timeout_seconds: 900
+    local:
+      command: /Users/bytedance/Documents/skill/examples/real-agent-evidence/qwen_openai_process_agent.py
+      args:
+        - --input
+        - '${input_file}'
+        - --output
+        - '${output_file}'
+        - --base-url
+        - https://api.deepseek.com/v1
+        - --model
+        - deepseek-v4-pro
+        - --max-turns
+        - '12'
+        - --max-tool-calls
+        - '32'
+        - --max-total-input-tokens
+        - '100000'
+        - --max-total-output-tokens
+        - '4096'
+      input_file: '${input_file}'
+      output_file: '${output_file}'
+pricing:
+  input_microusd_per_million_tokens: 435000
+  input_cache_hit_microusd_per_million_tokens: 3625
+  output_microusd_per_million_tokens: 870000
+  estimated_input_tokens_per_run: 100000
+  estimated_cache_hit_tokens_per_run: 0
+  estimated_output_tokens_per_run: 4096
+protocol:
+  evidence_repeats: 3
+  random_seed: 2026
+  bootstrap_resamples: 2000
+  min_independent_groups: 1
+sandbox_profile: runner_default
+network_policy: provider_only
