@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 680" font-family="Arial, Helvetica, sans-serif">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#555"/>
+    </marker>
+  </defs>
+  <rect width="960" height="680" fill="#FAFAFA" rx="8"/>
+  <text x="480" y="32" text-anchor="middle" font-size="16" font-weight="bold" fill="#333">AgentSkill-Eval: 配对评测与发布门禁</text>
+  <text x="480" y="50" text-anchor="middle" font-size="11" fill="#888">同一个 Case，同一个 Agent，唯一变量是 Skill</text>
+
+  <rect x="360" y="65" width="240" height="36" rx="18" fill="#2C3E50"/>
+  <text x="480" y="88" text-anchor="middle" font-size="13" font-weight="bold" fill="#fff">同一个 Bug Fix Case</text>
+  <line x1="480" y1="101" x2="480" y2="120" stroke="#555" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <rect x="150" y="125" width="300" height="42" rx="6" fill="#ECF0F1" stroke="#95A5A6" stroke-width="1.5"/>
+  <text x="300" y="143" text-anchor="middle" font-size="12" font-weight="bold" fill="#2C3E50">Control: 无 Skill</text>
+  <text x="300" y="158" text-anchor="middle" font-size="10" fill="#777">Agent 独立完成修复</text>
+  <rect x="510" y="125" width="300" height="42" rx="6" fill="#D5F5E3" stroke="#27AE60" stroke-width="1.5"/>
+  <text x="660" y="143" text-anchor="middle" font-size="12" font-weight="bold" fill="#1E8449">Treatment: 有 Skill v1/v2</text>
+  <text x="660" y="158" text-anchor="middle" font-size="10" fill="#666">Agent 加载 Skill 后执行</text>
+
+  <rect x="15" y="108" width="90" height="22" rx="4" fill="#FEF9E7" stroke="#F1C40F"/>
+  <text x="60" y="123" text-anchor="middle" font-size="8" fill="#7D6608">冻结变量</text>
+  <text x="60" y="135" text-anchor="middle" font-size="7" fill="#888">Agent · 模型 · 预算 · 环境</text>
+
+  <line x1="300" y1="167" x2="300" y2="195" stroke="#555" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="660" y1="167" x2="660" y2="195" stroke="#555" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <rect x="150" y="200" width="300" height="50" rx="6" fill="#E8F8F5" stroke="#1ABC9C" stroke-width="1.5"/>
+  <text x="300" y="220" text-anchor="middle" font-size="11" font-weight="bold" fill="#16A085">Agent 执行</text>
+  <text x="300" y="238" text-anchor="middle" font-size="10" fill="#666">查看代码 → 修改 → 运行测试</text>
+  <rect x="510" y="200" width="300" height="50" rx="6" fill="#E8F8F5" stroke="#1ABC9C" stroke-width="1.5"/>
+  <text x="660" y="220" text-anchor="middle" font-size="11" font-weight="bold" fill="#16A085">Agent 执行</text>
+  <text x="660" y="238" text-anchor="middle" font-size="10" fill="#666">查看代码 → 修改 → 运行测试</text>
+
+  <line x1="300" y1="250" x2="300" y2="280" stroke="#555" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="660" y1="250" x2="660" y2="280" stroke="#555" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <rect x="150" y="285" width="300" height="50" rx="6" fill="#F4F6F7" stroke="#95A5A6" stroke-width="1.5" stroke-dasharray="4,2"/>
+  <text x="300" y="305" text-anchor="middle" font-size="11" font-weight="bold" fill="#2C3E50">Patch + Trace + 费用</text>
+  <text x="300" y="322" text-anchor="middle" font-size="10" fill="#777">SHA-256 不可变证据</text>
+  <rect x="510" y="285" width="300" height="50" rx="6" fill="#F4F6F7" stroke="#95A5A6" stroke-width="1.5" stroke-dasharray="4,2"/>
+  <text x="660" y="305" text-anchor="middle" font-size="11" font-weight="bold" fill="#2C3E50">Patch + Trace + 费用</text>
+  <text x="660" y="322" text-anchor="middle" font-size="10" fill="#777">SHA-256 不可变证据</text>
+
+  <line x1="300" y1="335" x2="300" y2="360" stroke="#555" stroke-width="1.5"/>
+  <line x1="660" y1="335" x2="660" y2="360" stroke="#555" stroke-width="1.5"/>
+  <line x1="300" y1="360" x2="660" y2="360" stroke="#555" stroke-width="1.5"/>
+  <line x1="480" y1="360" x2="480" y2="380" stroke="#555" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <rect x="340" y="385" width="280" height="36" rx="18" fill="#2C3E50"/>
+  <text x="480" y="408" text-anchor="middle" font-size="12" font-weight="bold" fill="#fff">确定性 Grader</text>
+  <line x1="480" y1="421" x2="480" y2="440" stroke="#555" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <rect x="60" y="445" width="260" height="36" rx="6" fill="#D5F5E3" stroke="#27AE60" stroke-width="1.5"/>
+  <text x="190" y="467" text-anchor="middle" font-size="12" font-weight="bold" fill="#1E8449">PASS</text>
+  <text x="190" y="479" text-anchor="middle" font-size="8" fill="#666">任务成功</text>
+  <rect x="350" y="445" width="260" height="36" rx="6" fill="#FADBD8" stroke="#E74C3C" stroke-width="1.5"/>
+  <text x="480" y="467" text-anchor="middle" font-size="12" font-weight="bold" fill="#C0392B">FAIL</text>
+  <text x="480" y="479" text-anchor="middle" font-size="8" fill="#666">任务失败（有证据）</text>
+  <rect x="640" y="445" width="260" height="36" rx="6" fill="#FEF9E7" stroke="#F1C40F" stroke-width="1.5"/>
+  <text x="770" y="467" text-anchor="middle" font-size="12" font-weight="bold" fill="#7D6608">INVALID</text>
+  <text x="770" y="479" text-anchor="middle" font-size="8" fill="#666">基础设施异常，不计作 Skill 失败</text>
+
+  <line x1="480" y1="481" x2="480" y2="500" stroke="#555" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <rect x="280" y="505" width="400" height="36" rx="18" fill="#E8DAEF" stroke="#8E44AD" stroke-width="1.5"/>
+  <text x="480" y="528" text-anchor="middle" font-size="12" font-weight="bold" fill="#6C3483">WIN / TIE / LOSS — 配对 Case 比较</text>
+  <line x1="480" y1="541" x2="480" y2="560" stroke="#555" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <rect x="230" y="565" width="500" height="30" rx="15" fill="#2C3E50"/>
+  <text x="480" y="585" text-anchor="middle" font-size="11" font-weight="bold" fill="#fff">Search → Regression → Locked → 人工审核 → 发布 / 阻止</text>
+  <line x1="480" y1="595" x2="480" y2="612" stroke="#555" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <rect x="280" y="617" width="400" height="28" rx="14" fill="#FADBD8" stroke="#E74C3C" stroke-width="1.5"/>
+  <text x="480" y="636" text-anchor="middle" font-size="11" font-weight="bold" fill="#C0392B">无增益 → 系统阻止发布，而非美化结果</text>
+  <rect x="708" y="650" width="232" height="22" rx="4" fill="#FEF9E7" stroke="#F1C40F"/>
+  <text x="824" y="665" text-anchor="middle" font-size="9" font-weight="bold" fill="#7D6608">SIMULATED DEMO 不可冒充真实证据</text>
+</svg>

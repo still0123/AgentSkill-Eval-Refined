@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
-from typing import Callable, Dict, Mapping, Optional, Tuple
+from typing import Callable, Dict, List, Mapping, Optional, Tuple
 from uuid import NAMESPACE_URL, UUID, uuid4, uuid5
 
 import yaml
@@ -16,6 +17,7 @@ import yaml
 from agentskill_eval_benchmark_gen.dataset import DatasetLoader, LoadedDataset
 from agentskill_eval_contracts import (
     AgentSnapshot,
+    EvaluationOutcome,
     ExperimentManifest,
     ExperimentStatus,
     ExperimentVariant,
@@ -30,9 +32,11 @@ from agentskill_eval_experiment import (
     AnalysisConfig,
     ExecutionRecord,
     ExperimentAnalyzer,
+    ExperimentLayout,
     LocalExperimentExecutor,
     LocalExperimentPlanner,
     LocalExperimentStore,
+    ReplayBundleWriter,
     StaticReportPaths,
     StaticReportWriter,
     VariantRuntimeSpec,
@@ -83,6 +87,7 @@ class DemoRunResult:
     invalid_runs: int
     simulated: bool
     dataset_sha256: str
+    case_count: int
     report_paths: StaticReportPaths
 
 
@@ -164,7 +169,8 @@ class DemoExperimentRunner:
             ),
         )
         reports = StaticReportWriter(store).write(experiment_id, statistics)
-        return DemoRunResult(
+        case_count = len(dataset.cases)
+        result = DemoRunResult(
             experiment_id=experiment_id,
             control_variant_id=baseline.id,
             treatment_variant_id=treatment.id,
@@ -173,8 +179,12 @@ class DemoExperimentRunner:
             invalid_runs=execution.invalid_runs,
             simulated=config.mode == DemoMode.MOCK,
             dataset_sha256=dataset.dataset_sha256,
+            case_count=case_count,
             report_paths=reports,
         )
+        # Generate the standalone evidence pack at the workspace root.
+        DemoEvidencePack.generate(config.workspace, experiment_id, result)
+        return result
 
     @staticmethod
     def _runtime(
@@ -363,3 +373,255 @@ class DemoExperimentRunner:
                     grading={"score": 1.0 if passed else 0.0, "simulated": True},
                 )
         return MockRunnerAdapter(results)
+
+
+class DemoEvidencePack:
+    """Generate a standalone portfolio evidence pack from a completed demo experiment."""
+
+    @staticmethod
+    def generate(
+        workspace: Path,
+        experiment_id: UUID,
+        result: DemoRunResult,
+    ) -> None:
+        store = LocalExperimentStore(workspace)
+        layout = ExperimentLayout(workspace, experiment_id)
+        report_json = layout.reports / "report.json"
+        report_html = layout.reports / "report.html"
+
+        if not report_json.is_file() or not report_html.is_file():
+            raise ValueError("demo experiment reports not found; run the experiment first")
+
+        # 1. Copy experiment-report.json / .html to workspace root
+        _copy_file(report_json, workspace / "experiment-report.json")
+        _copy_file(report_html, workspace / "experiment-report.html")
+
+        # 2. Build paired-results.json from the report
+        bundle = json.loads(report_json.read_text(encoding="utf-8"))
+        statistics = bundle.get("statistics", {})
+        cases = statistics.get("cases", [])
+        wtl = statistics.get("wtl", {})
+        paired_results = {
+            "experiment_id": str(experiment_id),
+            "logical_runs": result.logical_runs,
+            "completed_runs": result.completed_runs,
+            "invalid_runs": result.invalid_runs,
+            "simulated": result.simulated,
+            "dataset_sha256": result.dataset_sha256,
+            "case_count": result.case_count,
+            "repeats": result.logical_runs // (result.case_count * 2) if result.case_count else 0,
+            "win": wtl.get("win", 0),
+            "tie_positive": wtl.get("tie_positive", 0),
+            "tie_negative": wtl.get("tie_negative", 0),
+            "loss": wtl.get("loss", 0),
+            "cases": [
+                {
+                    "case_id": c.get("case_id"),
+                    "classification": c.get("classification"),
+                    "control_pass_rate": c.get("control_pass_rate"),
+                    "treatment_pass_rate": c.get("treatment_pass_rate"),
+                    "absolute_gain": c.get("absolute_gain"),
+                }
+                for c in cases
+            ],
+        }
+        _write_json(workspace / "paired-results.json", paired_results)
+
+        # 3. Generate the replayable audit bundle and presentation artifacts.
+        runs = store.list_runs(experiment_id)
+        bundle_path = workspace / "audit-bundle.tar"
+        ReplayBundleWriter(store).write(experiment_id, bundle_path)
+        _write_file(
+            workspace / "skill-diff.patch",
+            "# SIMULATED DEMO: skill-diff.patch\n"
+            "# This is a placeholder. Real patches are generated\n"
+            "# from actual Skill v1→v2 evolution in a real experiment.\n",
+        )
+        trace_dir = workspace / "trace"
+        trace_dir.mkdir(parents=True, exist_ok=True)
+        for run in runs:
+            attempt = store.load_selected_attempt(experiment_id, run)
+            if attempt is None:
+                continue
+            trace_path = layout.trace_manifest(run.id, attempt.attempt_no)
+            if trace_path.is_file():
+                _copy_file(trace_path, trace_dir / f"{run.id}.json")
+
+        # 4. Freeze input lineage and every presentation-file digest.
+        variants = store.list_variants(experiment_id)
+        treatment = next(item for item in variants if item.skill_snapshot is not None)
+        skill_snapshot = treatment.skill_snapshot
+        if skill_snapshot is None:
+            raise ValueError("demo treatment variant is missing its Skill snapshot")
+        indexed_runs: List[Dict[str, Optional[str]]] = [
+            {
+                "run_id": str(run.id),
+                "variant_id": str(run.variant_id),
+                "outcome": run.evaluation_outcome.value if run.evaluation_outcome else None,
+                "pair_block_id": str(run.pair_block_id),
+            }
+            for run in runs
+        ]
+        indexed_files = [
+            _file_entry(path, workspace)
+            for path in sorted(
+                (
+                    workspace / "experiment-report.json",
+                    workspace / "experiment-report.html",
+                    workspace / "paired-results.json",
+                    workspace / "audit-bundle.tar",
+                    workspace / "skill-diff.patch",
+                    *trace_dir.glob("*.json"),
+                ),
+                key=lambda item: item.relative_to(workspace).as_posix(),
+            )
+        ]
+        evidence_index = {
+            "experiment_id": str(experiment_id),
+            "simulated": result.simulated,
+            "evidence_class": "SIMULATED_DEMO",
+            "total_runs": len(runs),
+            "invalid_runs": result.invalid_runs,
+            "hashes": {
+                "dataset_sha256": result.dataset_sha256,
+                "skill_sha256": skill_snapshot.content_sha256,
+                "runner_sha256": treatment.runner_snapshot.binary_sha256,
+                "environment_sha256": _sha256_json(
+                    {
+                        "runner": treatment.runner_snapshot.model_dump(mode="json"),
+                        "sandbox": treatment.sandbox_snapshot.model_dump(mode="json"),
+                    }
+                ),
+            },
+            "files": indexed_files,
+            "runs": indexed_runs,
+        }
+        _write_json(workspace / "evidence-index.json", evidence_index)
+
+    @staticmethod
+    def verify(workspace: Path) -> Dict[str, object]:
+        """Verify the integrity of a completed demo evidence pack."""
+        required_files = [
+            "experiment-report.json",
+            "experiment-report.html",
+            "paired-results.json",
+            "evidence-index.json",
+            "audit-bundle.tar",
+            "skill-diff.patch",
+        ]
+        missing = [f for f in required_files if not (workspace / f).is_file()]
+        if missing:
+            raise ValueError(f"evidence pack missing files: {', '.join(missing)}")
+
+        # Verify audit bundle
+        bundle_path = workspace / "audit-bundle.tar"
+        try:
+            ReplayBundleWriter.verify(bundle_path)
+        except Exception as exc:
+            raise ValueError(f"audit bundle verification failed: {exc}") from exc
+
+        # Verify evidence-index.json
+        index = json.loads((workspace / "evidence-index.json").read_text(encoding="utf-8"))
+        if index.get("evidence_class") != "SIMULATED_DEMO":
+            raise ValueError("evidence class must be SIMULATED_DEMO")
+        for entry in index.get("files", []):
+            path = workspace / entry["path"]
+            if not path.is_file():
+                raise ValueError(f"indexed evidence file is missing: {entry['path']}")
+            if path.stat().st_size != entry["size_bytes"]:
+                raise ValueError(f"evidence size mismatch: {entry['path']}")
+            if _sha256_file(path) != entry["sha256"]:
+                raise ValueError(f"evidence digest mismatch: {entry['path']}")
+
+        # Verify paired-results.json after its digest has been checked.
+        paired = json.loads((workspace / "paired-results.json").read_text(encoding="utf-8"))
+        if paired.get("invalid_runs", -1) != 0:
+            raise ValueError(f"demo must have 0 invalid runs, got {paired.get('invalid_runs')}")
+
+        # Verify experiment-report.json
+        report = json.loads((workspace / "experiment-report.json").read_text(encoding="utf-8"))
+        if report.get("report_schema_version") != "ase/report/v1alpha1":
+            raise ValueError("unexpected report schema version")
+
+        # Verify experiment-report.html is loadable
+        html_content = (workspace / "experiment-report.html").read_text(encoding="utf-8")
+        if "SIMULATED DEMO" not in html_content and "SIMULATED" not in html_content:
+            raise ValueError("HTML report must contain SIMULATED marker")
+
+        return {
+            "valid": True,
+            "experiment_id": paired.get("experiment_id"),
+            "total_runs": paired.get("logical_runs"),
+            "invalid_runs": paired.get("invalid_runs"),
+            "simulated": paired.get("simulated", True),
+            "evidence_class": "SIMULATED_DEMO",
+            "dataset_sha256": paired.get("dataset_sha256"),
+            "audit_bundle_verified": True,
+            "wtl": {
+                "win": paired.get("win", 0),
+                "tie_positive": paired.get("tie_positive", 0),
+                "tie_negative": paired.get("tie_negative", 0),
+                "loss": paired.get("loss", 0),
+            },
+        }
+
+
+class DemoExperimentVerifier:
+    """Verify a completed demo experiment's integrity (legacy)."""
+
+    @staticmethod
+    def verify(workspace: Path) -> Dict[str, object]:
+        store = LocalExperimentStore(workspace)
+        exp_root = workspace / "experiments"
+        if not exp_root.is_dir():
+            raise ValueError("no experiments found in workspace")
+        exp_dirs = sorted(exp_root.iterdir())
+        if not exp_dirs:
+            raise ValueError("no experiments found in workspace")
+        experiment_id = UUID(exp_dirs[0].name)
+        manifest = store.load_experiment(experiment_id)
+        runs = store.list_runs(experiment_id)
+        invalid = sum(1 for r in runs if r.evaluation_outcome == EvaluationOutcome.INVALID)
+        return {
+            "valid": True,
+            "experiment_id": str(experiment_id),
+            "total_runs": len(runs),
+            "invalid_runs": invalid,
+            "simulated": True,
+            "dataset_sha256": manifest.dataset_sha256,
+        }
+
+
+def _copy_file(source: Path, destination: Path) -> None:
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination.write_bytes(source.read_bytes())
+
+
+def _sha256_file(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _sha256_json(payload: object) -> str:
+    content = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(content.encode("utf-8")).hexdigest()
+
+
+def _file_entry(path: Path, workspace: Path) -> Dict[str, object]:
+    return {
+        "path": path.relative_to(workspace).as_posix(),
+        "sha256": _sha256_file(path),
+        "size_bytes": path.stat().st_size,
+    }
+
+
+def _write_json(path: Path, data: object) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(data, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+
+def _write_file(path: Path, content: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding="utf-8")

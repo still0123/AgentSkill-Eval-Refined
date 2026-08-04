@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from agentskill_eval_benchmark_gen import DemoExperimentRunner, DemoRunConfig
+from agentskill_eval_benchmark_gen import DemoEvidencePack, DemoExperimentRunner, DemoRunConfig
 from agentskill_eval_experiment import (
     AnalysisConfig,
     BundleError,
@@ -39,6 +39,17 @@ def test_mock_demo_runs_72_logical_runs_and_writes_labeled_reports(tmp_path: Pat
     assert result.invalid_runs == 0
     assert result.report_paths.json_path.is_file()
     assert result.report_paths.html_path.is_file()
+    verification = DemoEvidencePack.verify(workspace)
+    assert verification["valid"] is True
+    assert verification["total_runs"] == 72
+    assert verification["audit_bundle_verified"] is True
+    evidence_index = json.loads((workspace / "evidence-index.json").read_text(encoding="utf-8"))
+    assert set(evidence_index["hashes"]) == {
+        "dataset_sha256",
+        "skill_sha256",
+        "runner_sha256",
+        "environment_sha256",
+    }
 
     store = LocalExperimentStore(workspace)
     experiment = store.load_experiment(result.experiment_id)
@@ -98,3 +109,8 @@ def test_mock_demo_runs_72_logical_runs_and_writes_labeled_reports(tmp_path: Pat
     tampered.write_bytes(corrupted)
     with pytest.raises(BundleError, match="digest mismatch"):
         ReplayBundleWriter.verify(tampered)
+
+    paired_results = workspace / "paired-results.json"
+    paired_results.write_text("tampered\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="evidence (size|digest) mismatch"):
+        DemoEvidencePack.verify(workspace)

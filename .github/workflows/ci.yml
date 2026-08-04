@@ -35,6 +35,52 @@ jobs:
         run: python -m mypy apps packages
       - name: Pytest
         run: python -m pytest
+      - name: Demo verification
+        run: |
+          agentskill-eval demo run --workspace /tmp/portfolio-demo
+          agentskill-eval demo verify --workspace /tmp/portfolio-demo
+          agentskill-eval demo run --workspace /tmp/portfolio-demo-repeat
+          agentskill-eval demo verify --workspace /tmp/portfolio-demo-repeat
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          ws = Path("/tmp/portfolio-demo")
+          repeat_ws = Path("/tmp/portfolio-demo-repeat")
+
+          # Check evidence pack files exist
+          required = ["experiment-report.json", "experiment-report.html",
+                       "paired-results.json", "evidence-index.json",
+                       "audit-bundle.tar", "skill-diff.patch"]
+          for f in required:
+              assert (ws / f).is_file(), f"missing evidence pack file: {f}"
+
+          # Verify no invalid runs
+          paired = json.loads((ws / "paired-results.json").read_text())
+          assert paired.get("invalid_runs", 1) == 0, "demo must have 0 invalid runs"
+          assert paired.get("simulated") is True, "demo must be marked simulated"
+
+          # Verify evidence class
+          index = json.loads((ws / "evidence-index.json").read_text())
+          assert index.get("evidence_class") == "SIMULATED_DEMO", "wrong evidence class"
+          assert set(index["hashes"]) == {
+              "dataset_sha256", "skill_sha256", "runner_sha256", "environment_sha256"
+          }
+
+          # Repeated offline runs must produce the same domain result and input hashes.
+          repeated = json.loads((repeat_ws / "paired-results.json").read_text())
+          paired.pop("experiment_id")
+          repeated.pop("experiment_id")
+          assert paired == repeated, "repeated demo result drifted"
+          repeated_index = json.loads((repeat_ws / "evidence-index.json").read_text())
+          assert index["hashes"] == repeated_index["hashes"], "input lineage hashes drifted"
+
+          # Verify HTML contains SIMULATED marker
+          html = (ws / "experiment-report.html").read_text()
+          assert "SIMULATED" in html, "HTML report must contain SIMULATED marker"
+
+          print(f"demo verification passed: {paired.get('logical_runs')} runs, "
+                f"0 invalid, evidence class={index.get('evidence_class')}")
+          PY
       - name: Export and validate public schemas
         run: |
           agentskill-eval schema export /tmp/agentskill-eval-schema.json

@@ -13,6 +13,7 @@ from agentskill_eval_benchmark_gen import (
     BenchmarkGenerationSpec,
     BenchmarkStore,
     DatasetLoader,
+    DemoEvidencePack,
     DemoExperimentRunner,
     DemoMode,
     DemoRunConfig,
@@ -891,11 +892,34 @@ def run_demo(
                 "logical_runs": result.logical_runs,
                 "simulated": result.simulated,
                 "treatment_variant_id": str(result.treatment_variant_id),
+                "evidence_pack": {
+                    "experiment_report_json": str(workspace / "experiment-report.json"),
+                    "experiment_report_html": str(workspace / "experiment-report.html"),
+                    "paired_results": str(workspace / "paired-results.json"),
+                    "evidence_index": str(workspace / "evidence-index.json"),
+                    "audit_bundle": str(workspace / "audit-bundle.tar"),
+                    "skill_diff_patch": str(workspace / "skill-diff.patch"),
+                    "trace_dir": str(workspace / "trace"),
+                },
             },
             ensure_ascii=False,
             sort_keys=True,
         )
     )
+
+
+@demo_app.command("verify")
+def verify_demo(
+    workspace: Path = typer.Option(  # noqa: B008
+        Path(".agentskill-eval-workspace"),
+        "--workspace",
+        help="Demo workspace to verify.",
+        file_okay=False,
+    ),
+) -> None:
+    """Verify a completed demo experiment's integrity and evidence pack."""
+    result = DemoEvidencePack.verify(workspace)
+    typer.echo(json.dumps(result, sort_keys=True))
 
 
 @schema_app.command("export")

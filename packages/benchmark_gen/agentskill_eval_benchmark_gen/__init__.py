@@ -13,7 +13,9 @@ from agentskill_eval_benchmark_gen.dataset import (
     LoadedDataset,
 )
 from agentskill_eval_benchmark_gen.demo import (
+    DemoEvidencePack,
     DemoExperimentRunner,
+    DemoExperimentVerifier,
     DemoMode,
     DemoRunConfig,
     DemoRunResult,
@@ -86,7 +88,9 @@ __all__ = [
     "DatasetLoader",
     "DatasetManifest",
     "DatasetSplit",
+    "DemoEvidencePack",
     "DemoExperimentRunner",
+    "DemoExperimentVerifier",
     "DemoMode",
     "DemoRunConfig",
     "DemoRunResult",

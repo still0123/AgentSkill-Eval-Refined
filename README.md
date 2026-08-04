@@ -14,6 +14,8 @@ AgentSkill-Eval 是一个面向 Agent Skill 的**配对评测与发布门禁系�
 
 ## 核心流程
 
+![架构图](docs/assets/architecture-overview.svg)
+
 ```
 冻结输入 → 配对执行 → 确定性验收 → 失败诊断 → 候选搜索 → 回归验证 → 独立终评 → 人工审核 → 发布
 ```
@@ -44,6 +46,37 @@ python3 -m pip install -e ".[dev]"
 # 运行 Demo（不调用真实模型）
 agentskill-eval demo run --workspace .agentskill-eval/demo
 ```
+
+## 演示结果
+
+以下是一组真实 Demo 输出（零费用，完全离线模拟）：
+
+```text
+12 Cases × 2 Arms × 3 Repeats = 72 Runs
+Invalid: 0
+W/T/L: 5 / 6 / 1
+Evidence Bundle: VERIFIED
+Cost: $0
+Evidence Class: SIMULATED DEMO
+```
+
+Demo 证据包包含：
+
+| 文件 | 说明 |
+|---|---|
+| `experiment-report.json` | 完整实验报告 |
+| `experiment-report.html` | 离线可打开的 HTML 报告 |
+| `paired-results.json` | 配对 Case 对比结果 |
+| `evidence-index.json` | 全部 Run 的索引与证据分类 |
+| `audit-bundle.tar` | SHA-256 审计包 |
+| `skill-diff.patch` | Skill 差异补丁 |
+| `trace/` | Agent 执行 Trace 集合 |
+
+> **注意**：Demo 标记为 `SIMULATED DEMO`，所有结果均为确定性 fixture，不代表真实 Agent 或 Skill 性能。
+
+## 五分钟演示
+
+参阅 [docs/five-minute-demo.md](docs/five-minute-demo.md) 获取完整的面试讲解流程。
 
 ## CLI 命令
 
