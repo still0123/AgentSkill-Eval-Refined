@@ -165,9 +165,6 @@ class SkillCandidateTransition(FrozenModel):
 
 
 class SkillCandidate(FrozenModel):
-    schema_version: Literal["ase/skill-candidate/v1alpha1"] = (
-        "ase/skill-candidate/v1alpha1"
-    )
     id: UUID
     job_id: UUID
     name: str = Field(min_length=1)
@@ -207,9 +204,6 @@ class SkillCandidate(FrozenModel):
 
 
 class OptimizationJob(FrozenModel):
-    schema_version: Literal["ase/optimization-job/v1alpha1"] = (
-        "ase/optimization-job/v1alpha1"
-    )
     id: UUID
     status: OptimizationJobStatus
     spec_sha256: HexDigest

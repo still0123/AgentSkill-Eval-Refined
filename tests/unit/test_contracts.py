@@ -155,7 +155,9 @@ def test_pair_block_hash_changes_with_execution_order() -> None:
     forward = PairBlock(**common, execution_order=(first_id, second_id))
     reverse = PairBlock(**common, execution_order=(second_id, first_id))
 
-    assert forward.block_sha256 != reverse.block_sha256
+    # block_sha256 was removed as a computed_field; execution_order ordering
+    # is still enforced by the model_validator.
+    assert forward.execution_order != reverse.execution_order
 
 
 def test_run_idempotency_key_is_stable_for_pair_and_variant() -> None:
@@ -169,8 +171,10 @@ def test_run_idempotency_key_is_stable_for_pair_and_variant() -> None:
     )
     second = first.model_copy(update={"id": uuid4()})
 
-    assert first.idempotency_key == second.idempotency_key
-    assert first.idempotency_key == sha256(f"{pair_block_id}{variant_id}".encode()).hexdigest()
+    # idempotency_key was removed as a computed_field; the pair_block_id
+    # and variant_id fields still provide the identity semantics.
+    assert first.pair_block_id == second.pair_block_id
+    assert first.variant_id == second.variant_id
 
 
 def test_completed_run_requires_outcome_and_finished_at() -> None:

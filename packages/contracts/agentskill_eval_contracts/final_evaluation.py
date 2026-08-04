@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Literal, Optional, Tuple
+from typing import Optional, Tuple
 from uuid import UUID
 
 from pydantic import Field, model_validator
@@ -49,9 +49,6 @@ class FinalCaseComparison(FrozenModel):
 
 
 class FinalEvaluationJob(FrozenModel):
-    schema_version: Literal["ase/final-evaluation-job/v1alpha1"] = (
-        "ase/final-evaluation-job/v1alpha1"
-    )
     id: UUID
     optimization_job_id: UUID
     optimization_job_sha256: HexDigest
@@ -80,9 +77,6 @@ class FinalEvaluationJob(FrozenModel):
 
 
 class FinalEvaluationReport(FrozenModel):
-    schema_version: Literal["ase/final-evaluation-report/v1alpha1"] = (
-        "ase/final-evaluation-report/v1alpha1"
-    )
     job: FinalEvaluationJob
     base_evaluations: Tuple[CandidateEvaluation, ...] = Field(min_length=1)
     winner_evaluations: Tuple[CandidateEvaluation, ...] = Field(min_length=1)
@@ -144,9 +138,6 @@ class FinalEvaluationReport(FrozenModel):
 
 
 class LockedTestReceipt(FrozenModel):
-    schema_version: Literal["ase/locked-test-receipt/v1alpha1"] = (
-        "ase/locked-test-receipt/v1alpha1"
-    )
     optimization_job_id: UUID
     final_evaluation_job_id: UUID
     dataset_sha256: HexDigest

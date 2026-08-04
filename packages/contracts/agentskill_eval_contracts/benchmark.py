@@ -114,7 +114,6 @@ class CandidateTransition(FrozenModel):
 
 
 class BenchmarkCandidate(FrozenModel):
-    schema_version: Literal["ase/benchmark-candidate/v1alpha1"] = "ase/benchmark-candidate/v1alpha1"
     id: UUID
     job_id: UUID
     key: str = Field(pattern=r"^[a-z0-9][a-z0-9-]{2,79}$")
@@ -166,7 +165,6 @@ class BenchmarkCandidate(FrozenModel):
 
 
 class BenchmarkJob(FrozenModel):
-    schema_version: Literal["ase/benchmark-job/v1alpha1"] = "ase/benchmark-job/v1alpha1"
     id: UUID
     status: BenchmarkJobStatus
     source_spec_sha256: HexDigest
@@ -192,9 +190,6 @@ class PublishedCase(FrozenModel):
 
 
 class BenchmarkDatasetVersion(FrozenModel):
-    schema_version: Literal["ase/benchmark-dataset-version/v1alpha1"] = (
-        "ase/benchmark-dataset-version/v1alpha1"
-    )
     id: UUID
     name: str = Field(min_length=1)
     version: str = Field(min_length=1)

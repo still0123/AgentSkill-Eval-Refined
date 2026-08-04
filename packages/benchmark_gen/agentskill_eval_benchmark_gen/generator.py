@@ -42,8 +42,7 @@ from agentskill_eval_contracts import (
     canonical_json,
     stable_sha256,
 )
-from agentskill_eval_experiment.storage.atomic import AtomicFileWriter
-from agentskill_eval_experiment.storage.manifests import load_model, model_bytes
+from agentskill_eval_experiment.storage import ContentStore, load_model, model_bytes
 
 GENERATOR_VERSION = "0.2.0"
 VERIFIER_VERSION = "0.2.0"
@@ -87,30 +86,30 @@ class BenchmarkStore:
     """Atomic manifest store with immutable per-transition candidate snapshots."""
 
     def __init__(self, workspace: Path) -> None:
-        self.root = workspace.resolve() / "benchmark-jobs"
-        self.writer = AtomicFileWriter()
+        self.cs = ContentStore(workspace / "benchmark-jobs")
 
     def job_dir(self, job_id: UUID) -> Path:
-        return self.root / str(job_id)
+        return self.cs.sub(job_id).root
 
     def save_job(self, job: BenchmarkJob) -> None:
-        self.writer.write(self.job_dir(job.id) / "job.json", model_bytes(job))
+        self.cs.sub(job.id).save("job.json", job)
 
     def load_job(self, job_id: UUID) -> BenchmarkJob:
-        return load_model((self.job_dir(job_id) / "job.json").read_bytes(), BenchmarkJob)
+        return self.cs.sub(job_id).load("job.json", BenchmarkJob)
 
     def save_candidate(self, candidate: BenchmarkCandidate) -> None:
-        directory = self.job_dir(candidate.job_id) / "candidates" / str(candidate.id)
-        snapshot = directory / "history" / f"{len(candidate.transitions):04d}.json"
+        ns = self.cs.sub(candidate.job_id).namespace("candidates", str(candidate.id))
+        snapshot = ns.root / "history" / f"{len(candidate.transitions):04d}.json"
         if snapshot.exists():
             raise BenchmarkGenerationError(f"immutable transition snapshot exists: {snapshot}")
         content = model_bytes(candidate)
-        self.writer.write(snapshot, content)
-        self.writer.write(directory / "candidate.json", content)
+        ns.write_bytes(f"history/{len(candidate.transitions):04d}.json", content)
+        ns.write_bytes("candidate.json", content)
 
     def load_candidate(self, job_id: UUID, candidate_id: UUID) -> BenchmarkCandidate:
-        path = self.job_dir(job_id) / "candidates" / str(candidate_id) / "candidate.json"
-        return load_model(path.read_bytes(), BenchmarkCandidate)
+        return self.cs.sub(job_id).namespace("candidates", str(candidate_id)).load(
+            "candidate.json", BenchmarkCandidate
+        )
 
     def list_candidates(self, job: BenchmarkJob) -> Tuple[BenchmarkCandidate, ...]:
         return tuple(
@@ -118,16 +117,17 @@ class BenchmarkStore:
         )
 
     def save_dataset_version(self, version: BenchmarkDatasetVersion, root: Path) -> Path:
-        destination = self.root.parent / "dataset-versions" / str(version.id)
+        import shutil
+        destination = self.cs.root.parent / "dataset-versions" / str(version.id)
         if destination.exists():
             raise BenchmarkGenerationError("DatasetVersion is immutable and already exists")
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copytree(root, destination)
-        self.writer.write(destination / "dataset-version.json", model_bytes(version))
+        ContentStore(destination).save("dataset-version.json", version)
         return destination
 
     def published_dataset_versions(self) -> Tuple[Tuple[BenchmarkDatasetVersion, Path], ...]:
-        versions_root = self.root.parent / "dataset-versions"
+        versions_root = self.cs.root.parent / "dataset-versions"
         if not versions_root.is_dir():
             return ()
         versions = []
@@ -281,8 +281,8 @@ class CommandVerifier:
         log_dir.mkdir(parents=True, exist_ok=True)
         stdout_path = log_dir / f"{repeat:02d}.stdout"
         stderr_path = log_dir / f"{repeat:02d}.stderr"
-        self.store.writer.write(stdout_path, stdout)
-        self.store.writer.write(stderr_path, stderr)
+        self.store.cs.sub(self.job_id).namespace("candidates", str(candidate_id), "evidence", variant).write_bytes(f"{repeat:02d}.stdout", stdout)
+        self.store.cs.sub(self.job_id).namespace("candidates", str(candidate_id), "evidence", variant).write_bytes(f"{repeat:02d}.stderr", stderr)
         return CommandEvidence(
             variant=variant,  # type: ignore[arg-type]
             repeat_index=repeat,
@@ -343,9 +343,7 @@ class AutomaticBenchmarkGenerator:
                     f"repository origin does not match pinned repository_url: {key}"
                 )
         self.store.save_job(job)
-        self.store.writer.write(
-            self.store.job_dir(job_id) / "source-spec.json", canonical_json(semantic_spec)
-        )
+        self.store.cs.sub(job_id).write_bytes("source-spec.json", canonical_json(semantic_spec))
         verifier = CommandVerifier(self.store, job_id, spec.budget.max_commands)
         started = time.monotonic()
         candidates = []
@@ -536,8 +534,9 @@ class AutomaticBenchmarkGenerator:
         source.apply_patch(alternative_dir, alternative_patch)
         patch_dir = base / "evidence" / "patches"
         patch_dir.mkdir(parents=True, exist_ok=True)
-        self.store.writer.write(patch_dir / "reference.patch", reference_patch)
-        self.store.writer.write(patch_dir / "alternative.patch", alternative_patch)
+        cs = self.store.cs.sub(candidate.job_id).namespace("candidates", str(candidate.id))
+        cs.write_bytes("evidence/patches/reference.patch", reference_patch)
+        cs.write_bytes("evidence/patches/alternative.patch", alternative_patch)
         license_content = source.blob(after, source_spec.license_path)
         if not license_content.strip():
             raise BenchmarkGenerationError("license file is empty")

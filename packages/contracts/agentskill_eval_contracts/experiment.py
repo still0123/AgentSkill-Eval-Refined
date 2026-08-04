@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Dict, Final, Literal, Optional, Tuple
+from typing import Dict, Final, Optional, Tuple
 from uuid import UUID
 
 from pydantic import AwareDatetime, Field, JsonValue, computed_field, model_validator
@@ -21,11 +21,9 @@ from agentskill_eval_contracts.snapshots import (
 )
 
 SCHEMA_VERSION: Final = "ase/v1alpha1"
-SchemaVersion = Literal["ase/v1alpha1"]
 
 
 class ExperimentVariant(FrozenModel):
-    schema_version: SchemaVersion = SCHEMA_VERSION
     id: UUID
     experiment_id: UUID
     name: str = Field(min_length=1, max_length=120)
@@ -41,9 +39,7 @@ class ExperimentVariant(FrozenModel):
     @computed_field(return_type=str)  # type: ignore[prop-decorator]
     @property
     def variant_sha256(self) -> str:
-        """Hash only arm-level semantics, excluding database identity and display name."""
         payload = {
-            "schema_version": self.schema_version,
             "role": self.role.value,
             "runner_snapshot": self.runner_snapshot.model_dump(mode="json"),
             "agent_snapshot": self.agent_snapshot.model_dump(mode="json"),
@@ -67,7 +63,6 @@ class ExperimentVariant(FrozenModel):
 
 
 class PairBlock(FrozenModel):
-    schema_version: SchemaVersion = SCHEMA_VERSION
     id: UUID
     experiment_id: UUID
     case_id: UUID
@@ -82,11 +77,6 @@ class PairBlock(FrozenModel):
             raise ValueError("execution_order must contain each variant exactly once")
         return self
 
-    @computed_field(return_type=str)  # type: ignore[prop-decorator]
-    @property
-    def block_sha256(self) -> str:
-        return stable_sha256(self.model_dump(mode="json", exclude={"block_sha256"}))
-
 
 class VariantReference(FrozenModel):
     variant_id: UUID
@@ -95,7 +85,6 @@ class VariantReference(FrozenModel):
 
 
 class ExperimentManifest(FrozenModel):
-    schema_version: SchemaVersion = SCHEMA_VERSION
     id: UUID
     name: str = Field(min_length=1, max_length=200)
     created_at: AwareDatetime = Field(default_factory=lambda: datetime.now(timezone.utc))

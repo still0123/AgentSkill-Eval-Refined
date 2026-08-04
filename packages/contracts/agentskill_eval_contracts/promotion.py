@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Dict, Literal, Optional, Tuple
+from typing import Dict, Optional, Tuple
 from uuid import UUID
 
 from pydantic import Field, model_validator
@@ -71,9 +71,6 @@ class PromotionTransition(FrozenModel):
 
 
 class SkillVersionPromotion(FrozenModel):
-    schema_version: Literal["ase/skill-version-promotion/v1alpha1"] = (
-        "ase/skill-version-promotion/v1alpha1"
-    )
     id: UUID
     skill_name: str = Field(pattern=r"^[a-z0-9][a-z0-9-]{1,79}$")
     target_version: str = Field(pattern=r"^[0-9]+\.[0-9]+\.[0-9]+(?:-[a-z0-9.-]+)?$")
@@ -160,7 +157,6 @@ class SkillVersionPromotion(FrozenModel):
 class SkillVersionManifest(FrozenModel):
     """Immutable publication manifest for a promoted Skill version."""
 
-    schema_version: Literal["ase/skill-version/v1alpha1"] = "ase/skill-version/v1alpha1"
     id: UUID
     skill_name: str = Field(pattern=r"^[a-z0-9][a-z0-9-]{1,79}$")
     version: str = Field(pattern=r"^[0-9]+\.[0-9]+\.[0-9]+(?:-[a-z0-9.-]+)?$")

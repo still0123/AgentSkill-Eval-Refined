@@ -10,8 +10,6 @@ from uuid import UUID
 from pydantic import Field, JsonValue, field_validator, model_validator
 
 from agentskill_eval_contracts.base import FrozenModel
-from agentskill_eval_contracts.experiment import SCHEMA_VERSION, SchemaVersion
-
 
 class TraceAvailability(str, Enum):
     OBSERVED = "observed"
@@ -71,7 +69,6 @@ class TraceEvent(FrozenModel):
 
 
 class TraceManifest(FrozenModel):
-    schema_version: SchemaVersion = SCHEMA_VERSION
     run_id: UUID
     attempt_id: UUID
     capabilities: Tuple[TraceCapability, ...]
@@ -109,7 +106,6 @@ class DiagnosticFinding(FrozenModel):
 
 
 class FailureDiagnosis(FrozenModel):
-    schema_version: SchemaVersion = SCHEMA_VERSION
     run_id: UUID
     attempt_id: UUID
     status: Literal["no_failure", "diagnosed", "abstained"]
@@ -142,7 +138,6 @@ class EventCountDelta(FrozenModel):
 
 
 class PairTraceDiff(FrozenModel):
-    schema_version: SchemaVersion = SCHEMA_VERSION
     pair_block_id: UUID
     control_run_id: UUID
     treatment_run_id: UUID

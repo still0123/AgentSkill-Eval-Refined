@@ -5,11 +5,10 @@ from __future__ import annotations
 from typing import Dict, FrozenSet, Optional
 from uuid import UUID
 
-from pydantic import AwareDatetime, Field, JsonValue, computed_field, model_validator
+from pydantic import AwareDatetime, Field, JsonValue, model_validator
 
 from agentskill_eval_contracts.base import FrozenModel, HexDigest, sha256_text, stable_sha256
 from agentskill_eval_contracts.enums import AttemptStatus, EvaluationOutcome, ExecutionStatus
-from agentskill_eval_contracts.experiment import SCHEMA_VERSION, SchemaVersion
 from agentskill_eval_contracts.snapshots import EnvironmentFingerprint
 
 
@@ -19,12 +18,6 @@ class RunPlanFingerprint(FrozenModel):
     platform_compiled_prompt_sha256: HexDigest
     upstream_config_sha256: HexDigest
     image_digest: Optional[str] = None
-
-    @computed_field(return_type=str)  # type: ignore[prop-decorator]
-    @property
-    def plan_sha256(self) -> str:
-        return stable_sha256(self.model_dump(mode="json", exclude={"plan_sha256"}))
-
 
 ALLOWED_RUN_TRANSITIONS: Dict[ExecutionStatus, FrozenSet[ExecutionStatus]] = {
     ExecutionStatus.CREATED: frozenset({ExecutionStatus.QUEUED, ExecutionStatus.CANCEL_REQUESTED}),
@@ -123,7 +116,6 @@ def validate_attempt_transition(current: AttemptStatus, target: AttemptStatus) -
 
 
 class Run(FrozenModel):
-    schema_version: SchemaVersion = SCHEMA_VERSION
     id: UUID
     experiment_id: UUID
     pair_block_id: UUID
@@ -139,11 +131,6 @@ class Run(FrozenModel):
     max_attempts: int = Field(default=3, ge=1)
     queued_at: Optional[AwareDatetime] = None
     finished_at: Optional[AwareDatetime] = None
-
-    @computed_field(return_type=str)  # type: ignore[prop-decorator]
-    @property
-    def idempotency_key(self) -> str:
-        return sha256_text(f"{self.pair_block_id}{self.variant_id}")
 
     @model_validator(mode="after")
     def terminal_state_must_have_consistent_outcome(self) -> "Run":
@@ -165,7 +152,6 @@ class Run(FrozenModel):
 
 
 class RunAttempt(FrozenModel):
-    schema_version: SchemaVersion = SCHEMA_VERSION
     id: UUID
     run_id: UUID
     attempt_no: int = Field(ge=1)

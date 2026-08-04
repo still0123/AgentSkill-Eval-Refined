@@ -13,17 +13,6 @@ from agentskill_eval_scenarios.contracts import (
     UnifiedScenarioSpec,
     VariantDescriptor,
 )
-from agentskill_eval_scenarios.interactive import (
-    InteractionHistoryEvent,
-    InteractiveAgentAction,
-    InteractiveRunEvidence,
-    InteractiveTraceEvent,
-)
-from agentskill_eval_scenarios.process_agent import (
-    AgentDecisionEvidence,
-    ProcessAgentError,
-    ProcessScenarioAgentClient,
-)
 from agentskill_eval_scenarios.runtime import UnifiedScenarioRunner
 
 __all__ = [
@@ -31,13 +20,6 @@ __all__ = [
     "ComparisonKind",
     "EvaluationPlan",
     "EvidenceClass",
-    "AgentDecisionEvidence",
-    "InteractionHistoryEvent",
-    "InteractiveAgentAction",
-    "InteractiveRunEvidence",
-    "InteractiveTraceEvent",
-    "ProcessAgentError",
-    "ProcessScenarioAgentClient",
     "ProcessScenarioAgentSpec",
     "ScenarioAdapter",
     "ScenarioKind",

@@ -2,6 +2,7 @@
 
 from agentskill_eval_experiment.storage.atomic import AtomicFileWriter, StagedWrite
 from agentskill_eval_experiment.storage.blobs import BlobReference, ContentAddressedBlobStore
+from agentskill_eval_experiment.storage.content_store import ContentStore, ManifestEnvelope
 from agentskill_eval_experiment.storage.errors import (
     ImmutableManifestError,
     IntegrityError,
@@ -11,7 +12,6 @@ from agentskill_eval_experiment.storage.errors import (
 from agentskill_eval_experiment.storage.index import LocalSqliteIndex, ManifestIndexRecord
 from agentskill_eval_experiment.storage.locks import LocalRunLock
 from agentskill_eval_experiment.storage.manifests import (
-    ManifestEnvelope,
     envelope_for_model,
     load_model,
     model_bytes,
@@ -27,6 +27,7 @@ __all__ = [
     "AtomicFileWriter",
     "BlobReference",
     "ContentAddressedBlobStore",
+    "ContentStore",
     "ExperimentLayout",
     "ImmutableManifestError",
     "IntegrityError",

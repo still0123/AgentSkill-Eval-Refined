@@ -5,15 +5,12 @@ from __future__ import annotations
 from typing import Dict, Literal, Optional, Tuple
 from uuid import UUID
 
-from pydantic import Field, computed_field, model_validator
+from pydantic import Field, model_validator
 
 from agentskill_eval_contracts.artifacts import ArtifactEntry
 from agentskill_eval_contracts.base import FrozenModel, HexDigest, stable_sha256
-from agentskill_eval_contracts.experiment import SCHEMA_VERSION, SchemaVersion
-
 
 class FrozenInputManifest(FrozenModel):
-    schema_version: SchemaVersion = SCHEMA_VERSION
     experiment_id: UUID
     input_kind: Literal["case_source", "skill"]
     owner_id: UUID
@@ -28,16 +25,8 @@ class FrozenInputManifest(FrozenModel):
             raise ValueError("frozen input paths must be sorted")
         return self
 
-    @computed_field(return_type=str)  # type: ignore[prop-decorator]
-    @property
-    def tree_sha256(self) -> str:
-        return stable_sha256(
-            [entry.model_dump(mode="json", round_trip=True) for entry in self.files]
-        )
-
 
 class SkillActivationEvidence(FrozenModel):
-    schema_version: SchemaVersion = SCHEMA_VERSION
     run_id: UUID
     attempt_id: UUID
     skill_expected: bool
@@ -54,7 +43,6 @@ class SkillActivationEvidence(FrozenModel):
 
 
 class SecurityScanEvidence(FrozenModel):
-    schema_version: SchemaVersion = SCHEMA_VERSION
     run_id: UUID
     attempt_id: UUID
     scanner: Literal["exact-secret/v1"] = "exact-secret/v1"
@@ -75,7 +63,6 @@ class SecurityScanEvidence(FrozenModel):
 
 
 class ReplayBundleManifest(FrozenModel):
-    schema_version: SchemaVersion = SCHEMA_VERSION
     experiment_id: UUID
     scope: Literal["audit_and_reanalysis"] = "audit_and_reanalysis"
     files: Tuple[ArtifactEntry, ...] = Field(min_length=1)
@@ -93,10 +80,3 @@ class ReplayBundleManifest(FrozenModel):
         if paths != sorted(paths):
             raise ValueError("replay bundle paths must be sorted")
         return self
-
-    @computed_field(return_type=str)  # type: ignore[prop-decorator]
-    @property
-    def bundle_sha256(self) -> str:
-        return stable_sha256(
-            [entry.model_dump(mode="json", round_trip=True) for entry in self.files]
-        )

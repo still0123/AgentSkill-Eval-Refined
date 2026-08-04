@@ -62,7 +62,6 @@ class SkillUnderTest(FrozenModel):
 
 
 class UnifiedScenarioSpec(FrozenModel):
-    schema_version: Literal["ase/unified-scenario/v1alpha1"]
     name: str = Field(min_length=1)
     scenario: ScenarioKind
     comparison: ComparisonKind
@@ -154,7 +153,6 @@ class ProcessScenarioAgentSpec(FrozenModel):
 
 
 class EvaluationPlan(FrozenModel):
-    schema_version: Literal["ase/evaluation-plan/v1alpha1"] = "ase/evaluation-plan/v1alpha1"
     name: str
     scenario: ScenarioKind
     comparison: ComparisonKind
@@ -197,7 +195,6 @@ class ArtifactReference(FrozenModel):
 
 
 class UnifiedEvaluationResult(FrozenModel):
-    schema_version: Literal["ase/unified-result/v1alpha1"] = "ase/unified-result/v1alpha1"
     experiment_id: UUID
     plan: EvaluationPlan
     status: Literal["completed", "invalid"]

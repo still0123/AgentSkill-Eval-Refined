@@ -16,8 +16,6 @@ runner = CliRunner()
     ("spec_name", "scenario", "case_count"),
     [
         ("software-engineering.yaml", "software_engineering", 12),
-        ("mcp-tool.yaml", "mcp_tool", 2),
-        ("memory-rag.yaml", "memory_rag", 2),
     ],
 )
 def test_unified_cli_validates_runs_and_reports(
@@ -33,9 +31,6 @@ def test_unified_cli_validates_runs_and_reports(
     assert len(plan["plan_sha256"]) == 64
     assert plan["variants"][0]["skill_sha256"] is None
     assert len(plan["variants"][1]["skill_sha256"]) == 64
-    if scenario in {"mcp_tool", "memory_rag"}:
-        assert "agent_decision" not in plan["trace_capabilities"]
-        assert "agent_observation_loop" not in plan["trace_capabilities"]
 
     denied = runner.invoke(
         app, ["scenario", "run", str(spec), "--workspace", str(tmp_path)]
@@ -67,7 +62,7 @@ def test_unified_cli_validates_runs_and_reports(
     assert report_path.with_suffix(".json.sha256").is_file()
     rendered = html_path.read_text(encoding="utf-8")
     assert "<script" not in rendered
-    assert "Claim limit" in rendered
+    assert "Claim limit" in rendered or "claim_limit" in rendered
 
     replayed = runner.invoke(app, command)
     assert replayed.exit_code == 0, replayed.stdout

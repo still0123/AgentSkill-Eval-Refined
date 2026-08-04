@@ -27,8 +27,7 @@ from agentskill_eval_contracts import (
     canonical_json,
     stable_sha256,
 )
-from agentskill_eval_experiment.storage.atomic import AtomicFileWriter
-from agentskill_eval_experiment.storage.manifests import load_model, model_bytes
+from agentskill_eval_experiment.storage import ContentStore, load_model, model_bytes
 from agentskill_eval_skill_optimizer.evaluator import CandidateEvaluator, build_evaluator
 from agentskill_eval_skill_optimizer.real_evaluator import (
     RealAgentCandidateEvaluator,
@@ -66,29 +65,28 @@ def _sha256(content: bytes) -> str:
 class OptimizationStore:
     def __init__(self, workspace: Path) -> None:
         self.root = workspace.resolve() / "optimization-jobs"
-        self.writer = AtomicFileWriter()
+        self._store = ContentStore(self.root)
 
     def job_dir(self, job_id: UUID) -> Path:
         return self.root / str(job_id)
 
     def save_job(self, job: OptimizationJob) -> None:
-        self.writer.write(self.job_dir(job.id) / "job.json", model_bytes(job))
+        self._store.sub(job.id).save("job.json", job)
 
     def load_job(self, job_id: UUID) -> OptimizationJob:
-        return load_model((self.job_dir(job_id) / "job.json").read_bytes(), OptimizationJob)
+        return self._store.sub(job_id).load("job.json", OptimizationJob)
 
     def save_candidate(self, candidate: SkillCandidate) -> None:
         directory = self.job_dir(candidate.job_id) / "candidates" / str(candidate.id)
         snapshot = directory / "history" / f"{len(candidate.transitions):04d}.json"
         if snapshot.exists():
             raise SkillSearchError(f"immutable candidate snapshot exists: {snapshot}")
-        content = model_bytes(candidate)
-        self.writer.write(snapshot, content)
-        self.writer.write(directory / "candidate.json", content)
+        candidate_store = self._store.sub(candidate.job_id).namespace("candidates", str(candidate.id))
+        candidate_store.write_bytes(f"history/{len(candidate.transitions):04d}.json", model_bytes(candidate))
+        candidate_store.save("candidate.json", candidate)
 
     def load_candidate(self, job_id: UUID, candidate_id: UUID) -> SkillCandidate:
-        path = self.job_dir(job_id) / "candidates" / str(candidate_id) / "candidate.json"
-        return load_model(path.read_bytes(), SkillCandidate)
+        return self._store.sub(job_id).namespace("candidates", str(candidate_id)).load("candidate.json", SkillCandidate)
 
     def list_candidates(self, job: OptimizationJob) -> Tuple[SkillCandidate, ...]:
         return tuple(self.load_candidate(job.id, item) for item in job.candidate_ids)
@@ -102,7 +100,7 @@ class OptimizationStore:
         target = self.skill_path(candidate)
         if target.exists():
             raise SkillSearchError("candidate Skill content is immutable")
-        self.writer.write(target, content)
+        self._store.sub(candidate.job_id).namespace("candidates", str(candidate.id)).write_bytes("SKILL.md", content)
 
     def assert_skill_integrity(self, candidate: SkillCandidate) -> None:
         if _sha256(self.skill_path(candidate).read_bytes()) != candidate.content_sha256:
@@ -237,14 +235,14 @@ class BenchmarkGuidedSkillSearch:
         )
         self.store.save_job(job)
         job_dir = self.store.job_dir(job.id)
-        self.store.writer.write(job_dir / "search-spec.json", canonical_json(semantic_spec))
-        self.store.writer.write(
-            job_dir / "validation-search.json",
+        self.store._store.sub(job.id).write_bytes("search-spec.json", canonical_json(semantic_spec))
+        self.store._store.sub(job.id).write_bytes(
+            "validation-search.json",
             canonical_json(dataset.model_dump(mode="json")),
         )
         inputs = job_dir / "inputs"
-        self.store.writer.write(inputs / "base-SKILL.md", base_content)
-        self.store.writer.write(inputs / "manual-SKILL.md", manual_content)
+        self.store._store.sub(job.id).namespace("inputs").write_bytes("base-SKILL.md", base_content)
+        self.store._store.sub(job.id).namespace("inputs").write_bytes("manual-SKILL.md", manual_content)
         if curated_source is None:
             frozen_dataset_file = job_dir / "validation-search.json"
         else:
@@ -819,8 +817,8 @@ class BenchmarkGuidedSkillSearch:
         }
         json_path = report_dir / "search-report.json"
         html_path = report_dir / "search-report.html"
-        self.store.writer.write(
-            json_path, json.dumps(report, indent=2, sort_keys=True).encode() + b"\n"
+        self.store._store.sub(job.id).namespace("reports").write_bytes(
+            "search-report.json", json.dumps(report, indent=2, sort_keys=True).encode() + b"\n"
         )
         table_rows = "".join(
             "<tr>"
@@ -848,5 +846,5 @@ class BenchmarkGuidedSkillSearch:
             f"<th>Pass rate</th><th>Tokens</th></tr></thead><tbody>{table_rows}</tbody></table>"
             "</body></html>"
         )
-        self.store.writer.write(html_path, page.encode("utf-8"))
+        self.store._store.sub(job.id).namespace("reports").write_bytes("search-report.html", page.encode("utf-8"))
         return json_path, html_path

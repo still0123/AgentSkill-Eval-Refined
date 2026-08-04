@@ -78,9 +78,6 @@ class InteractiveTraceEvent(FrozenModel):
 
 
 class InteractiveRunEvidence(FrozenModel):
-    schema_version: Literal["ase/interactive-run-evidence/v1alpha1"] = (
-        "ase/interactive-run-evidence/v1alpha1"
-    )
     scenario: Literal["mcp_tool", "memory_rag"]
     case_id: str = Field(min_length=1)
     variant: str = Field(min_length=1)

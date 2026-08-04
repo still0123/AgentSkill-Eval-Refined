@@ -288,25 +288,7 @@ def test_static_report_is_offline_escaped_and_machine_readable(tmp_path: Path) -
         "traces": [],
     }
 
-    cli_result = cli_runner.invoke(
-        app,
-        [
-            "report",
-            "generate",
-            str(tmp_path),
-            str(experiment.id),
-            "--control",
-            str(control.id),
-            "--treatment",
-            str(treatment.id),
-            "--bootstrap-resamples",
-            "10",
-        ],
-    )
-    assert cli_result.exit_code == 0
-    cli_payload = json.loads(cli_result.stdout)
-    assert cli_payload["inference_ready"] is True
-    assert cli_payload["html_report"].endswith("report.html")
+    # CLI report generate command was removed during CLI reduction
 
 
 def test_statistics_reject_nonterminal_runs(tmp_path: Path) -> None:

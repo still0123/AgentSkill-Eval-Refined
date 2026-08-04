@@ -8,11 +8,8 @@ from uuid import UUID
 from pydantic import Field, computed_field
 
 from agentskill_eval_contracts.base import FrozenModel
-from agentskill_eval_contracts.experiment import SCHEMA_VERSION, SchemaVersion
-
 
 class RunMeasurement(FrozenModel):
-    schema_version: SchemaVersion = SCHEMA_VERSION
     run_id: UUID
     attempt_id: UUID
     runner_status: Literal["PASS", "FAIL", "SKIP", "ERROR"]
@@ -29,6 +26,8 @@ class RunMeasurement(FrozenModel):
     @computed_field(return_type=Optional[int])  # type: ignore[prop-decorator]
     @property
     def total_tokens(self) -> Optional[int]:
-        if self.input_tokens is None or self.output_tokens is None:
-            return None
-        return self.input_tokens + self.output_tokens
+        if self.input_tokens is not None and self.output_tokens is not None:
+            return self.input_tokens + self.output_tokens
+        return None
+
+    

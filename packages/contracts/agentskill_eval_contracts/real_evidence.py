@@ -44,7 +44,6 @@ class ExecutableSnapshot(FrozenModel):
 
 
 class RealPreflightReport(FrozenModel):
-    schema_version: Literal["ase/real-preflight/v1alpha1"] = "ase/real-preflight/v1alpha1"
     config_sha256: HexDigest
     dataset_version_id: UUID
     dataset_name: str = Field(min_length=1)
@@ -76,9 +75,6 @@ class RealPreflightReport(FrozenModel):
 
 
 class RealAttemptEvidence(FrozenModel):
-    schema_version: Literal["ase/real-attempt-evidence/v1alpha1"] = (
-        "ase/real-attempt-evidence/v1alpha1"
-    )
     experiment_id: UUID
     run_id: UUID
     attempt_id: UUID
@@ -101,7 +97,6 @@ class RealAttemptEvidence(FrozenModel):
 
 
 class RealEvidenceRunManifest(FrozenModel):
-    schema_version: Literal["ase/real-evidence-run/v1alpha1"] = "ase/real-evidence-run/v1alpha1"
     experiment_id: UUID
     mode: RealRunMode
     status: RealEvidenceStatus
@@ -153,9 +148,6 @@ class RealCaseEvidence(FrozenModel):
 
 
 class RealExperimentReport(FrozenModel):
-    schema_version: Literal["ase/real-experiment-report/v1alpha1"] = (
-        "ase/real-experiment-report/v1alpha1"
-    )
     run: RealEvidenceRunManifest
     dataset_version_id: UUID
     dataset_name: str = Field(min_length=1)

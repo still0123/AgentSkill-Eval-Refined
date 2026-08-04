@@ -41,7 +41,6 @@ class HumanReviewRecord(FrozenModel):
 
 
 class PromotionWorkflowRecord(FrozenModel):
-    schema_version: Literal["ase/promotion-workflow/v1alpha1"] = "ase/promotion-workflow/v1alpha1"
     id: UUID
     promotion_id: UUID
     evolution_id: UUID
@@ -111,7 +110,6 @@ class PromotionWorkflowRecord(FrozenModel):
 
 
 class PromotionReleaseManifest(FrozenModel):
-    schema_version: Literal["ase/promotion-release/v1alpha1"] = "ase/promotion-release/v1alpha1"
     workflow_id: UUID
     promotion_id: UUID
     decision: Literal["APPROVED", "REJECTED"]

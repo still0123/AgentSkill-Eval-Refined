@@ -496,13 +496,9 @@ def test_storage_cli_recovers_and_rebuilds_index(tmp_path: Path) -> None:
     layout = ExperimentLayout(tmp_path, experiment.id)
     layout.index.unlink()
 
-    recover_result = cli_runner.invoke(app, ["storage", "recover", str(tmp_path)])
-    rebuild_result = cli_runner.invoke(
-        app,
-        ["storage", "rebuild-index", str(tmp_path), str(experiment.id)],
-    )
+    # Direct API calls (CLI commands removed during CLI reduction)
+    report = store.recover()
+    records = store.rebuild_index(experiment.id)
 
-    assert recover_result.exit_code == 0
-    assert json.loads(recover_result.stdout)["unfinished_run_ids"]
-    assert rebuild_result.exit_code == 0
-    assert json.loads(rebuild_result.stdout) == {"indexed_manifests": 5}
+    assert report.unfinished_run_ids
+    assert len(records) == 5
