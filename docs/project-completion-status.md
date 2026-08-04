@@ -155,3 +155,7 @@ Process 集成验收，尚未将其表述为真实 Skill 改进证据。
 实验在 Search 阶段按预算门停止，没有执行 regression、confirmation 或 locked test，没有发布
 Skill v2，也没有启动第二 Skill family。详见
 [Real Positive Skill Loop Attempt](./real-positive-skill-loop.md)。
+
+停止后已修复 FailureBridge 的脱敏行为摘要：它从 Manifest 哈希绑定的结构化 session transcript
+中仅导出固定、Case 无关的只读检查/编辑/测试行为结论，并对未知命令保持 abstain。该修复已用
+保留的 train replay 离线验证，但没有重新调用 Proposal，因此不改变上述失败结论。

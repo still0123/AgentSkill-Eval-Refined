@@ -34,6 +34,17 @@ The full bundles are intentionally not committed because they contain complete p
 fixtures and total several megabytes. Their digests bind this summary to the retained local
 artifacts.
 
+## Post-attempt recovery
+
+FailureBridge now derives a fixed case-agnostic behavior summary from the hash-bound structured
+session transcript when every observed action is provably read-only. The retained train replay
+rebuilds to “only read-only inspection actions; no edit action or test-oriented command was
+observed.” Unknown commands cause abstention, and raw commands, paths, patches, test output, and
+`workspace_diff` never enter the Proposal request.
+
+This was an offline recovery check only. No Proposal or Agent was called, the budget ledger did not
+change, and the original validation_search result remains zero gain.
+
 ## Evidence boundary
 
 All successful train and search Runs are `observed_agent`, not simulated. The cases originate from

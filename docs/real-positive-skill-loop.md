@@ -98,10 +98,23 @@ No completed Run was replayed for additional cost.
 - Test Generation Skill: not started.
 
 The next attempt should change only the sanitized failure-evidence granularity. The Proposal input
-must distinguish “deterministic verification failed” from the observed behavior “the Agent made no
-edit and did not run the targeted test.” The Case selection, Runtime, grading protocol, and
-confirmation/locked datasets should remain unchanged until a genuinely different general rule is
-proposed under a fresh budget.
+must distinguish “deterministic verification failed” from the observed behavior “the structured
+session recorded only read-only inspection actions; no edit action or test-oriented command was
+observed.” The Case selection, Runtime, grading protocol, and confirmation/locked datasets should
+remain unchanged until a genuinely different general rule is proposed under a fresh budget.
+
+## Post-attempt recovery fix
+
+After the paid experiment stopped, FailureBridge was updated to derive that case-agnostic behavior
+summary from the hash-bound `session-result.json`. It verifies the artifact manifest and declared
+tool-call count, recognizes only a strict allowlist of read-only inspection commands, ignores
+`workspace_diff` because the Runner may capture pre-existing host-worktree changes, and abstains on
+unknown commands or schema drift. The generated Proposal request contains only the fixed summary,
+never tool arguments, commands, paths, repository names, patches, or test output.
+
+This recovery fix was verified by rebuilding a new FailureBundle from the retained train replay
+without an Agent or Proposal call. It does not alter the recorded Search result, consume additional
+budget, or establish a Skill v2.
 
 ## Evidence
 
