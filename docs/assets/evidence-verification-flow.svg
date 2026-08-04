@@ -1,0 +1,128 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 820" font-family="Arial, 'PingFang SC', 'Microsoft YaHei', sans-serif">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#52606d"/>
+    </marker>
+    <marker id="green-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#16855b"/>
+    </marker>
+    <marker id="red-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#c23b3b"/>
+    </marker>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#172b4d" flood-opacity="0.12"/>
+    </filter>
+  </defs>
+
+  <rect width="1200" height="820" fill="#f7f9fc"/>
+  <text x="600" y="38" text-anchor="middle" font-size="22" font-weight="700" fill="#172b4d">
+    Portfolio Demo：从冻结输入到可验证证据
+  </text>
+  <text x="600" y="62" text-anchor="middle" font-size="12" fill="#5e6c84">
+    任何展示结果都必须回到 audit bundle；索引、报告或 Trace 任一漂移都会拒绝验证
+  </text>
+
+  <rect x="35" y="92" width="1130" height="208" rx="14" fill="#ffffff" stroke="#d8e0ea" filter="url(#shadow)"/>
+  <text x="55" y="120" font-size="14" font-weight="700" fill="#172b4d">1. 冻结输入与配对执行</text>
+
+  <rect x="55" y="140" width="205" height="132" rx="10" fill="#eaf2ff" stroke="#7aa7e8"/>
+  <text x="157" y="165" text-anchor="middle" font-size="13" font-weight="700" fill="#174a8b">输入指纹</text>
+  <text x="75" y="191" font-size="11" fill="#274c77">Dataset SHA-256</text>
+  <text x="75" y="211" font-size="11" fill="#274c77">Skill SHA-256</text>
+  <text x="75" y="231" font-size="11" fill="#274c77">Runner SHA-256</text>
+  <text x="75" y="251" font-size="11" fill="#274c77">Environment SHA-256</text>
+
+  <line x1="260" y1="206" x2="305" y2="206" stroke="#52606d" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <rect x="310" y="140" width="280" height="132" rx="10" fill="#edf8f3" stroke="#65b88e"/>
+  <text x="450" y="165" text-anchor="middle" font-size="13" font-weight="700" fill="#116149">稳定 Run Key</text>
+  <text x="330" y="190" font-size="11" fill="#245b4a">UUIDv5(Dataset + Skill + Protocol)</text>
+  <rect x="330" y="208" width="105" height="42" rx="7" fill="#ffffff" stroke="#93c9ae"/>
+  <text x="382" y="226" text-anchor="middle" font-size="11" font-weight="700" fill="#245b4a">Control</text>
+  <text x="382" y="241" text-anchor="middle" font-size="9" fill="#52796f">无 Skill</text>
+  <rect x="465" y="208" width="105" height="42" rx="7" fill="#ffffff" stroke="#93c9ae"/>
+  <text x="517" y="226" text-anchor="middle" font-size="11" font-weight="700" fill="#245b4a">Treatment</text>
+  <text x="517" y="241" text-anchor="middle" font-size="9" fill="#52796f">有 Skill</text>
+
+  <line x1="590" y1="206" x2="635" y2="206" stroke="#52606d" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <rect x="640" y="140" width="205" height="132" rx="10" fill="#fff6e5" stroke="#dfae49"/>
+  <text x="742" y="165" text-anchor="middle" font-size="13" font-weight="700" fill="#825b0b">确定性 Grader</text>
+  <text x="660" y="194" font-size="11" fill="#6c541f">Run：PASS / FAIL / INVALID</text>
+  <text x="660" y="218" font-size="11" fill="#6c541f">Pair：WIN / TIE / LOSS</text>
+  <text x="660" y="242" font-size="11" fill="#6c541f">INVALID 不归因给 Skill</text>
+
+  <line x1="845" y1="206" x2="890" y2="206" stroke="#52606d" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <rect x="895" y="140" width="245" height="132" rx="10" fill="#f3efff" stroke="#9a83d6"/>
+  <text x="1017" y="165" text-anchor="middle" font-size="13" font-weight="700" fill="#51358c">根证据包</text>
+  <text x="915" y="190" font-size="10.5" fill="#554477">experiment-report.json / html</text>
+  <text x="915" y="209" font-size="10.5" fill="#554477">paired-results.json</text>
+  <text x="915" y="228" font-size="10.5" fill="#554477">evidence-index.json + trace/</text>
+  <text x="915" y="247" font-size="10.5" fill="#554477">audit-bundle.tar + skill-diff.patch</text>
+
+  <rect x="35" y="325" width="1130" height="330" rx="14" fill="#ffffff" stroke="#d8e0ea" filter="url(#shadow)"/>
+  <text x="55" y="353" font-size="14" font-weight="700" fill="#172b4d">2. Fail-closed 验证链</text>
+
+  <rect x="55" y="380" width="235" height="105" rx="10" fill="#eaf2ff" stroke="#7aa7e8"/>
+  <text x="172" y="405" text-anchor="middle" font-size="12" font-weight="700" fill="#174a8b">A. 验证 audit bundle</text>
+  <text x="75" y="430" font-size="10.5" fill="#274c77">校验 tar 内部文件集合、大小、SHA-256</text>
+  <text x="75" y="451" font-size="10.5" fill="#274c77">读取不可变 experiment_id 与报告摘要</text>
+  <text x="75" y="472" font-size="10.5" fill="#274c77">拒绝路径穿越与不安全成员</text>
+
+  <line x1="290" y1="432" x2="325" y2="432" stroke="#52606d" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <rect x="330" y="380" width="235" height="105" rx="10" fill="#edf8f3" stroke="#65b88e"/>
+  <text x="447" y="405" text-anchor="middle" font-size="12" font-weight="700" fill="#116149">B. 锚定根报告</text>
+  <text x="350" y="430" font-size="10.5" fill="#245b4a">根 JSON / HTML 必须匹配 tar 内摘要</text>
+  <text x="350" y="451" font-size="10.5" fill="#245b4a">report 与 statistics 的 ID 必须一致</text>
+  <text x="350" y="472" font-size="10.5" fill="#245b4a">报告 Schema 必须为受支持版本</text>
+
+  <line x1="565" y1="432" x2="600" y2="432" stroke="#52606d" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <rect x="605" y="380" width="250" height="105" rx="10" fill="#fff6e5" stroke="#dfae49"/>
+  <text x="730" y="405" text-anchor="middle" font-size="12" font-weight="700" fill="#825b0b">C. 重建展示统计</text>
+  <text x="625" y="430" font-size="10.5" fill="#6c541f">从审计报告重建 72 Runs 与 W/T/L</text>
+  <text x="625" y="451" font-size="10.5" fill="#6c541f">paired-results 必须逐字段完全相同</text>
+  <text x="625" y="472" font-size="10.5" fill="#6c541f">输入四类哈希必须与 Variant 一致</text>
+
+  <line x1="855" y1="432" x2="890" y2="432" stroke="#52606d" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <rect x="895" y="380" width="245" height="105" rx="10" fill="#f3efff" stroke="#9a83d6"/>
+  <text x="1017" y="405" text-anchor="middle" font-size="12" font-weight="700" fill="#51358c">D. 核对索引与 Trace</text>
+  <text x="915" y="430" font-size="10.5" fill="#554477">文件列表必须精确且路径安全</text>
+  <text x="915" y="451" font-size="10.5" fill="#554477">Trace Run ID 必须与审计报告一致</text>
+  <text x="915" y="472" font-size="10.5" fill="#554477">拒绝缺文件、额外文件、软链接和漂移</text>
+
+  <line x1="172" y1="485" x2="172" y2="525" stroke="#16855b" stroke-width="2"/>
+  <line x1="447" y1="485" x2="447" y2="525" stroke="#16855b" stroke-width="2"/>
+  <line x1="730" y1="485" x2="730" y2="525" stroke="#16855b" stroke-width="2"/>
+  <line x1="1017" y1="485" x2="1017" y2="525" stroke="#16855b" stroke-width="2"/>
+  <line x1="172" y1="525" x2="1017" y2="525" stroke="#16855b" stroke-width="2"/>
+  <line x1="595" y1="525" x2="595" y2="548" stroke="#16855b" stroke-width="2" marker-end="url(#green-arrow)"/>
+
+  <rect x="430" y="553" width="330" height="55" rx="27" fill="#dff5e9" stroke="#16855b" stroke-width="2"/>
+  <text x="595" y="578" text-anchor="middle" font-size="14" font-weight="700" fill="#0e6848">全部一致：Evidence Bundle VERIFIED</text>
+  <text x="595" y="596" text-anchor="middle" font-size="9.5" fill="#39715d">返回 72 Runs、0 Invalid、5 / 6 / 1</text>
+
+  <line x1="895" y1="595" x2="845" y2="625" stroke="#c23b3b" stroke-width="2" stroke-dasharray="5,4" marker-end="url(#red-arrow)"/>
+  <rect x="690" y="610" width="155" height="30" rx="15" fill="#fde7e7" stroke="#c23b3b"/>
+  <text x="767" y="630" text-anchor="middle" font-size="10.5" font-weight="700" fill="#932d2d">任一不一致：拒绝</text>
+
+  <rect x="35" y="680" width="1130" height="105" rx="14" fill="#172b4d" filter="url(#shadow)"/>
+  <text x="55" y="708" font-size="14" font-weight="700" fill="#ffffff">3. 发布产物来源证明</text>
+  <text x="70" y="748" font-size="11" fill="#dce6f2">Git Tag</text>
+  <line x1="125" y1="744" x2="205" y2="744" stroke="#9fb3c8" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="220" y="748" font-size="11" fill="#dce6f2">GitHub Actions</text>
+  <line x1="330" y1="744" x2="410" y2="744" stroke="#9fb3c8" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="425" y="748" font-size="11" fill="#dce6f2">wheel-only Demo</text>
+  <line x1="540" y1="744" x2="620" y2="744" stroke="#9fb3c8" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="635" y="748" font-size="11" fill="#dce6f2">SHA256SUMS</text>
+  <line x1="735" y1="744" x2="815" y2="744" stroke="#9fb3c8" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="830" y="748" font-size="11" fill="#dce6f2">Build Attestation</text>
+  <line x1="955" y1="744" x2="1035" y2="744" stroke="#9fb3c8" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="1050" y="748" font-size="11" fill="#dce6f2">Prerelease</text>
+  <text x="600" y="774" text-anchor="middle" font-size="9.5" fill="#9fb3c8">
+    Release 附件由 Tag 对应提交在 CI 中构建，不使用本地手工产物
+  </text>
+</svg>

@@ -65,6 +65,7 @@ jobs:
             skill-diff.patch \
             trace
           cp docs/assets/architecture-overview.svg dist/
+          cp docs/assets/evidence-verification-flow.svg dist/
           cp docs/assets/dashboard-simulated.png dist/
           cp docs/five-minute-demo.md dist/
           (cd dist && shasum -a 256 * > SHA256SUMS)
@@ -96,6 +97,7 @@ jobs:
             dist/*.tar.gz
             dist/agentskill-eval-refined-demo-evidence.tar
             dist/architecture-overview.svg
+            dist/evidence-verification-flow.svg
             dist/dashboard-simulated.png
             dist/five-minute-demo.md
             dist/SHA256SUMS

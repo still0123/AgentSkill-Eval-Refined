@@ -2,6 +2,8 @@
 
 [![Python](https://img.shields.io/badge/Python-3.9%2B-blue)](./pyproject.toml)
 [![License](https://img.shields.io/badge/License-Apache--2.0-green)](./LICENSE)
+[![CI](https://github.com/still0123/AgentSkill-Eval-Refined/actions/workflows/ci.yml/badge.svg)](https://github.com/still0123/AgentSkill-Eval-Refined/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/still0123/AgentSkill-Eval-Refined?include_prereleases)](https://github.com/still0123/AgentSkill-Eval-Refined/releases/tag/v0.3.0-rc.2)
 
 AgentSkill-Eval 是一个面向 Agent Skill 的**配对评测与发布门禁系统**。它解决的核心问题是：
 
@@ -11,6 +13,8 @@ AgentSkill-Eval 是一个面向 Agent Skill 的**配对评测与发布门禁系�
 
 > **AgentSkill-Eval-Refined** 是 AgentSkill-Eval 的聚焦公开版本，保留 Python Bug Fix Skill 评测主线，移除尚未形成真实证据的 MCP、Memory/RAG 和平台化扩展。
 > 原始完整研究版见 [ranmaoxia0123/AgentSkill-Eval](https://github.com/ranmaoxia0123/AgentSkill-Eval)。
+
+当前 Portfolio Release：[`v0.3.0-rc.2`](https://github.com/still0123/AgentSkill-Eval-Refined/releases/tag/v0.3.0-rc.2)。
 
 ## 核心流程
 
@@ -35,16 +39,28 @@ AgentSkill-Eval 是一个面向 Agent Skill 的**配对评测与发布门禁系�
 
 ## 快速开始
 
+### 方式一：安装 Release wheel（推荐）
+
+wheel 已内置离线 Demo Dataset 与 Skill，不要求 clone 源码，也不需要 API Key。
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python3 -m pip install \
+  https://github.com/still0123/AgentSkill-Eval-Refined/releases/download/v0.3.0-rc.2/agentskill_eval-0.3.0rc2-py3-none-any.whl
+
+agentskill-eval demo run \
+  --workspace .agentskill-eval/portfolio-demo
+agentskill-eval demo verify \
+  --workspace .agentskill-eval/portfolio-demo
+```
+
+### 方式二：源码开发
+
 ```bash
 git clone https://github.com/still0123/AgentSkill-Eval-Refined.git
 cd AgentSkill-Eval-Refined
-
-python3 -m venv .venv
-source .venv/bin/activate
 python3 -m pip install -e ".[dev]"
-
-# 运行 Demo（不调用真实模型）
-agentskill-eval demo run --workspace .agentskill-eval/demo
 ```
 
 ## 演示结果
@@ -71,10 +87,47 @@ Demo 证据包包含：
 | `paired-results.json` | 配对 Case 对比结果 |
 | `evidence-index.json` | 全部 Run 的索引与证据分类 |
 | `audit-bundle.tar` | SHA-256 审计包 |
-| `skill-diff.patch` | Skill 差异补丁 |
+| `skill-diff.patch` | Simulated Demo 占位说明；不冒充真实 Skill v2 diff |
 | `trace/` | Agent 执行 Trace 集合 |
 
 > **注意**：Demo 标记为 `SIMULATED DEMO`，所有结果均为确定性 fixture，不代表真实 Agent 或 Skill 性能。
+
+相同输入会生成稳定 Experiment ID。在同一 workspace 重跑时复用已有实验，不新增实验目录，
+也不会把根证据包覆盖成另一组结果。
+
+## 证据为什么可信
+
+`demo verify` 不信任展示层 JSON，而是以 `audit-bundle.tar` 的内部 Manifest 为锚点，
+交叉核对 Experiment ID、根报告摘要、W/T/L、Trace 集合、文件集合和四类输入哈希。
+
+![证据生成与校验流程](docs/assets/evidence-verification-flow.svg)
+
+验证采用 fail-closed 语义：
+
+- `evidence-index.json` 缺文件、多文件、路径越界或软链接时拒绝；
+- `paired-results.json` 与审计报告统计不一致时拒绝；
+- 根 JSON/HTML 与 audit bundle 内摘要不一致时拒绝；
+- Dataset、Skill、Runner、Environment 任一哈希漂移时拒绝；
+- `simulated=true` 或 `SIMULATED_DEMO` 标记缺失时拒绝。
+
+真实 Agent 实验不复用 Portfolio Demo 入口，必须通过预算授权的
+`real preflight`、`real smoke` 或 `real run` 命令执行。
+
+## Release 完整性
+
+Tag Release 由 GitHub Actions 自动构建。wheel、sdist、Demo evidence bundle、图稿和演示文档
+均附带 `SHA256SUMS`，核心发布物同时生成 GitHub build provenance。
+
+```bash
+gh release download v0.3.0-rc.2 \
+  --repo still0123/AgentSkill-Eval-Refined \
+  --dir release
+
+cd release
+shasum -a 256 -c SHA256SUMS
+gh attestation verify agentskill_eval-0.3.0rc2-py3-none-any.whl \
+  --repo still0123/AgentSkill-Eval-Refined
+```
 
 ## 五分钟演示
 
@@ -92,7 +145,7 @@ agentskill-eval [OPTIONS] COMMAND
   final evaluate   独立终评
   skill promote begin/confirm/locked/approve/reject  Skill 版本发布
   real preflight/smoke/run  真实 Agent 实验
-  scenario validate/run  统一场景验证与执行
+  scenario validate/run  软件工程场景验证与执行
 ```
 
 ## 项目结构
@@ -107,7 +160,7 @@ AgentSkill-Eval/
 │   ├── skill_optimizer/      # 候选搜索、终评、发布
 │   ├── runner_adapters/      # Runner 防腐层
 │   ├── real_evidence/        # 真实 Agent 证据
-│   ├── scenarios/            # 统一场景协议
+│   ├── scenarios/            # 聚焦的软件工程场景协议
 │   └── trace_intelligence/   # Trace 与失败诊断
 ├── tests/                    # 单元 + 集成测试
 └── examples/                 # 配置与数据集示例
@@ -123,6 +176,7 @@ AgentSkill-Eval/
 | 存储 | 本地内容寻址 Blob + SHA-256 |
 | 评测 | 确定性 Grader + 两级 cluster bootstrap |
 | 工程质量 | Ruff, mypy, pytest, GitHub Actions |
+| 发布可信度 | SHA256SUMS + GitHub build provenance |
 
 ## 核心设计原则
 
