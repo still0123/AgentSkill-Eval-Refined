@@ -16,8 +16,6 @@ from agentskill_eval_contracts import FrozenModel, stable_sha256
 
 class ScenarioKind(str, Enum):
     SOFTWARE_ENGINEERING = "software_engineering"
-    MCP_TOOL = "mcp_tool"
-    MEMORY_RAG = "memory_rag"
 
 
 class ComparisonKind(str, Enum):
@@ -28,7 +26,6 @@ class ComparisonKind(str, Enum):
 
 class EvidenceClass(str, Enum):
     SIMULATED_CONTROLLER = "simulated_controller"
-    PROCESS_INTEGRATION = "process_integration"
     OBSERVED_AGENT = "observed_agent"
 
 
@@ -67,7 +64,6 @@ class UnifiedScenarioSpec(FrozenModel):
     comparison: ComparisonKind
     native_config: Path
     skill: Optional[SkillUnderTest] = None
-    process_agent: Optional["ProcessScenarioAgentSpec"] = None
     simulated: bool
     evidence_class: EvidenceClass
     claim_limit: str = Field(min_length=1)
@@ -80,17 +76,6 @@ class UnifiedScenarioSpec(FrozenModel):
             raise ValueError("observed_agent evidence cannot be simulated")
         if self.evidence_class == EvidenceClass.SIMULATED_CONTROLLER and not self.simulated:
             raise ValueError("simulated_controller evidence requires simulated=true")
-        if self.evidence_class == EvidenceClass.PROCESS_INTEGRATION and (
-            not self.simulated or self.process_agent is None
-        ):
-            raise ValueError(
-                "process_integration requires simulated=true and a pinned process_agent"
-            )
-        if (
-            self.process_agent is not None
-            and self.evidence_class != EvidenceClass.PROCESS_INTEGRATION
-        ):
-            raise ValueError("process_agent is only valid for process_integration evidence")
         return self
 
     @classmethod
@@ -114,42 +99,7 @@ class UnifiedScenarioSpec(FrozenModel):
         skill = spec.skill
         if skill is not None and not skill.path.is_absolute():
             skill = skill.model_copy(update={"path": resolved.parent / skill.path})
-        process_agent = spec.process_agent
-        if process_agent is not None and not process_agent.executable.is_absolute():
-            process_agent = process_agent.model_copy(
-                update={"executable": resolved.parent / process_agent.executable}
-            )
-        return spec.model_copy(
-            update={"native_config": native, "skill": skill, "process_agent": process_agent}
-        )
-
-
-class ProcessScenarioAgentSpec(FrozenModel):
-    name: str = Field(min_length=1)
-    version: str = Field(min_length=1)
-    executable: Path
-    expected_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
-    argv: Tuple[str, ...] = ()
-    version_args: Tuple[str, ...] = ("--version",)
-    expected_version_output: str = Field(min_length=1)
-    timeout_seconds: float = Field(default=10, gt=0, le=600)
-    max_response_bytes: int = Field(default=1_000_000, ge=1, le=10_000_000)
-    allowed_environment: Tuple[str, ...] = ("PATH", "LANG", "LC_ALL")
-    interaction_mode: Literal["plan_once", "step_loop"] = "plan_once"
-    max_steps: int = Field(default=12, ge=1, le=50)
-    max_history_events: int = Field(default=24, ge=1, le=200)
-    max_observation_bytes: int = Field(default=100_000, ge=1, le=1_000_000)
-
-    @model_validator(mode="after")
-    def environment_must_not_include_secrets(self) -> "ProcessScenarioAgentSpec":
-        if len(set(self.allowed_environment)) != len(self.allowed_environment):
-            raise ValueError("allowed_environment values must be unique")
-        secret_markers = ("KEY", "TOKEN", "SECRET", "PASSWORD", "AUTH", "CREDENTIAL")
-        if any(
-            marker in name.upper() for name in self.allowed_environment for marker in secret_markers
-        ):
-            raise ValueError("Process Scenario Agent cannot inherit Secret-like environment names")
-        return self
+        return spec.model_copy(update={"native_config": native, "skill": skill})
 
 
 class EvaluationPlan(FrozenModel):

@@ -37,7 +37,6 @@ Skill 缺陷，也没有消费已授权但不满足前提的 proposal 调用。
 | 独立终评 | confirmation、一次性 locked test、burn rule | 工程链路已完成 |
 | Promotion | 人工审核、父版本哈希、不可变 SkillVersion、回滚指针 | 当前真实 v2 未发布；Fake fixture 只证明流程 |
 | Evidence Release | `prepare`、`verify`、`inspect` CLI，离线 HTML、diff、索引和审计包 | Stage 5A.2 已用 Fake Promotion fixture 完成端到端验收 |
-| 多场景 | 软件工程、MCP、Memory/RAG 统一入口与专项指标 | MCP、Memory/RAG 仍是离线 simulated Lab |
 | 可视化 | 本地只读 Dashboard 展示实验、Trace、候选、版本谱系和 Skill Evolution Timeline | 不承担写操作、批准或在线调度 |
 
 ## 3. 已有真实证据

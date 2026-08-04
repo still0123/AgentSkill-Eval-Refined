@@ -7,7 +7,6 @@ from click import Command, Group, Option
 from typer.main import get_command
 from typer.testing import CliRunner
 
-from agentskill_eval_benchmark_gen import DemoMode
 from agentskill_eval_cli import __version__
 from agentskill_eval_cli.main import app
 
@@ -90,22 +89,12 @@ def test_demo_run_command_executes_service_free_mock_loop(tmp_path: Path) -> Non
     assert Path(payload["html_report"]).is_file()
 
 
-def test_demo_real_mode_requires_explicit_cost_confirmation(tmp_path: Path) -> None:
-    result = runner.invoke(
-        app,
-        [
-            "demo",
-            "run",
-            "--workspace",
-            str(tmp_path / "workspace"),
-            "--mode",
-            DemoMode.SKILL_UP.value,
-        ],
-        terminal_width=240,
-    )
+def test_demo_command_is_offline_only() -> None:
+    result = runner.invoke(app, ["demo", "run", "--help"], terminal_width=240)
 
-    assert result.exit_code == 2
-    assert _option(("demo", "run"), "confirm_real_run").default is False
+    assert result.exit_code == 0
+    assert "--mode" not in result.stdout
+    assert "--confirm-real-run" not in result.stdout
 
 
 def test_optimizer_simulation_requires_explicit_acknowledgement() -> None:

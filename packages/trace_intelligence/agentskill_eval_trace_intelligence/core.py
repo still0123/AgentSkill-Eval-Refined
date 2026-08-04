@@ -25,7 +25,7 @@ from agentskill_eval_contracts import (
 )
 
 _Clock = Callable[[], datetime]
-_TraceSource = Literal["platform", "runner", "agent", "mcp", "rag", "memory", "judge"]
+_TraceSource = Literal["platform", "runner", "agent", "judge"]
 _TraceStatus = Literal["started", "completed", "failed", "cancelled"]
 
 
@@ -77,12 +77,6 @@ class TraceCollector:
         source: _TraceSource = "runner"
         if kind.startswith(("tool.", "file.", "command.", "test.")):
             source = "agent"
-        elif kind.startswith("mcp."):
-            source = "mcp"
-        elif kind.startswith("retrieval."):
-            source = "rag"
-        elif kind.startswith("memory."):
-            source = "memory"
         elif kind.startswith("judge."):
             source = "judge"
         self.record(kind, source=source, summary=payload)
@@ -123,12 +117,6 @@ class TraceCollector:
                     "Agent runtime",
                     "agent" in sources,
                     "Current Attempt exposed no normalized tool/file/command event",
-                ),
-                self._capability(
-                    "mcp_rag_memory",
-                    "Platform proxy/lab",
-                    bool({"mcp", "rag", "memory"}.intersection(sources)),
-                    "No MCP/RAG/Memory proxy event was observed for this Attempt",
                 ),
             ),
             events=tuple(events),

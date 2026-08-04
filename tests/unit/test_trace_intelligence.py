@@ -42,8 +42,6 @@ def test_collector_normalizes_bounds_and_redacts_secret_values() -> None:
     capabilities = {item.name: item for item in trace.capabilities}
     assert capabilities["tool_file_command"].availability.value == "observed"
     assert capabilities["tool_file_command"].reason is None
-    assert capabilities["mcp_rag_memory"].availability.value == "unavailable"
-    assert capabilities["mcp_rag_memory"].reason
 
 
 def test_collector_bounds_event_count_and_redacts_non_string_payloads() -> None:

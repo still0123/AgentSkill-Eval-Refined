@@ -4,13 +4,15 @@
 
 ## 1. 安装
 
+下载 GitHub Release 中的 wheel 后：
+
 ```bash
-git clone https://github.com/still0123/AgentSkill-Eval-Refined.git
-cd AgentSkill-Eval-Refined
 python3 -m venv .venv
 source .venv/bin/activate
-python3 -m pip install -e ".[dev]"
+python3 -m pip install agentskill_eval-0.3.0rc2-py3-none-any.whl
 ```
+
+wheel 已内置离线 Dataset 与 Skill，不要求当前目录存在源码仓库。
 
 ## 2. 运行离线 Demo
 
@@ -27,6 +29,8 @@ Invalid: 0
 W/T/L: 5 / 6 / 1
 Evidence Class: SIMULATED DEMO
 ```
+
+相同参数在同一 workspace 重跑会复用稳定 Experiment ID，不会新增实验或覆盖成另一份结果。
 
 ## 3. 查看配对结果
 

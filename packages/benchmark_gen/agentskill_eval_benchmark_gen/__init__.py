@@ -15,10 +15,10 @@ from agentskill_eval_benchmark_gen.dataset import (
 from agentskill_eval_benchmark_gen.demo import (
     DemoEvidencePack,
     DemoExperimentRunner,
-    DemoExperimentVerifier,
-    DemoMode,
     DemoRunConfig,
     DemoRunResult,
+    default_demo_dataset_root,
+    default_demo_skill_root,
 )
 from agentskill_eval_benchmark_gen.generator import (
     AutomaticBenchmarkGenerator,
@@ -90,8 +90,6 @@ __all__ = [
     "DatasetSplit",
     "DemoEvidencePack",
     "DemoExperimentRunner",
-    "DemoExperimentVerifier",
-    "DemoMode",
     "DemoRunConfig",
     "DemoRunResult",
     "LoadedCase",
@@ -123,6 +121,8 @@ __all__ = [
     "SplitDatasetReference",
     "audit_loaded_datasets",
     "audit_split_entries",
+    "default_demo_dataset_root",
+    "default_demo_skill_root",
     "exposure_zone",
     "require_common_split_plan_lineage",
     "split_inventory",

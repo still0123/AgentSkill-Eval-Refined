@@ -16,6 +16,32 @@ describe('report parser', () => {
     expect(report.schemaVersion).toBe('ase/report/v1alpha1')
   })
 
+  it('recognizes the generated Portfolio Demo evidence files', () => {
+    const paired = parseReportText(
+      JSON.stringify({
+        schema_version: 'ase/demo-paired-results/v1alpha1',
+        experiment_id: 'experiment',
+        simulated: true,
+        logical_runs: 72,
+        invalid_runs: 0,
+        cases: [],
+      }),
+    )
+    const index = parseReportText(
+      JSON.stringify({
+        schema_version: 'ase/demo-evidence-index/v1alpha1',
+        experiment_id: 'experiment',
+        simulated: true,
+        evidence_class: 'SIMULATED_DEMO',
+        hashes: {},
+        files: [],
+        runs: [],
+      }),
+    )
+    expect([paired.kind, index.kind]).toEqual(['demo-evidence', 'demo-evidence'])
+    expect(paired.simulated && index.simulated).toBe(true)
+  })
+
   it('keeps malicious HTML inert as plain text and strips prototype keys', () => {
     const payload = JSON.parse(
       JSON.stringify({

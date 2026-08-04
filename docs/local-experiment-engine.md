@@ -45,7 +45,7 @@ order    = Random(seed).shuffle(experiment.variant_references)
 
 同一冻结输入重复规划会得到相同 PairBlock ID、Run ID、seed、执行顺序和指纹。`persist()` 可重复调用：已有 Run 的 PairBlock、Variant 和 Plan Fingerprint 一致时保持当前状态，不会把已执行 Run 回退为 `CREATED`。
 
-`RunPlanFingerprint` 包含 Case、Grader、平台编译 Prompt、Variant、Engine、Environment、MCP、artifact 规则、timeout、max turns 和镜像摘要。Secret 不进入指纹和 Manifest。
+`RunPlanFingerprint` 包含 Case、Grader、平台编译 Prompt、Variant、Engine、Environment、artifact 规则、timeout、max turns 和镜像摘要。Secret 不进入指纹和 Manifest。
 
 ## 执行状态机
 

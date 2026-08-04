@@ -1,4 +1,4 @@
-"""Unified multi-scenario evaluation facade."""
+"""Focused software-engineering scenario evaluation facade."""
 
 from agentskill_eval_scenarios.adapters import ScenarioAdapter
 from agentskill_eval_scenarios.contracts import (
@@ -6,7 +6,6 @@ from agentskill_eval_scenarios.contracts import (
     ComparisonKind,
     EvaluationPlan,
     EvidenceClass,
-    ProcessScenarioAgentSpec,
     ScenarioKind,
     SkillUnderTest,
     UnifiedEvaluationResult,
@@ -20,7 +19,6 @@ __all__ = [
     "ComparisonKind",
     "EvaluationPlan",
     "EvidenceClass",
-    "ProcessScenarioAgentSpec",
     "ScenarioAdapter",
     "ScenarioKind",
     "SkillUnderTest",

@@ -12,7 +12,6 @@ from agentskill_eval_contracts.base import FrozenModel, HexDigest, stable_sha256
 from agentskill_eval_contracts.enums import ExperimentStatus, VariantRole
 from agentskill_eval_contracts.snapshots import (
     AgentSnapshot,
-    MemoryRagSnapshot,
     PriceSnapshot,
     RunnerSnapshot,
     SandboxSnapshot,
@@ -32,7 +31,6 @@ class ExperimentVariant(FrozenModel):
     agent_snapshot: AgentSnapshot
     skill_snapshot: Optional[SkillSnapshot] = None
     tool_snapshot: ToolSnapshot
-    memory_rag_snapshot: Optional[MemoryRagSnapshot] = None
     sandbox_snapshot: SandboxSnapshot
     price_snapshot: Optional[PriceSnapshot] = None
 
@@ -49,11 +47,6 @@ class ExperimentVariant(FrozenModel):
                 else None
             ),
             "tool_snapshot": self.tool_snapshot.model_dump(mode="json"),
-            "memory_rag_snapshot": (
-                self.memory_rag_snapshot.model_dump(mode="json")
-                if self.memory_rag_snapshot
-                else None
-            ),
             "sandbox_snapshot": self.sandbox_snapshot.model_dump(mode="json"),
             "price_snapshot": (
                 self.price_snapshot.model_dump(mode="json") if self.price_snapshot else None

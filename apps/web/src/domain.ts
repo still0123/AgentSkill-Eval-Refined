@@ -7,6 +7,7 @@ export type ReportKind =
   | 'skill-search'
   | 'promotion'
   | 'evolution'
+  | 'demo-evidence'
 
 export interface ImportedReport {
   id: string

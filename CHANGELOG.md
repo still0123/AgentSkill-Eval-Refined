@@ -41,6 +41,16 @@ after the first stable release.
   optimizer-only view that withholds confirmation/locked inputs, and offline publish/verify/inspect
   CLI commands.
 
+## [0.3.0-rc2] - 2026-08-04
+
+### Fixed
+
+- Bound Portfolio Demo summaries and Trace indexes to the verified replay bundle.
+- Packaged the offline Dataset and Skill in the wheel and made same-workspace reruns idempotent.
+- Added Dashboard schemas for the generated Demo evidence files.
+- Removed unsupported MCP, Memory/RAG and Process Scenario public surfaces from the Refined build.
+- Added tag-triggered release builds, checksums and build provenance.
+
 ## [0.3.0-rc1] - 2026-07-14
 
 ### Added
@@ -118,7 +128,8 @@ after the first stable release.
 - RC1 includes real-agent execution infrastructure and Fake Process Agent CI coverage; a complete,
   successful paid smoke/evidence report is a separate release-evidence artifact.
 
-[Unreleased]: https://github.com/ranmaoxia0123/AgentSkill-Eval/compare/v0.3.0-rc1...HEAD
+[Unreleased]: https://github.com/still0123/AgentSkill-Eval-Refined/compare/v0.3.0-rc.2...HEAD
+[0.3.0-rc2]: https://github.com/still0123/AgentSkill-Eval-Refined/compare/v0.3.0-rc.1...v0.3.0-rc.2
 [0.3.0-rc1]: https://github.com/ranmaoxia0123/AgentSkill-Eval/compare/v0.2.0-rc1...v0.3.0-rc1
 [0.2.0-rc1]: https://github.com/ranmaoxia0123/AgentSkill-Eval/compare/v0.1.0-rc1...v0.2.0-rc1
 [0.1.0-rc1]: https://github.com/ranmaoxia0123/AgentSkill-Eval/releases/tag/v0.1.0-rc1

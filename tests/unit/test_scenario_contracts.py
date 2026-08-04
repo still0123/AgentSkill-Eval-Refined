@@ -8,7 +8,6 @@ from pydantic import ValidationError
 from agentskill_eval_scenarios import (
     ComparisonKind,
     EvidenceClass,
-    UnifiedScenarioRunner,
     UnifiedScenarioSpec,
 )
 
@@ -53,34 +52,3 @@ def test_software_engineering_requires_frozen_skill() -> None:
                 "claim_limit": "simulation only",
             }
         )
-
-
-def test_software_engineering_rejects_process_agent() -> None:
-    spec = UnifiedScenarioSpec.model_validate(
-        {
-            "name": "se-with-process-agent",
-            "scenario": "software_engineering",
-            "comparison": ComparisonKind.SKILL_AB,
-            "native_config": "config.yaml",
-            "simulated": True,
-            "evidence_class": EvidenceClass.PROCESS_INTEGRATION,
-            "claim_limit": "simulation only",
-            "skill": {
-                "name": "test",
-                "version": "1.0",
-                "activation_mode": "native_install",
-                "path": str(ROOT / "examples/skills/python-review-v1"),
-                "expected_sha256": "00" * 32,
-            },
-            "process_agent": {
-                "name": "test",
-                "version": "1.0",
-                "executable": str(ROOT / "tests/fixtures/fake_scenario_agent.py"),
-                "expected_sha256": "00" * 32,
-                "expected_version_output": "v1",
-                "timeout_seconds": 1,
-            },
-        }
-    )
-    with pytest.raises(ValueError, match="Skill content does not match expected_sha256"):
-        UnifiedScenarioRunner(ROOT).validate(spec)

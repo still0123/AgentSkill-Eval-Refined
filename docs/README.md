@@ -4,7 +4,7 @@
 
 ## 后续执行路线
 
-- [`v0.3.0-rc1` 发布说明](./releases/v0.3.0-rc1.md)
+- [`v0.3.0-rc.2` 发布说明](./releases/v0.3.0-rc2.md)
 - [项目收口状态与证据边界](./project-completion-status.md)
 - [答辩与面试讲解手册](./portfolio-demo-and-interview-guide.md)
 - [Skill v1→v2 分阶段执行工作文档](./skill-evolution-execution-roadmap.md)
@@ -41,18 +41,10 @@
 - [Stage 5 Evidence Release Prep](./evidence-release-prep.md)
 - [Stage 5A.2 / 5B Evolution Evidence Release CLI](./evolution-evidence-release-cli.md)
 
-## 专项 Lab 与界面
+## 界面
 
-- [Unified Multi-Scenario Evaluation MVP](./unified-multi-scenario-evaluation.md)
-- [Process Agent Scenario Evaluation MVP](./process-agent-scenario-evaluation.md)
-- [Interactive Scenario Agent Loop MVP](./interactive-scenario-agent-loop.md)
-- [MCP Tool Evaluation MVP](./mcp-tool-evaluation.md)
-- [Memory/RAG Evaluation MVP](./memory-rag-evaluation.md)
 - [Read-only Evaluation Dashboard MVP](./dashboard-mvp.md)
 - [Stage 4C Skill Evolution Timeline Dashboard](./evolution-timeline-dashboard.md)
-
-这些文档会明确区分真实证据与 simulated Lab。历史纵切文档中的“不支持”描述只约束该纵切，
-不能据此推断整个集成仓库缺少其他已经合入的模块。
 
 阶段 4A 只使用 Fake／simulated evidence 验证 Promotion 状态机、不可变 Manifest 和拒绝
 流程；它不表示真实 winner 已确认，也不表示真实 Skill v2 已发布。

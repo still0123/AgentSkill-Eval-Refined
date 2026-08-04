@@ -106,7 +106,6 @@ from agentskill_eval_contracts.schema import build_schema_bundle, export_schema_
 from agentskill_eval_contracts.snapshots import (
     AgentSnapshot,
     EnvironmentFingerprint,
-    MemoryRagSnapshot,
     PriceSnapshot,
     RunnerSnapshot,
     SandboxSnapshot,
@@ -170,7 +169,6 @@ __all__ = [
     "FinalEvaluationStatus",
     "HexDigest",
     "HumanReviewRecord",
-    "MemoryRagSnapshot",
     "LockedTestReceipt",
     "OptimizationJob",
     "OptimizationJobStatus",

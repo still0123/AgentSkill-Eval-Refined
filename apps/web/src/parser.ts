@@ -31,6 +31,10 @@ const versions: Record<ReportKind, Set<string>> = {
     'ase/real-llm-proposal-report/v1alpha1',
     'ase/real-llm-proposal-smoke-result/v1alpha1',
   ]),
+  'demo-evidence': new Set([
+    'ase/demo-paired-results/v1alpha1',
+    'ase/demo-evidence-index/v1alpha1',
+  ]),
 }
 
 function object(value: unknown, field = 'root'): Record<string, any> {
@@ -61,6 +65,7 @@ function detect(root: Record<string, any>): { kind: ReportKind; version: string 
     }
   }
   const version = requiredString(root.schema_version, 'schema_version')
+  if (version.startsWith('ase/demo-')) return { kind: 'demo-evidence', version }
   if (version.startsWith('ase/evolution-evidence-') || version.startsWith('ase/real-llm-proposal-'))
     return { kind: 'evolution', version }
   if (
@@ -94,6 +99,22 @@ function detect(root: Record<string, any>): { kind: ReportKind; version: string 
 }
 
 function validateByKind(kind: ReportKind, root: Record<string, any>): void {
+  if (kind === 'demo-evidence') {
+    requiredString(root.experiment_id, 'experiment_id')
+    if (root.simulated !== true)
+      throw new ImportError('Portfolio Demo evidence 必须声明 simulated=true', 'schema')
+    if (root.schema_version === 'ase/demo-paired-results/v1alpha1') {
+      requiredArray(root.cases, 'cases')
+      if (typeof root.logical_runs !== 'number' || typeof root.invalid_runs !== 'number')
+        throw new ImportError('缺少 Demo run 计数', 'schema')
+    } else {
+      object(root.hashes, 'hashes')
+      requiredArray(root.files, 'files')
+      requiredArray(root.runs, 'runs')
+      if (root.evidence_class !== 'SIMULATED_DEMO')
+        throw new ImportError('Demo evidence_class 必须为 SIMULATED_DEMO', 'schema')
+    }
+  }
   if (kind === 'evolution') {
     if (root.schema_version === 'ase/evolution-evidence-report/v1alpha1') {
       object(root.skill_versions, 'skill_versions')

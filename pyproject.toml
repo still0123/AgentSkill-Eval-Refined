@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "agentskill-eval"
-version = "0.3.0rc1"
+version = "0.3.0rc2"
 description = "Reproducible evaluation and regression analysis for Agent Skills."
 readme = "README.md"
 requires-python = ">=3.9"
@@ -44,6 +44,10 @@ packages = [
   
   "packages/scenarios/agentskill_eval_scenarios",
 ]
+
+[tool.hatch.build.targets.wheel.force-include]
+"examples/datasets/python-review-demo" = "agentskill_eval_benchmark_gen/resources/python-review-demo"
+"examples/skills/python-review-v1" = "agentskill_eval_benchmark_gen/resources/python-review-v1"
 
 [tool.hatch.build.targets.sdist]
 exclude = [

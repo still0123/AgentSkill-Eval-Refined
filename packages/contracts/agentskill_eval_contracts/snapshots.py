@@ -38,11 +38,6 @@ class ToolSnapshot(FrozenModel):
     config: Dict[str, JsonValue] = Field(default_factory=dict)
 
 
-class MemoryRagSnapshot(FrozenModel):
-    config_sha256: HexDigest
-    config: Dict[str, JsonValue] = Field(default_factory=dict)
-
-
 class SandboxSnapshot(FrozenModel):
     profile: str = Field(min_length=1)
     image: Optional[str] = None

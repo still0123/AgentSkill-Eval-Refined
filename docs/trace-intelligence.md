@@ -6,7 +6,7 @@ Trace Intelligence 回答“平台实际观测到了什么”和“哪些失败�
 
 ## 统一事件
 
-每个 `TraceEvent` 包含连续 `sequence_no`、带时区时间、事件类型、来源、状态和有限 JSON 摘要。当前规范覆盖平台、Runner、Agent、MCP、RAG、Memory 和 Judge 来源。Executor 固定记录：
+每个 `TraceEvent` 包含连续 `sequence_no`、带时区时间、事件类型、来源、状态和有限 JSON 摘要。当前规范覆盖平台、Runner、Agent 和 Judge 来源。Executor 固定记录：
 
 ```text
 platform.validation started/completed/failed
@@ -15,7 +15,7 @@ runner.started / runner.finished（Adapter 实际提供时）
 platform.run_terminal completed/failed
 ```
 
-Adapter 后续可发送 `tool.*`、`file.*`、`command.*`、`test.*`、`mcp.*`、`retrieval.*`、`memory.*` 和 `judge.*`。摘要最多保留三层、30 个对象字段、20 个数组成员和每字符串 1000 字符；默认最多接收 10000 个事件，超限写入 `platform.trace_truncated` 与丢弃计数；非有限浮点转换为占位符；配置 Secret 在对象键、字符串和回退表示中精确替换。
+Adapter 后续可发送 `tool.*`、`file.*`、`command.*`、`test.*` 和 `judge.*`。摘要最多保留三层、30 个对象字段、20 个数组成员和每字符串 1000 字符；默认最多接收 10000 个事件，超限写入 `platform.trace_truncated` 与丢弃计数；非有限浮点转换为占位符；配置 Secret 在对象键、字符串和回退表示中精确替换。
 
 ## Capability 声明
 
@@ -23,8 +23,7 @@ Adapter 后续可发送 `tool.*`、`file.*`、`command.*`、`test.*`、`mcp.*`�
 
 - `post_run_result`；
 - `runner_lifecycle`；
-- `tool_file_command`；
-- `mcp_rag_memory`。
+- `tool_file_command`。
 
 只有对应来源事件真实出现才标记 `observed`。否则标记 `unavailable` 并写明原因。未来由 Agent telemetry 或平台 Proxy 提供事件时无需改变持久化模型。
 

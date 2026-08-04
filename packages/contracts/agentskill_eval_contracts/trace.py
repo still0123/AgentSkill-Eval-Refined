@@ -57,7 +57,7 @@ class TraceEvent(FrozenModel):
     sequence_no: int = Field(ge=1)
     occurred_at: datetime
     kind: str = Field(pattern=r"^[a-z][a-z0-9_.-]*$")
-    source: Literal["platform", "runner", "agent", "mcp", "rag", "memory", "judge"]
+    source: Literal["platform", "runner", "agent", "judge"]
     status: Optional[Literal["started", "completed", "failed", "cancelled"]] = None
     summary: Dict[str, JsonValue] = Field(default_factory=dict)
 

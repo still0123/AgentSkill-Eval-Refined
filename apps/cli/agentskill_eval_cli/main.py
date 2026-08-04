@@ -3,7 +3,7 @@
 import asyncio
 import json
 from pathlib import Path
-from typing import List, Optional
+from typing import Optional
 from uuid import UUID
 
 import typer
@@ -15,8 +15,9 @@ from agentskill_eval_benchmark_gen import (
     DatasetLoader,
     DemoEvidencePack,
     DemoExperimentRunner,
-    DemoMode,
     DemoRunConfig,
+    default_demo_dataset_root,
+    default_demo_skill_root,
 )
 from agentskill_eval_cli import __version__
 from agentskill_eval_contracts import (
@@ -24,9 +25,6 @@ from agentskill_eval_contracts import (
     RealRunMode,
     ReviewDecision,
     export_schema_bundle,
-)
-from agentskill_eval_experiment import (
-    ExecutionRecord,
 )
 from agentskill_eval_real_evidence import (
     RealAgentEvidenceRunner,
@@ -46,6 +44,9 @@ from agentskill_eval_skill_optimizer import (
     PromotionWorkflow,
     RealEvaluationAuthorization,
 )
+
+DEFAULT_DEMO_DATASET = default_demo_dataset_root()
+DEFAULT_DEMO_SKILL = default_demo_skill_root()
 
 app = typer.Typer(
     name="agentskill-eval",
@@ -802,81 +803,40 @@ def run_demo(
         file_okay=False,
     ),
     dataset_root: Path = typer.Option(  # noqa: B008
-        Path("examples/datasets/python-review-demo"),
+        DEFAULT_DEMO_DATASET,
         "--dataset",
         help="Curated demo dataset root.",
         exists=True,
         file_okay=False,
     ),
     skill_root: Path = typer.Option(  # noqa: B008
-        Path("examples/skills/python-review-v1"),
+        DEFAULT_DEMO_SKILL,
         "--skill",
         help="Versioned demo Skill root.",
         exists=True,
         file_okay=False,
     ),
-    mode: DemoMode = typer.Option(DemoMode.MOCK, "--mode"),  # noqa: B008
     repeats: int = typer.Option(3, "--repeats", min=1),  # noqa: B008
     random_seed: int = typer.Option(2026, "--random-seed"),  # noqa: B008
     bootstrap_resamples: int = typer.Option(  # noqa: B008
         10_000, "--bootstrap-resamples", min=1
     ),
-    engine: str = typer.Option("codex", "--engine"),  # noqa: B008
-    model_provider: str = typer.Option("openai", "--model-provider"),  # noqa: B008
-    model_name: Optional[str] = typer.Option(None, "--model"),  # noqa: B008
-    runner_binary: Optional[Path] = typer.Option(  # noqa: B008
-        None,
-        "--runner-bin",
-        exists=True,
-        dir_okay=False,
-        help="Pinned skill-up binary; managed installation is auto-discovered.",
-    ),
-    inherit_secret_env: Optional[List[str]] = typer.Option(  # noqa: B008
-        None,
-        "--inherit-secret-env",
-        help="Secret variable name to pass to the isolated Runner; repeat as needed.",
-    ),
     timeout_seconds: int = typer.Option(300, "--timeout-seconds", min=1),  # noqa: B008
     max_turns: int = typer.Option(10, "--max-turns", min=1),  # noqa: B008
-    confirm_real_run: bool = typer.Option(  # noqa: B008
-        False,
-        "--confirm-real-run",
-        help="Required for skill-up mode because it can consume Agent quota and money.",
-    ),
 ) -> None:
-    """Run 12 cases × 2 variants × 3 repeats and write JSON/HTML reports."""
-    if mode == DemoMode.SKILL_UP and not confirm_real_run:
-        raise typer.BadParameter(
-            "skill-up mode may consume Agent quota; pass --confirm-real-run explicitly",
-            param_hint="--confirm-real-run",
-        )
-
-    def progress(record: ExecutionRecord, completed: int, total: int) -> None:
-        outcome = record.evaluation_outcome.value if record.evaluation_outcome else "none"
-        typer.echo(
-            f"[{completed}/{total}] run={record.run_id} outcome={outcome}",
-            err=True,
-        )
-
+    """Run the deterministic offline 12 × 2 × 3 Portfolio Demo."""
     result = asyncio.run(
         DemoExperimentRunner().run(
             DemoRunConfig(
                 workspace=workspace,
                 dataset_root=dataset_root,
                 skill_root=skill_root,
-                mode=mode,
                 repeats=repeats,
                 random_seed=random_seed,
                 bootstrap_resamples=bootstrap_resamples,
-                runner_binary=runner_binary,
-                engine=engine,
-                model_provider=model_provider,
-                model_name=model_name,
-                inherited_secret_env=tuple(inherit_secret_env or ()),
                 timeout_seconds=timeout_seconds,
                 max_turns=max_turns,
-            ),
-            progress_sink=progress if mode == DemoMode.SKILL_UP else None,
+            )
         )
     )
     typer.echo(
@@ -918,7 +878,10 @@ def verify_demo(
     ),
 ) -> None:
     """Verify a completed demo experiment's integrity and evidence pack."""
-    result = DemoEvidencePack.verify(workspace)
+    try:
+        result = DemoEvidencePack.verify(workspace)
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc), param_hint="WORKSPACE") from exc
     typer.echo(json.dumps(result, sort_keys=True))
 
 

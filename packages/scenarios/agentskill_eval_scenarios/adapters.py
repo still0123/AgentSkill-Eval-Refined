@@ -11,7 +11,7 @@ from uuid import NAMESPACE_URL, uuid5
 
 from pydantic import JsonValue
 
-from agentskill_eval_benchmark_gen import DemoExperimentRunner, DemoMode, DemoRunConfig
+from agentskill_eval_benchmark_gen import DemoExperimentRunner, DemoRunConfig
 from agentskill_eval_scenarios.contracts import (
     ArtifactReference,
     EvaluationPlan,
@@ -56,10 +56,6 @@ class SoftwareEngineeringScenarioAdapter:
         if skill is None:
             raise ValueError("software engineering scenarios require a frozen Skill")
         skill.verify()
-        if spec.process_agent is not None:
-            raise ValueError(
-                "software engineering Process Agent uses the existing real runner path"
-            )
         if skill.activation_mode != "native_install":
             raise ValueError("software engineering Skill activation must be native_install")
         dataset_root = _resolved_child(spec.native_config, str(config["dataset_root"]))
@@ -102,7 +98,6 @@ class SoftwareEngineeringScenarioAdapter:
                     workspace=workspace,
                     dataset_root=_resolved_child(spec.native_config, str(config["dataset_root"])),
                     skill_root=spec.skill.verify(),
-                    mode=DemoMode.MOCK,
                     repeats=_config_int(config, "repeats", 1),
                     random_seed=_config_int(config, "random_seed", 2026),
                     bootstrap_resamples=_config_int(config, "bootstrap_resamples", 100),

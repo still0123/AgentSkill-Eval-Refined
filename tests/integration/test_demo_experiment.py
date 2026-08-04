@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 from pathlib import Path
 
@@ -44,12 +45,27 @@ def test_mock_demo_runs_72_logical_runs_and_writes_labeled_reports(tmp_path: Pat
     assert verification["total_runs"] == 72
     assert verification["audit_bundle_verified"] is True
     evidence_index = json.loads((workspace / "evidence-index.json").read_text(encoding="utf-8"))
+    assert evidence_index["schema_version"] == "ase/demo-evidence-index/v1alpha1"
     assert set(evidence_index["hashes"]) == {
         "dataset_sha256",
         "skill_sha256",
         "runner_sha256",
         "environment_sha256",
     }
+    first_bundle_bytes = (workspace / "audit-bundle.tar").read_bytes()
+    repeated = asyncio.run(
+        DemoExperimentRunner().run(
+            DemoRunConfig(
+                workspace=workspace,
+                dataset_root=DATASET,
+                skill_root=SKILL,
+                bootstrap_resamples=50,
+            )
+        )
+    )
+    assert repeated.experiment_id == result.experiment_id
+    assert len(list((workspace / "experiments").iterdir())) == 1
+    assert (workspace / "audit-bundle.tar").read_bytes() == first_bundle_bytes
 
     store = LocalExperimentStore(workspace)
     experiment = store.load_experiment(result.experiment_id)
@@ -110,7 +126,25 @@ def test_mock_demo_runs_72_logical_runs_and_writes_labeled_reports(tmp_path: Pat
     with pytest.raises(BundleError, match="digest mismatch"):
         ReplayBundleWriter.verify(tampered)
 
+    index_path = workspace / "evidence-index.json"
+    original_index = index_path.read_bytes()
+    evidence_index["files"] = []
+    index_path.write_text(json.dumps(evidence_index), encoding="utf-8")
+    with pytest.raises(ValueError, match="file index"):
+        DemoEvidencePack.verify(workspace)
+
+    index_path.write_bytes(original_index)
     paired_results = workspace / "paired-results.json"
-    paired_results.write_text("tampered\n", encoding="utf-8")
-    with pytest.raises(ValueError, match="evidence (size|digest) mismatch"):
+    paired = json.loads(paired_results.read_text(encoding="utf-8"))
+    paired["win"] = 99
+    paired["logical_runs"] = 999
+    paired_results.write_text(json.dumps(paired), encoding="utf-8")
+    evidence_index = json.loads(original_index)
+    paired_entry = next(
+        entry for entry in evidence_index["files"] if entry["path"] == "paired-results.json"
+    )
+    paired_entry["size_bytes"] = paired_results.stat().st_size
+    paired_entry["sha256"] = hashlib.sha256(paired_results.read_bytes()).hexdigest()
+    index_path.write_text(json.dumps(evidence_index), encoding="utf-8")
+    with pytest.raises(ValueError, match="does not match the audited experiment report"):
         DemoEvidencePack.verify(workspace)

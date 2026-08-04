@@ -60,6 +60,8 @@ Cost: $0
 Evidence Class: SIMULATED DEMO
 ```
 
+![Dashboard simulated demo](docs/assets/dashboard-simulated.png)
+
 Demo 证据包包含：
 
 | 文件 | 说明 |
