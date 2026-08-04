@@ -2,7 +2,6 @@
 
 import json
 from pathlib import Path
-from uuid import UUID
 
 from click import Command, Group, Option
 from typer.main import get_command
@@ -11,7 +10,6 @@ from typer.testing import CliRunner
 from agentskill_eval_benchmark_gen import DemoMode
 from agentskill_eval_cli import __version__
 from agentskill_eval_cli.main import app
-from agentskill_eval_experiment import LocalExperimentStore
 
 runner = CliRunner()
 ROOT = Path(__file__).resolve().parents[2]

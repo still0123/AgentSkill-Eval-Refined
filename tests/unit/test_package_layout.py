@@ -7,12 +7,11 @@ PACKAGE_NAMES = (
     "agentskill_eval_cli",
     "agentskill_eval_contracts",
     "agentskill_eval_experiment",
-    
     "agentskill_eval_real_evidence",
     "agentskill_eval_runner_adapters",
     "agentskill_eval_skill_optimizer",
     "agentskill_eval_trace_intelligence",
-    "agentskill_eval_worker",
+    "agentskill_eval_scenarios",
 )
 
 

@@ -10,6 +10,7 @@ from pydantic import Field, field_validator, model_validator
 from agentskill_eval_contracts.base import FrozenModel, HexDigest
 from agentskill_eval_contracts.enums import ArtifactSensitivity
 
+
 class ArtifactEntry(FrozenModel):
     path: str = Field(min_length=1)
     sha256: HexDigest

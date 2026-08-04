@@ -7,7 +7,7 @@ from uuid import UUID
 
 from pydantic import AwareDatetime, Field, JsonValue, model_validator
 
-from agentskill_eval_contracts.base import FrozenModel, HexDigest, sha256_text, stable_sha256
+from agentskill_eval_contracts.base import FrozenModel, HexDigest
 from agentskill_eval_contracts.enums import AttemptStatus, EvaluationOutcome, ExecutionStatus
 from agentskill_eval_contracts.snapshots import EnvironmentFingerprint
 

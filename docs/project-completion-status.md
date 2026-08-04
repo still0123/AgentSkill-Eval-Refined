@@ -1,8 +1,9 @@
 # AgentSkill-Eval 项目收口状态
 
-更新日期：2026-07-14
+更新日期：2026-08-04
 
-基线：`main@6f2a458`
+基线：`still0123/AgentSkill-Eval-Refined`。Refined 版仅保留 Python Bug Fix 主线，
+原始研究版包含 MCP 和 Memory/RAG Lab 能力，详见 [ranmaoxia0123/AgentSkill-Eval](https://github.com/ranmaoxia0123/AgentSkill-Eval)。
 
 状态：核心工程 MVP 已完成；真实 Skill v2 研究闭环保留为后续实验课题
 

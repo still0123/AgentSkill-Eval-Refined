@@ -9,6 +9,7 @@ from pydantic import Field, computed_field
 
 from agentskill_eval_contracts.base import FrozenModel
 
+
 class RunMeasurement(FrozenModel):
     run_id: UUID
     attempt_id: UUID

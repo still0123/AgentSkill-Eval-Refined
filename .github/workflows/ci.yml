@@ -62,12 +62,11 @@ jobs:
           import agentskill_eval_cli
           import agentskill_eval_contracts
           import agentskill_eval_experiment
-          import agentskill_eval_mcp_lab
-          import agentskill_eval_memory_rag_lab
           import agentskill_eval_real_evidence
           import agentskill_eval_runner_adapters
           import agentskill_eval_skill_optimizer
           import agentskill_eval_trace_intelligence
+          import agentskill_eval_scenarios
           PY
       - uses: actions/upload-artifact@v4
         with:

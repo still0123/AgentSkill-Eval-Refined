@@ -279,10 +279,12 @@ class CommandVerifier:
             / variant
         )
         log_dir.mkdir(parents=True, exist_ok=True)
-        stdout_path = log_dir / f"{repeat:02d}.stdout"
-        stderr_path = log_dir / f"{repeat:02d}.stderr"
-        self.store.cs.sub(self.job_id).namespace("candidates", str(candidate_id), "evidence", variant).write_bytes(f"{repeat:02d}.stdout", stdout)
-        self.store.cs.sub(self.job_id).namespace("candidates", str(candidate_id), "evidence", variant).write_bytes(f"{repeat:02d}.stderr", stderr)
+        ev_dir = (
+            self.store.cs.sub(self.job_id)
+            .namespace("candidates", str(candidate_id), "evidence", variant)
+        )
+        ev_dir.write_bytes(f"{repeat:02d}.stdout", stdout)
+        ev_dir.write_bytes(f"{repeat:02d}.stderr", stderr)
         return CommandEvidence(
             variant=variant,  # type: ignore[arg-type]
             repeat_index=repeat,

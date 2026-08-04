@@ -12,13 +12,13 @@ import hashlib
 import json
 import os
 from pathlib import Path
-from typing import Dict, Final, Generic, Literal, Optional, Tuple, Type, TypeVar
+from typing import Dict, Final, Literal, Optional, Tuple, Type, TypeVar
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, JsonValue, ValidationError, model_validator
 
 from agentskill_eval_contracts import FrozenModel, HexDigest, stable_sha256
-from agentskill_eval_experiment.storage.errors import IntegrityError, StorageError
+from agentskill_eval_experiment.storage.errors import IntegrityError
 
 STORAGE_SCHEMA_VERSION: Final = "ase/storage/v1"
 _TEMP_PATTERN = __import__("re").compile(

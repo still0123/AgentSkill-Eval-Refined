@@ -8,7 +8,8 @@ from uuid import UUID
 from pydantic import Field, model_validator
 
 from agentskill_eval_contracts.artifacts import ArtifactEntry
-from agentskill_eval_contracts.base import FrozenModel, HexDigest, stable_sha256
+from agentskill_eval_contracts.base import FrozenModel, HexDigest
+
 
 class FrozenInputManifest(FrozenModel):
     experiment_id: UUID

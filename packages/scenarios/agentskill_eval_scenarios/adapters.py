@@ -6,7 +6,7 @@ import asyncio
 import json
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, Optional, Protocol, Tuple, cast
+from typing import Dict, Protocol, Tuple, cast
 from uuid import NAMESPACE_URL, uuid5
 
 from pydantic import JsonValue
@@ -111,7 +111,6 @@ class SoftwareEngineeringScenarioAdapter:
                 )
             )
         )
-        import json
 
         native = json.loads(result.report_paths.json_path.read_text(encoding="utf-8"))
         stats = native["statistics"]

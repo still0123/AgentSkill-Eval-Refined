@@ -27,7 +27,7 @@ from agentskill_eval_contracts import (
     canonical_json,
     stable_sha256,
 )
-from agentskill_eval_experiment.storage import ContentStore, load_model, model_bytes
+from agentskill_eval_experiment.storage import ContentStore, model_bytes
 from agentskill_eval_skill_optimizer.evaluator import CandidateEvaluator, build_evaluator
 from agentskill_eval_skill_optimizer.real_evaluator import (
     RealAgentCandidateEvaluator,
@@ -81,12 +81,20 @@ class OptimizationStore:
         snapshot = directory / "history" / f"{len(candidate.transitions):04d}.json"
         if snapshot.exists():
             raise SkillSearchError(f"immutable candidate snapshot exists: {snapshot}")
-        candidate_store = self._store.sub(candidate.job_id).namespace("candidates", str(candidate.id))
-        candidate_store.write_bytes(f"history/{len(candidate.transitions):04d}.json", model_bytes(candidate))
+        candidate_store = self._store.sub(candidate.job_id).namespace(
+            "candidates", str(candidate.id)
+        )
+        candidate_store.write_bytes(
+            f"history/{len(candidate.transitions):04d}.json", model_bytes(candidate)
+        )
         candidate_store.save("candidate.json", candidate)
 
     def load_candidate(self, job_id: UUID, candidate_id: UUID) -> SkillCandidate:
-        return self._store.sub(job_id).namespace("candidates", str(candidate_id)).load("candidate.json", SkillCandidate)
+        return (
+            self._store.sub(job_id)
+            .namespace("candidates", str(candidate_id))
+            .load("candidate.json", SkillCandidate)
+        )
 
     def list_candidates(self, job: OptimizationJob) -> Tuple[SkillCandidate, ...]:
         return tuple(self.load_candidate(job.id, item) for item in job.candidate_ids)
@@ -100,7 +108,9 @@ class OptimizationStore:
         target = self.skill_path(candidate)
         if target.exists():
             raise SkillSearchError("candidate Skill content is immutable")
-        self._store.sub(candidate.job_id).namespace("candidates", str(candidate.id)).write_bytes("SKILL.md", content)
+        self._store.sub(candidate.job_id).namespace(
+            "candidates", str(candidate.id)
+        ).write_bytes("SKILL.md", content)
 
     def assert_skill_integrity(self, candidate: SkillCandidate) -> None:
         if _sha256(self.skill_path(candidate).read_bytes()) != candidate.content_sha256:
@@ -241,8 +251,9 @@ class BenchmarkGuidedSkillSearch:
             canonical_json(dataset.model_dump(mode="json")),
         )
         inputs = job_dir / "inputs"
-        self.store._store.sub(job.id).namespace("inputs").write_bytes("base-SKILL.md", base_content)
-        self.store._store.sub(job.id).namespace("inputs").write_bytes("manual-SKILL.md", manual_content)
+        store_ins = self.store._store.sub(job.id).namespace("inputs")
+        store_ins.write_bytes("base-SKILL.md", base_content)
+        store_ins.write_bytes("manual-SKILL.md", manual_content)
         if curated_source is None:
             frozen_dataset_file = job_dir / "validation-search.json"
         else:
@@ -846,5 +857,7 @@ class BenchmarkGuidedSkillSearch:
             f"<th>Pass rate</th><th>Tokens</th></tr></thead><tbody>{table_rows}</tbody></table>"
             "</body></html>"
         )
-        self.store._store.sub(job.id).namespace("reports").write_bytes("search-report.html", page.encode("utf-8"))
+        self.store._store.sub(job.id).namespace("reports").write_bytes(
+            "search-report.html", page.encode("utf-8")
+        )
         return json_path, html_path

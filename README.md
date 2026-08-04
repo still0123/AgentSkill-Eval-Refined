@@ -9,6 +9,9 @@ AgentSkill-Eval 是一个面向 Agent Skill 的**配对评测与发布门禁系�
 
 系统在冻结 Agent、模型、Case、环境和预算的前提下，**同题双跑** Control（无 Skill / v1）和 Treatment（有 Skill / v2），通过确定性判分、证据归档和分阶段数据集判断新 Skill 是否值得发布。
 
+> **AgentSkill-Eval-Refined** 是 AgentSkill-Eval 的聚焦公开版本，保留 Python Bug Fix Skill 评测主线，移除尚未形成真实证据的 MCP、Memory/RAG 和平台化扩展。
+> 原始完整研究版见 [ranmaoxia0123/AgentSkill-Eval](https://github.com/ranmaoxia0123/AgentSkill-Eval)。
+
 ## 核心流程
 
 ```

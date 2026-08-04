@@ -1,7 +1,6 @@
 """AgentSkill-Eval command-line interface."""
 
 import asyncio
-import hashlib
 import json
 from pathlib import Path
 from typing import List, Optional
@@ -20,17 +19,13 @@ from agentskill_eval_benchmark_gen import (
 )
 from agentskill_eval_cli import __version__
 from agentskill_eval_contracts import (
-    RealEvidenceClass,
     RealEvidenceStatus,
     RealRunMode,
     ReviewDecision,
     export_schema_bundle,
 )
 from agentskill_eval_experiment import (
-    AnalysisConfig,
     ExecutionRecord,
-    ExperimentAnalyzer,
-    LocalExperimentStore,
 )
 from agentskill_eval_real_evidence import (
     RealAgentEvidenceRunner,
@@ -48,7 +43,6 @@ from agentskill_eval_skill_optimizer import (
     OptimizationSearchSpec,
     OptimizationStore,
     PromotionWorkflow,
-    PromotionWorkflowResult,
     RealEvaluationAuthorization,
 )
 
@@ -392,7 +386,12 @@ def skill_promote_confirm(
         raise typer.BadParameter("requires --allow-simulation", param_hint="--allow-simulation")
     spec = IndependentFinalEvaluationSpec.load(spec_path)
     result = PromotionWorkflow(workspace).confirm(workflow_id, spec)
-    typer.echo(json.dumps({"result": "confirm_ok", "status": result.workflow.status.value}, sort_keys=True))
+    typer.echo(
+        json.dumps(
+            {"result": "confirm_ok", "status": result.workflow.status.value},
+            sort_keys=True,
+        )
+    )
 
 
 @skill_promote_app.command("locked")
@@ -409,7 +408,12 @@ def skill_promote_locked(
         raise typer.BadParameter("requires --allow-simulation", param_hint="--allow-simulation")
     spec = IndependentFinalEvaluationSpec.load(spec_path)
     result = PromotionWorkflow(workspace).locked_test(workflow_id, spec)
-    typer.echo(json.dumps({"result": "locked_ok", "status": result.workflow.status.value}, sort_keys=True))
+    typer.echo(
+        json.dumps(
+            {"result": "locked_ok", "status": result.workflow.status.value},
+            sort_keys=True,
+        )
+    )
 
 
 @skill_promote_app.command("approve")

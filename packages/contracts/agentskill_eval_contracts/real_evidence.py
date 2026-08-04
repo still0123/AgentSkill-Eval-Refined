@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Dict, Literal, Optional, Tuple
+from typing import Dict, Optional, Tuple
 from uuid import UUID
 
 from pydantic import Field, JsonValue, model_validator

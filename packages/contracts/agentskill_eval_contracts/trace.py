@@ -11,6 +11,7 @@ from pydantic import Field, JsonValue, field_validator, model_validator
 
 from agentskill_eval_contracts.base import FrozenModel
 
+
 class TraceAvailability(str, Enum):
     OBSERVED = "observed"
     INFERRED = "inferred"

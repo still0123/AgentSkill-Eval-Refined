@@ -12,7 +12,6 @@ from uuid import UUID, uuid4
 import pytest
 from typer.testing import CliRunner
 
-from agentskill_eval_cli.main import app
 from agentskill_eval_contracts import (
     AgentSnapshot,
     ArtifactEntry,
