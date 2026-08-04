@@ -1,0 +1,34 @@
+schema_version: ase/real-positive-loop-summary/v1alpha1
+status: STOPPED_AT_VALIDATION_SEARCH_NO_GAIN
+base_commit: 49657be785354b29c027c90728a0ee8d39ded8f6
+branch: codex/real-positive-skill-loop
+provider: deepseek
+model: deepseek-v4-pro
+runner:
+  name: skill-up
+  version: 0.5.0
+agent:
+  name: qwen-openai-process-agent
+  version: 0.1.2
+skill:
+  name: python-bug-fix-v1
+  version: 1.0.0
+splits:
+  train: more-itertools-islice-release
+  validation_search: cachetools-cachedmethod-autospec
+  regression_dev: boltons-lri-replacement
+  validation_confirm: humanize-intcomma-string-ndigits
+  locked_test: pydash-empty-intersperse
+limits:
+  max_agent_runs: 16
+  max_proposal_calls: 2
+  max_cost_microusd: 2500000
+observed:
+  agent_runs: 8
+  proposal_calls: 2
+  known_cost_microusd: 207471
+  conservative_cost_microusd: 210259
+evidence_class: observed_agent_descriptive
+simulated: false
+locked_test_accessed: false
+secrets_stored: false

@@ -57,7 +57,7 @@ class SourceBundle(StrictModel):
 class OptimizationSplitInput(StrictModel):
     split: DatasetSplit
     source_spec: Path
-    candidate_keys: Tuple[str, ...] = Field(min_length=4, max_length=4)
+    candidate_keys: Tuple[str, ...] = Field(min_length=1, max_length=4)
     bundles: Tuple[SourceBundle, ...] = Field(min_length=1)
     optimizer_visible: bool
 
@@ -68,8 +68,8 @@ class OptimizationSplitInput(StrictModel):
             raise ValueError(
                 f"optimizer_visible must be {expected} for split {self.split.value}"
             )
-        if len(set(self.candidate_keys)) != 4:
-            raise ValueError("each split requires four unique candidate keys")
+        if len(set(self.candidate_keys)) != len(self.candidate_keys):
+            raise ValueError("candidate keys must be unique inside one split")
         source_keys = [item.source_key for item in self.bundles]
         if len(source_keys) != len(set(source_keys)):
             raise ValueError("bundle source keys must be unique inside one split")
@@ -92,8 +92,8 @@ class OptimizationBenchmarkPlan(StrictModel):
         if set(split_values) != set(REQUIRED_SPLITS) or len(set(split_values)) != 5:
             raise ValueError("plan requires train/search/regression/confirm/locked exactly once")
         keys = [key for item in self.splits for key in item.candidate_keys]
-        if len(keys) != 20 or len(set(keys)) != 20:
-            raise ValueError("plan requires exactly twenty globally unique candidate keys")
+        if len(keys) < 5 or len(keys) > 20 or len(set(keys)) != len(keys):
+            raise ValueError("plan requires five to twenty globally unique candidate keys")
         return self
 
     @classmethod
@@ -146,12 +146,14 @@ class OptimizationBenchmarkRelease(StrictModel):
         expected = self.calculate_content_sha256(payload)
         if self.content_sha256 != expected:
             raise ValueError("optimization benchmark release content hash mismatch")
-        if self.total_case_count != 20 or len(self.splits) != 5:
-            raise ValueError("release must contain five four-case DatasetVersions")
+        if self.total_case_count != sum(item.case_count for item in self.splits):
+            raise ValueError("release total_case_count does not match split references")
+        if len(self.splits) != 5:
+            raise ValueError("release must contain exactly five DatasetVersions")
         if {item.split for item in self.splits} != set(REQUIRED_SPLITS):
             raise ValueError("release split set is incomplete")
-        if any(item.case_count != 4 for item in self.splits):
-            raise ValueError("each released DatasetVersion must contain exactly four cases")
+        if any(item.case_count < 1 or item.case_count > 4 for item in self.splits):
+            raise ValueError("each released DatasetVersion must contain one to four cases")
         return self
 
 
@@ -205,9 +207,9 @@ class OptimizationBenchmarkPublisher:
             raise OptimizationSplitError(
                 f"plan requires five independent repositories, found {len(repositories)}"
             )
-        if len(families) < 10:
+        if len(families) < len(plan.splits):
             raise OptimizationSplitError(
-                f"plan requires at least ten independent patch families, found {len(families)}"
+                f"plan requires at least five independent patch families, found {len(families)}"
             )
         return specs
 
@@ -344,8 +346,9 @@ class OptimizationBenchmarkPublisher:
         except ValueError as exc:
             raise OptimizationSplitError(str(exc)) from exc
         inventory = split_inventory(audit.entries)
-        if any(inventory.get(split, 0) != 4 for split in REQUIRED_SPLITS):
-            raise OptimizationSplitError("released split inventory is not 4/4/4/4/4")
+        expected = {item.split: item.case_count for item in release.splits}
+        if any(inventory.get(split, 0) != expected[split] for split in REQUIRED_SPLITS):
+            raise OptimizationSplitError("released split inventory does not match references")
 
     @staticmethod
     def optimizer_view(release: OptimizationBenchmarkRelease) -> Mapping[str, object]:
@@ -407,7 +410,10 @@ class OptimizationBenchmarkPublisher:
                     "sources": sources,
                     "candidates": candidates,
                     "budget": template.budget.model_copy(
-                        update={"max_candidates": 4, "max_commands": 48}
+                        update={
+                            "max_candidates": len(candidates),
+                            "max_commands": 12 * len(candidates),
+                        }
                     ),
                 }
             )
@@ -416,7 +422,10 @@ class OptimizationBenchmarkPublisher:
                 "target_split": split_input.split.value,
                 "candidates": candidates,
                 "budget": template.budget.model_copy(
-                    update={"max_candidates": 4, "max_commands": 48}
+                    update={
+                        "max_candidates": len(candidates),
+                        "max_commands": 12 * len(candidates),
+                    }
                 ),
             }
         )

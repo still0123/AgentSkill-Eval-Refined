@@ -151,7 +151,7 @@ class RealAgentEvidenceSpec(StrictModel):
     dataset_path: Path
     skill_path: Path
     baseline_skill_path: Optional[Path] = None
-    case_ids: Tuple[str, ...] = Field(min_length=2, max_length=4)
+    case_ids: Tuple[str, ...] = Field(min_length=1, max_length=4)
     evidence_class: RealEvidenceClass
     simulated: bool
     runner: RunnerSpec

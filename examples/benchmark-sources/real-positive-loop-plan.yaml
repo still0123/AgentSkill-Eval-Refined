@@ -1,0 +1,54 @@
+schema_version: ase/optimization-benchmark-plan/v1
+name: python-bug-fix-real-positive-loop
+version: "2026.08.05.1"
+description: >-
+  Five one-case DatasetVersions selected before real execution from independent repositories for
+  one bounded Python Bug Fix Skill v1-to-v2 experiment.
+claim_limit: >-
+  Public Git-history cases with high contamination risk. Results are descriptive evidence for the
+  exact frozen Agent, Skill, datasets, runtime, and protocol only.
+splits:
+  - split: train
+    source_spec: cross-repository-generation.example.yaml
+    candidate_keys: [more-itertools-islice-release]
+    bundles:
+      - source_key: more-itertools
+        path: more-itertools.bundle
+        sha256: 9e19644b0027cc11502b5ccc959abce2847b8cf94a3446b09d45a1cd716651bb
+    optimizer_visible: true
+
+  - split: validation_search
+    source_spec: cross-repository-generation.example.yaml
+    candidate_keys: [cachetools-cachedmethod-autospec]
+    bundles:
+      - source_key: cachetools
+        path: cachetools.bundle
+        sha256: 9933f9067dbc4da476cdc2612625422251916d53d8945153b0795dca1371258c
+    optimizer_visible: true
+
+  - split: regression_dev
+    source_spec: optimization-split-v1/boltons-regression-dev.yaml
+    candidate_keys: [boltons-lri-replacement]
+    bundles:
+      - source_key: primary
+        path: boltons.bundle
+        sha256: d561ac68fbb7568ee42314ce74a983d8732f527989e8ad4cc3450a0ec9e6c453
+    optimizer_visible: true
+
+  - split: validation_confirm
+    source_spec: optimization-split-v1/humanize-validation-confirm.yaml
+    candidate_keys: [humanize-intcomma-string-ndigits]
+    bundles:
+      - source_key: primary
+        path: humanize.bundle
+        sha256: 7f6e7eb68724bc4a3ab66ede0bd29da94225a00fcdba16d612fef51c6582534e
+    optimizer_visible: false
+
+  - split: locked_test
+    source_spec: optimization-split-v1/pydash-locked-test.yaml
+    candidate_keys: [pydash-empty-intersperse]
+    bundles:
+      - source_key: primary
+        path: pydash.bundle
+        sha256: 96ef9847c42e5408c4739feb23bfbb982afeece3b719f277202d99a639d264d4
+    optimizer_visible: false

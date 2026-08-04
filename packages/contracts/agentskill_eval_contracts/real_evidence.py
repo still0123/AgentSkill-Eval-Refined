@@ -49,7 +49,7 @@ class RealPreflightReport(FrozenModel):
     dataset_name: str = Field(min_length=1)
     dataset_version: str = Field(min_length=1)
     dataset_sha256: HexDigest
-    case_ids: Tuple[str, ...] = Field(min_length=2)
+    case_ids: Tuple[str, ...] = Field(min_length=1)
     skill_sha256: HexDigest
     baseline_skill_sha256: Optional[HexDigest] = None
     runner: ExecutableSnapshot
@@ -58,8 +58,8 @@ class RealPreflightReport(FrozenModel):
     model: str = Field(min_length=1)
     simulated: bool
     evidence_class: RealEvidenceClass
-    smoke_runs: int = Field(ge=4)
-    evidence_runs: int = Field(ge=12)
+    smoke_runs: int = Field(ge=2)
+    evidence_runs: int = Field(ge=6)
     estimated_input_tokens_per_run: int = Field(ge=1)
     estimated_output_tokens_per_run: int = Field(ge=1)
     estimated_cost_per_run_microusd: int = Field(ge=1)

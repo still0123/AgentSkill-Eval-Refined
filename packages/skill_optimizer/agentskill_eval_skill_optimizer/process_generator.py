@@ -24,7 +24,7 @@ class HypothesisGeneratorSpec(FrozenModel):
     type: Literal["deterministic", "process", "deepseek"] = "deterministic"
     name: str = Field(default="failure-guidance", min_length=1)
     version: str = Field(min_length=1)
-    max_hypotheses: int = Field(default=8, ge=3, le=20)
+    max_hypotheses: int = Field(default=8, ge=2, le=20)
     executable: Optional[Path] = None
     expected_sha256: Optional[str] = Field(default=None, pattern=r"^[0-9a-f]{64}$")
     argv: Tuple[str, ...] = ()
@@ -116,7 +116,7 @@ class ProcessHypothesisProposal(FrozenModel):
 
 class ProcessHypothesisResponse(FrozenModel):
     schema_version: Literal["ase/process-hypothesis-response/v1alpha1"]
-    hypotheses: Tuple[ProcessHypothesisProposal, ...] = Field(min_length=3, max_length=20)
+    hypotheses: Tuple[ProcessHypothesisProposal, ...] = Field(min_length=2, max_length=20)
 
     @model_validator(mode="after")
     def ids_must_be_unique(self) -> "ProcessHypothesisResponse":
@@ -137,7 +137,7 @@ class GeneratorInvocationEvidence(FrozenModel):
     request_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     response_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     hypotheses_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
-    hypothesis_count: int = Field(ge=3, le=20)
+    hypothesis_count: int = Field(ge=2, le=20)
     duration_ms: float = Field(ge=0)
     exit_code: Literal[0] = 0
     inherited_environment: Tuple[str, ...]

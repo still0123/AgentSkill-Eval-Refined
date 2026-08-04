@@ -194,12 +194,8 @@ class RealAgentCandidateEvaluator:
                     pending.append(case)
                 else:
                     results[case.id] = cached_result
-        if len(pending) % 2:
-            raise RealCandidateEvaluationError(
-                "real candidate evaluation requires an even number of uncached cases"
-            )
         for index in range(0, len(pending), 2):
-            pair = (pending[index], pending[index + 1])
+            pair = tuple(pending[index : index + 2])
             pair_results = self._run_pair(
                 skill_root, skill_sha, dataset_root, dataset_sha256, pair
             )
@@ -218,8 +214,10 @@ class RealAgentCandidateEvaluator:
         skill_sha: str,
         dataset_root: Path,
         dataset_sha256: str,
-        cases: Tuple[SearchCase, SearchCase],
-    ) -> Tuple[SearchCaseResult, SearchCaseResult]:
+        cases: Tuple[SearchCase, ...],
+    ) -> Tuple[SearchCaseResult, ...]:
+        if not 1 <= len(cases) <= 2:
+            raise RealCandidateEvaluationError("real evaluator batches one or two cases")
         # A candidate pair has two logical baseline Runs and two treatment Runs.
         # Once the immutable v1 baseline is cached, only the treatment Runs are
         # new external calls.  The global authorization must therefore reserve
@@ -238,7 +236,7 @@ class RealAgentCandidateEvaluator:
             raise RealCandidateEvaluationError("real optimizer Agent Run budget exhausted")
         if self.authorization.remaining_cost() < estimated_cost:
             raise RealCandidateEvaluationError("real optimizer cost budget exhausted")
-        pair_ids = (cases[0].id, cases[1].id)
+        pair_ids = tuple(item.id for item in cases)
         spec = self.template.model_copy(
             update={
                 "name": (
@@ -329,17 +327,17 @@ class RealAgentCandidateEvaluator:
         self,
         found_baseline: Dict[str, SearchCaseResult],
         found_treatment: Dict[str, SearchCaseResult],
-        case_ids: Tuple[str, str],
+        case_ids: Tuple[str, ...],
     ) -> Tuple[
-        Tuple[SearchCaseResult, SearchCaseResult],
-        Tuple[SearchCaseResult, SearchCaseResult],
+        Tuple[SearchCaseResult, ...],
+        Tuple[SearchCaseResult, ...],
     ]:
         expected = set(case_ids)
         if set(found_baseline) != expected or set(found_treatment) != expected:
             raise RealCandidateEvaluationError("real evidence returned the wrong paired cases")
         return (
-            (found_baseline[case_ids[0]], found_baseline[case_ids[1]]),
-            (found_treatment[case_ids[0]], found_treatment[case_ids[1]]),
+            tuple(found_baseline[case_id] for case_id in case_ids),
+            tuple(found_treatment[case_id] for case_id in case_ids),
         )
 
     def _observed_variant_results(

@@ -144,3 +144,14 @@ Stage 3C 已提供 `evolution execute preflight/search/regression/inspect/verify
 receipt，不重复创建 Agent Run。通过 regression 后只生成 confirmation handoff，不读取
 `validation_confirm` 或 `locked_test`，也不自动发布 Skill v2。当前只完成无费用代码与 Fake
 Process 集成验收，尚未将其表述为真实 Skill 改进证据。
+
+## 12. 首次受限真实正向闭环尝试
+
+2026-08-05 的受限实验获得了一个有效的 observed Skill v1 `VERIFICATION` task failure，并用
+同一脱敏 train bundle 生成两个通用候选。validation_search 中 v1 与两个候选均为 FAIL，
+两个候选相对 v1 的 W/T/L 都是 `0 / 1 / 0`。执行链、Skill 安装、Grader 和 Secret Scan 均
+正常，因此结论是候选无增益，而不是 Runtime invalid。
+
+实验在 Search 阶段按预算门停止，没有执行 regression、confirmation 或 locked test，没有发布
+Skill v2，也没有启动第二 Skill family。详见
+[Real Positive Skill Loop Attempt](./real-positive-skill-loop.md)。

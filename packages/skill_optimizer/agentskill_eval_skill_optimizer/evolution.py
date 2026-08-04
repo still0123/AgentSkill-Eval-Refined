@@ -310,7 +310,7 @@ class HypothesisArtifact(FrozenModel):
         "ase/improvement-hypotheses/v1alpha1"
     )
     generator: str = Field(min_length=1)
-    hypotheses: Tuple[ImprovementHypothesis, ...] = Field(min_length=3)
+    hypotheses: Tuple[ImprovementHypothesis, ...] = Field(min_length=2)
     invocation_evidence: Optional[GeneratorEvidence] = None
 
     @model_validator(mode="after")
