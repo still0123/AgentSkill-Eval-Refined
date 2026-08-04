@@ -67,14 +67,18 @@ jobs:
           cp docs/assets/architecture-overview.svg dist/
           cp docs/assets/dashboard-simulated.png dist/
           cp docs/five-minute-demo.md dist/
-          shasum -a 256 dist/* > dist/SHA256SUMS
+          (cd dist && shasum -a 256 * > SHA256SUMS)
       - name: Attest release assets
         uses: actions/attest-build-provenance@v2
         with:
           subject-path: |
             dist/*.whl
             dist/*.tar.gz
-            dist/agentskill-eval-refined-demo-evidence.tar
+            dist/*.tar
+            dist/*.svg
+            dist/*.png
+            dist/*.md
+            dist/SHA256SUMS
       - name: Resolve release notes
         id: release_notes
         run: |
