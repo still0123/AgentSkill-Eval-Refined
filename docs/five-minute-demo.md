@@ -123,4 +123,7 @@ Search → Regression → Locked Test → 人工审核 → Release
 
 - Skill 对真实模型具有普遍增益；
 - 模拟结果等价于真实 Agent 证据；
-- 系统已经发布真实 Skill v2。
+- 真实 Skill v2 的发布证据本身。
+
+项目已发布 `python-bug-fix@2.0.0`，但必须单独展示 observed Evidence Release，不能用本页
+simulated Demo 代替。
