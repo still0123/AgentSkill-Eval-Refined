@@ -16,7 +16,13 @@ from agentskill_eval_contracts import (
     EvaluationOutcome,
     ExecutionStatus,
     ExperimentVariant,
+    FinalDecision,
+    FinalEvaluationStage,
     PairBlock,
+    PromotionEvidenceRef,
+    PromotionLineageArtifact,
+    PromotionWorkflowRecord,
+    PromotionWorkflowStatus,
     Run,
     RunAttempt,
     RunnerSnapshot,
@@ -255,3 +261,54 @@ def test_schema_version_is_not_silently_accepted() -> None:
 
     with pytest.raises(ValidationError):
         ExperimentVariant.model_validate({**payload, "schema_version": "ase/v9"})
+
+
+def test_observed_promotion_workflow_requires_observed_evidence() -> None:
+    now = datetime.now(timezone.utc)
+    roles = (
+        "handoff",
+        "evolution_report",
+        "regression_gate",
+        "hypotheses",
+        "search_report",
+    )
+    lineage = tuple(
+        PromotionLineageArtifact(role=role, sha256=DIGEST_A, size_bytes=1)
+        for role in roles
+    )
+    confirmation = PromotionEvidenceRef(
+        stage=FinalEvaluationStage.VALIDATION_CONFIRM,
+        final_evaluation_job_id=uuid4(),
+        report_sha256=DIGEST_A,
+        decision=FinalDecision.CONFIRMED,
+        base_skill_sha256=DIGEST_A,
+        winner_skill_sha256=DIGEST_B,
+        simulated=False,
+        validator_version="observed-test",
+        recorded_at=now,
+    )
+    payload = {
+        "id": uuid4(),
+        "promotion_id": uuid4(),
+        "evolution_id": uuid4(),
+        "optimization_job_id": uuid4(),
+        "winner_candidate_id": uuid4(),
+        "skill_name": "python-bug-fix",
+        "target_version": "2.0.0",
+        "base_skill_sha256": DIGEST_A,
+        "winner_skill_sha256": DIGEST_B,
+        "lineage_sha256": DIGEST_A,
+        "lineage": lineage,
+        "status": PromotionWorkflowStatus.AWAITING_LOCKED_TEST,
+        "confirmation": confirmation,
+        "simulated": False,
+        "created_at": now,
+        "updated_at": now,
+        "claim_limit": "descriptive observed evidence only",
+    }
+
+    assert PromotionWorkflowRecord.model_validate(payload).simulated is False
+    with pytest.raises(ValidationError, match="evidence boundary"):
+        PromotionWorkflowRecord.model_validate(
+            {**payload, "confirmation": confirmation.model_copy(update={"simulated": True})}
+        )

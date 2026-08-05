@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Callable, MutableMapping, Optional, Tuple
 from uuid import NAMESPACE_URL, UUID, uuid5
 
+import yaml
 from pydantic import JsonValue
 
 from agentskill_eval_benchmark_gen import LoadedDataset
@@ -591,6 +592,32 @@ class RealAgentEvidenceRunner:
             table_sha256=stable_sha256(rates),
             rates=rates,
         )
+        treatment_name, treatment_version = self._skill_identity(spec.skill_path)
+        baseline_identity = (
+            self._skill_identity(spec.baseline_skill_path)
+            if spec.baseline_skill_path is not None
+            else None
+        )
+        baseline_snapshot = None
+        if (
+            spec.baseline_skill_path is not None
+            and preflight.baseline_skill_sha256 is not None
+        ):
+            if baseline_identity is None:
+                raise RealEvidenceError("baseline Skill identity is unavailable")
+            baseline_snapshot = SkillSnapshot(
+                skill_id=uuid5(
+                    NAMESPACE_URL,
+                    f"agentskill-eval:skill:{baseline_identity[0]}",
+                ),
+                version_id=uuid5(
+                    NAMESPACE_URL, f"skill:{preflight.baseline_skill_sha256}"
+                ),
+                name=baseline_identity[0],
+                version=baseline_identity[1],
+                content_sha256=preflight.baseline_skill_sha256,
+                injection_mode="skill-up-native-install",
+            )
         baseline = ExperimentVariant(
             id=uuid5(experiment_id, "variant:without-skill"),
             experiment_id=experiment_id,
@@ -598,21 +625,7 @@ class RealAgentEvidenceRunner:
             role=VariantRole.BASELINE,
             runner_snapshot=runner,
             agent_snapshot=agent,
-            skill_snapshot=(
-                SkillSnapshot(
-                    skill_id=uuid5(NAMESPACE_URL, "agentskill-eval:skill:python-bug-fix"),
-                    version_id=uuid5(
-                        NAMESPACE_URL, f"skill:{preflight.baseline_skill_sha256}"
-                    ),
-                    name="python-bug-fix-v1",
-                    version="1.0.0",
-                    content_sha256=preflight.baseline_skill_sha256,
-                    injection_mode="skill-up-native-install",
-                )
-                if spec.baseline_skill_path is not None
-                and preflight.baseline_skill_sha256 is not None
-                else None
-            ),
+            skill_snapshot=baseline_snapshot,
             tool_snapshot=tools,
             sandbox_snapshot=sandbox,
             price_snapshot=price,
@@ -625,10 +638,13 @@ class RealAgentEvidenceRunner:
             runner_snapshot=runner,
             agent_snapshot=agent,
             skill_snapshot=SkillSnapshot(
-                skill_id=uuid5(NAMESPACE_URL, "agentskill-eval:skill:python-bug-fix"),
+                skill_id=uuid5(
+                    NAMESPACE_URL,
+                    f"agentskill-eval:skill:{treatment_name}",
+                ),
                 version_id=uuid5(NAMESPACE_URL, f"skill:{preflight.skill_sha256}"),
-                name="python-bug-fix-v1",
-                version="1.0.0",
+                name=treatment_name,
+                version=treatment_version,
                 content_sha256=preflight.skill_sha256,
                 injection_mode="skill-up-native-install",
             ),
@@ -724,6 +740,21 @@ class RealAgentEvidenceRunner:
                 status=ExperimentStatus.FROZEN,
             )
         return (baseline, treatment), runtimes, experiment
+
+    @staticmethod
+    def _skill_identity(skill_root: Path) -> Tuple[str, str]:
+        metadata = yaml.safe_load(
+            (skill_root.resolve(strict=True) / "metadata.yaml").read_text(encoding="utf-8")
+        )
+        if not isinstance(metadata, dict):
+            raise RealEvidenceError("Skill metadata must be a mapping")
+        name = metadata.get("name")
+        version = metadata.get("version")
+        if not isinstance(name, str) or not name:
+            raise RealEvidenceError("Skill metadata requires a name")
+        if not isinstance(version, str) or not version:
+            raise RealEvidenceError("Skill metadata requires a version")
+        return name, version
 
     def _persist_attempt_evidence(
         self,

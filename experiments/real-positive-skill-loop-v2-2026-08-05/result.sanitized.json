@@ -1,0 +1,125 @@
+{
+  "schema_version": "ase/real-positive-loop-v2-result/v1alpha1",
+  "status": "COMPLETED_OBSERVED_POSITIVE_LOOP",
+  "failure_bundle_sha256": "ae4b84113ce1ef71a24d753a76c5f2c9eb54ab032f34711f5302082bf3ac0d62",
+  "proposal": {
+    "job_id": "6d0a0f55-fc36-5e96-9178-4bb985eac8f5",
+    "request_sha256": "4800b5ccfa07f08026f0fdacafadd52ffae464fb2ee026961e421f88a2c34f40",
+    "calls": 1,
+    "candidate_count": 2,
+    "input_tokens": 827,
+    "output_tokens": 287,
+    "cost_microusd": 610,
+    "ai_assisted_review_passed": true
+  },
+  "winner": {
+    "candidate_id": "f6bf32f3-c91d-5df0-b2a7-106fce3590a8",
+    "name": "require-post-fix-verification",
+    "content_sha256": "f14cd4a975b8a1820971e824b5f82ab9b79dee071a13acb673e6b2019720e13c",
+    "case_specific_information_found": false,
+    "answer_or_patch_leakage_found": false
+  },
+  "stages": [
+    {
+      "stage": "validation_search",
+      "classification": "win",
+      "v1_outcome": "fail",
+      "v2_outcome": "pass",
+      "v1_tokens": 106302,
+      "v2_tokens": 114252,
+      "v1_latency_ms": 33423,
+      "v2_latency_ms": 48061,
+      "v1_cost_microusd": 47051,
+      "v2_cost_microusd": 51167,
+      "invalid": 0
+    },
+    {
+      "stage": "regression_dev",
+      "classification": "tie_negative",
+      "v1_outcome": "fail",
+      "v2_outcome": "fail",
+      "v1_tokens": 103562,
+      "v2_tokens": 110538,
+      "v1_latency_ms": 21809,
+      "v2_latency_ms": 29691,
+      "v1_cost_microusd": 45527,
+      "v2_cost_microusd": 48924,
+      "invalid": 0
+    },
+    {
+      "stage": "validation_confirm",
+      "classification": "tie_negative",
+      "v1_outcome": "fail",
+      "v2_outcome": "fail",
+      "v1_tokens": 105504,
+      "v2_tokens": 97992,
+      "v1_latency_ms": 43920,
+      "v2_latency_ms": 55552,
+      "v1_cost_microusd": 46674,
+      "v2_cost_microusd": 43654,
+      "invalid": 0
+    },
+    {
+      "stage": "locked_test",
+      "classification": "tie_negative",
+      "v1_outcome": "fail",
+      "v2_outcome": "fail",
+      "v1_tokens": 92948,
+      "v2_tokens": 93741,
+      "v1_latency_ms": 31991,
+      "v2_latency_ms": 25240,
+      "v1_cost_microusd": 41243,
+      "v2_cost_microusd": 41375,
+      "invalid": 0
+    }
+  ],
+  "aggregate": {
+    "win": 1,
+    "tie": 3,
+    "loss": 0,
+    "v1_tokens": 408316,
+    "v2_tokens": 416523,
+    "v1_latency_ms": 131143,
+    "v2_latency_ms": 158544,
+    "v1_cost_microusd": 180495,
+    "v2_cost_microusd": 185120
+  },
+  "budget": {
+    "agent_runs": 9,
+    "proposal_calls": 1,
+    "cost_microusd": 378446,
+    "max_cost_microusd": 500000
+  },
+  "promotion": {
+    "workflow_id": "0353ca42-f58c-52d9-afd4-7589c49db1d0",
+    "decision": "APPROVED",
+    "reviewer": "AI-assisted review (OpenAI Codex)",
+    "skill_version_id": "a434afe8-cc6b-5d80-a4af-cd6819d53e64",
+    "version": "2.0.0",
+    "release_manifest_sha256": "9ba36e6ff01c21e235130367ca6e86d608c2c216e48400da5ca2872e72942d19"
+  },
+  "test_generation": {
+    "dataset_version_id": "d90135df-d060-562a-9252-29322cc99847",
+    "case_count": 2,
+    "excluded_grader_environment_runs": 4,
+    "excluded_grader_environment_cost_microusd": 86637,
+    "excluded_attempt_raw_runner_invalid_runs": 0,
+    "excluded_attempt_raw_outcome": "fail",
+    "excluded_attempt_research_classification": "environment_error_not_skill_evidence",
+    "experiment_id": "855ded69-a605-526d-9fd8-c84b5ee2dc27",
+    "valid_runs": 4,
+    "invalid_runs": 0,
+    "win": 0,
+    "tie": 2,
+    "loss": 0,
+    "baseline_tokens": 128311,
+    "treatment_tokens": 143771,
+    "baseline_latency_ms": 51133,
+    "treatment_latency_ms": 43351,
+    "baseline_cost_microusd": 57048,
+    "treatment_cost_microusd": 63649,
+    "conclusion": "valid_negative_no_optimization"
+  },
+  "simulated": false,
+  "claim_limit": "Descriptive evidence for frozen public Cases and protocol only."
+}

@@ -59,7 +59,7 @@ class PromotionWorkflowRecord(FrozenModel):
     skill_version_manifest_sha256: Optional[HexDigest] = None
     diff_sha256: Optional[HexDigest] = None
     release_manifest_sha256: Optional[HexDigest] = None
-    simulated: Literal[True] = True
+    simulated: bool = True
     created_at: datetime
     updated_at: datetime
     claim_limit: str = Field(min_length=1)
@@ -87,6 +87,9 @@ class PromotionWorkflowRecord(FrozenModel):
             raise ValueError("workflow status requires confirmation evidence")
         if needs_locked and self.locked_test is None:
             raise ValueError("workflow status requires locked-test evidence")
+        for evidence in (self.confirmation, self.locked_test):
+            if evidence is not None and evidence.simulated != self.simulated:
+                raise ValueError("workflow evidence boundary is inconsistent")
         if self.status in {
             PromotionWorkflowStatus.APPROVED,
             PromotionWorkflowStatus.REJECTED,

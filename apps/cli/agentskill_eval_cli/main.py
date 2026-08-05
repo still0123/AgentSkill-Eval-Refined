@@ -281,6 +281,32 @@ def real_report(
     )
 
 
+def _final_authorization(
+    spec: IndependentFinalEvaluationSpec,
+    *,
+    confirm_real_run: bool,
+    max_cost_microusd: Optional[int],
+    max_agent_runs: Optional[int],
+) -> Optional[RealEvaluationAuthorization]:
+    if spec.evaluator.type != "real_agent":
+        return None
+    if not confirm_real_run:
+        raise typer.BadParameter(
+            "real_agent evaluator requires --confirm-real-run",
+            param_hint="--confirm-real-run",
+        )
+    if max_cost_microusd is None or max_agent_runs is None:
+        raise typer.BadParameter(
+            "real_agent evaluator requires Run and cost limits",
+            param_hint="--max-cost-microusd/--max-agent-runs",
+        )
+    return RealEvaluationAuthorization(
+        confirm_real_run=True,
+        max_cost_microusd=max_cost_microusd,
+        max_agent_runs=max_agent_runs,
+    )
+
+
 @final_app.command("evaluate")
 def final_evaluate(
     spec_path: Path = typer.Argument(  # noqa: B008
@@ -294,6 +320,13 @@ def final_evaluate(
         "--allow-simulation",
         help="Required for simulated evaluators; results are never performance evidence.",
     ),
+    confirm_real_run: bool = typer.Option(False, "--confirm-real-run"),  # noqa: B008
+    max_cost_microusd: Optional[int] = typer.Option(  # noqa: B008
+        None, "--max-cost-microusd", min=1
+    ),
+    max_agent_runs: Optional[int] = typer.Option(  # noqa: B008
+        None, "--max-agent-runs", min=1
+    ),
 ) -> None:
     """Run paired confirmation or one-shot locked-test evaluation."""
     spec = IndependentFinalEvaluationSpec.load(spec_path)
@@ -302,7 +335,15 @@ def final_evaluate(
             "simulated evaluator requires --allow-simulation",
             param_hint="--allow-simulation",
         )
-    result = IndependentFinalEvaluator(workspace).run(spec)
+    authorization = _final_authorization(
+        spec,
+        confirm_real_run=confirm_real_run,
+        max_cost_microusd=max_cost_microusd,
+        max_agent_runs=max_agent_runs,
+    )
+    result = IndependentFinalEvaluator(workspace).run(
+        spec, real_authorization=authorization
+    )
     typer.echo(
         json.dumps(
             {
@@ -316,6 +357,12 @@ def final_evaluate(
                 "simulated": result.job.simulated,
                 "stage": result.job.stage.value,
                 "winner_pass_rate": result.report.winner_pass_rate,
+                "real_agent_runs_consumed": (
+                    authorization.consumed_agent_runs if authorization else None
+                ),
+                "real_cost_consumed_microusd": (
+                    authorization.consumed_cost_microusd if authorization else None
+                ),
             },
             sort_keys=True,
         )
@@ -350,7 +397,7 @@ def skill_promote_begin(
         Path(".agentskill-eval-workspace"), "--workspace", file_okay=False
     ),
 ) -> None:
-    """Accept one Fake AWAITING_INDEPENDENT_FINAL_EVALUATION handoff."""
+    """Accept one AWAITING_INDEPENDENT_FINAL_EVALUATION handoff."""
     try:
         workflow = PromotionWorkflow(workspace).begin(
             handoff_path,
@@ -382,12 +429,27 @@ def skill_promote_confirm(
         Path(".agentskill-eval-workspace"), "--workspace", file_okay=False
     ),
     allow_simulation: bool = typer.Option(False, "--allow-simulation"),  # noqa: B008
+    confirm_real_run: bool = typer.Option(False, "--confirm-real-run"),  # noqa: B008
+    max_cost_microusd: Optional[int] = typer.Option(  # noqa: B008
+        None, "--max-cost-microusd", min=1
+    ),
+    max_agent_runs: Optional[int] = typer.Option(  # noqa: B008
+        None, "--max-agent-runs", min=1
+    ),
 ) -> None:
-    """Run Fake validation_confirm through IndependentFinalEvaluator."""
-    if not allow_simulation:
-        raise typer.BadParameter("requires --allow-simulation", param_hint="--allow-simulation")
+    """Run validation_confirm through IndependentFinalEvaluator."""
     spec = IndependentFinalEvaluationSpec.load(spec_path)
-    result = PromotionWorkflow(workspace).confirm(workflow_id, spec)
+    if spec.evaluator.simulated and not allow_simulation:
+        raise typer.BadParameter("requires --allow-simulation", param_hint="--allow-simulation")
+    authorization = _final_authorization(
+        spec,
+        confirm_real_run=confirm_real_run,
+        max_cost_microusd=max_cost_microusd,
+        max_agent_runs=max_agent_runs,
+    )
+    result = PromotionWorkflow(workspace).confirm(
+        workflow_id, spec, real_authorization=authorization
+    )
     typer.echo(
         json.dumps(
             {"result": "confirm_ok", "status": result.workflow.status.value},
@@ -404,12 +466,27 @@ def skill_promote_locked(
         Path(".agentskill-eval-workspace"), "--workspace", file_okay=False
     ),
     allow_simulation: bool = typer.Option(False, "--allow-simulation"),  # noqa: B008
+    confirm_real_run: bool = typer.Option(False, "--confirm-real-run"),  # noqa: B008
+    max_cost_microusd: Optional[int] = typer.Option(  # noqa: B008
+        None, "--max-cost-microusd", min=1
+    ),
+    max_agent_runs: Optional[int] = typer.Option(  # noqa: B008
+        None, "--max-agent-runs", min=1
+    ),
 ) -> None:
-    """Consume the one-shot Fake locked test through IndependentFinalEvaluator."""
-    if not allow_simulation:
-        raise typer.BadParameter("requires --allow-simulation", param_hint="--allow-simulation")
+    """Consume the one-shot locked test through IndependentFinalEvaluator."""
     spec = IndependentFinalEvaluationSpec.load(spec_path)
-    result = PromotionWorkflow(workspace).locked_test(workflow_id, spec)
+    if spec.evaluator.simulated and not allow_simulation:
+        raise typer.BadParameter("requires --allow-simulation", param_hint="--allow-simulation")
+    authorization = _final_authorization(
+        spec,
+        confirm_real_run=confirm_real_run,
+        max_cost_microusd=max_cost_microusd,
+        max_agent_runs=max_agent_runs,
+    )
+    result = PromotionWorkflow(workspace).locked_test(
+        workflow_id, spec, real_authorization=authorization
+    )
     typer.echo(
         json.dumps(
             {"result": "locked_ok", "status": result.workflow.status.value},
@@ -423,20 +500,28 @@ def skill_promote_approve(
     workflow_id: UUID = typer.Argument(...),  # noqa: B008
     reviewer: str = typer.Option(..., "--reviewer"),  # noqa: B008
     reason: str = typer.Option(..., "--reason"),  # noqa: B008
+    confirm_review: bool = typer.Option(False, "--confirm-review"),  # noqa: B008
     confirm_human_review: bool = typer.Option(False, "--confirm-human-review"),  # noqa: B008
     allow_simulation: bool = typer.Option(False, "--allow-simulation"),  # noqa: B008
     workspace: Path = typer.Option(  # noqa: B008
         Path(".agentskill-eval-workspace"), "--workspace", file_okay=False
     ),
 ) -> None:
-    """Approve and locally publish a Fake-only immutable SkillVersion fixture."""
-    if not confirm_human_review or not allow_simulation:
+    """Approve and locally publish an immutable SkillVersion."""
+    service = PromotionWorkflow(workspace)
+    current = service.status(workflow_id).workflow
+    if not (confirm_review or confirm_human_review):
         raise typer.BadParameter(
-            "approval requires --confirm-human-review and --allow-simulation",
-            param_hint="--confirm-human-review/--allow-simulation",
+            "approval requires --confirm-review",
+            param_hint="--confirm-review",
+        )
+    if current.simulated and not allow_simulation:
+        raise typer.BadParameter(
+            "simulated approval requires --allow-simulation",
+            param_hint="--allow-simulation",
         )
     try:
-        result = PromotionWorkflow(workspace).approve(workflow_id, reviewer=reviewer, reason=reason)
+        result = service.approve(workflow_id, reviewer=reviewer, reason=reason)
     except (OSError, ValueError, RuntimeError) as exc:
         raise typer.BadParameter(str(exc), param_hint="WORKFLOW_ID") from exc
     typer.echo(json.dumps({
@@ -451,20 +536,28 @@ def skill_promote_reject(
     workflow_id: UUID = typer.Argument(...),  # noqa: B008
     reviewer: str = typer.Option(..., "--reviewer"),  # noqa: B008
     reason: str = typer.Option(..., "--reason"),  # noqa: B008
+    confirm_review: bool = typer.Option(False, "--confirm-review"),  # noqa: B008
     confirm_human_review: bool = typer.Option(False, "--confirm-human-review"),  # noqa: B008
     allow_simulation: bool = typer.Option(False, "--allow-simulation"),  # noqa: B008
     workspace: Path = typer.Option(  # noqa: B008
         Path(".agentskill-eval-workspace"), "--workspace", file_okay=False
     ),
 ) -> None:
-    """Reject a Fake promotion after locked-test completion."""
-    if not confirm_human_review or not allow_simulation:
+    """Reject a promotion after locked-test completion."""
+    service = PromotionWorkflow(workspace)
+    current = service.status(workflow_id).workflow
+    if not (confirm_review or confirm_human_review):
         raise typer.BadParameter(
-            "rejection requires --confirm-human-review and --allow-simulation",
-            param_hint="--confirm-human-review/--allow-simulation",
+            "rejection requires --confirm-review",
+            param_hint="--confirm-review",
+        )
+    if current.simulated and not allow_simulation:
+        raise typer.BadParameter(
+            "simulated rejection requires --allow-simulation",
+            param_hint="--allow-simulation",
         )
     try:
-        result = PromotionWorkflow(workspace).reject(workflow_id, reviewer=reviewer, reason=reason)
+        result = service.reject(workflow_id, reviewer=reviewer, reason=reason)
     except (OSError, ValueError, RuntimeError) as exc:
         raise typer.BadParameter(str(exc), param_hint="WORKFLOW_ID") from exc
     typer.echo(json.dumps({

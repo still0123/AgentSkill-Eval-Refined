@@ -1,12 +1,14 @@
-# Real Positive Skill Loop Attempt
+# Real Positive Skill Loop
 
 ## Status
 
-`STOPPED_AT_VALIDATION_SEARCH_NO_GAIN`
+`COMPLETED_OBSERVED_POSITIVE_LOOP`
 
-This bounded observed-Agent attempt did not produce a publishable Python Bug Fix Skill v2.
-It stopped before regression, confirmation, and locked test, and did not start the Test Generation
-Skill family.
+The first bounded attempt stopped at validation_search with zero gain. After a fail-closed
+FailureBridge recovery fix, one separately authorized Proposal/Search round completed the full
+observed-Agent loop and published immutable `python-bug-fix@2.0.0`.
+
+## Attempt 1: retained negative result
 
 ## Frozen protocol
 
@@ -116,8 +118,86 @@ This recovery fix was verified by rebuilding a new FailureBundle from the retain
 without an Agent or Proposal call. It does not alter the recorded Search result, consume additional
 budget, or establish a Skill v2.
 
+## Attempt 2: positive loop
+
+The second attempt reused the exact frozen train/search/regression/confirmation/locked Cases,
+Process Agent, DeepSeek Runtime, Grader, and statistics. Only the sanitized FailureBundle and
+Proposal request changed.
+
+The enriched failure evidence stated that the structured session contained only read-only
+inspection actions and no observed edit or test command. One authorized Proposal call generated
+two generic candidates:
+
+1. mandate reproduction before editing;
+2. require post-fix verification and continued iteration after a failed check.
+
+AI-assisted review found no Case ID, repository, code path, patch, expected answer, or holdout
+leakage. The call used 827 input tokens, 287 output tokens, and 610 microusd.
+
+### Stage results
+
+| Stage | v1 | v2 | W/T/L | v1 tokens | v2 tokens | v1 cost | v2 cost |
+|---|---|---|---:|---:|---:|---:|---:|
+| validation_search | FAIL | PASS | 1 / 0 / 0 | 106,302 | 114,252 | 47,051 | 51,167 |
+| regression_dev | FAIL | FAIL | 0 / 1 / 0 | 103,562 | 110,538 | 45,527 | 48,924 |
+| validation_confirm | FAIL | FAIL | 0 / 1 / 0 | 105,504 | 97,992 | 46,674 | 43,654 |
+| locked_test | FAIL | FAIL | 0 / 1 / 0 | 92,948 | 93,741 | 41,243 | 41,375 |
+| **Total** |  |  | **1 / 3 / 0** | **408,316** | **416,523** | **180,495** | **185,120** |
+
+All stages used observed real evidence. Search produced the required independent WIN.
+Regression, confirmation, and locked test contained no LOSS or INVALID. Confirmation and locked
+were no-loss `TIE_NEGATIVE` checks; they do not constitute additional improvement claims.
+
+The second attempt consumed:
+
+- 1 Proposal call;
+- 9 new Agent Runs;
+- 378,446 microusd including both Proposal candidates and all gates.
+
+Promotion workflow `0353ca42-f58c-52d9-afd4-7589c49db1d0` passed. Review was recorded as
+`AI-assisted review (OpenAI Codex)`, not human review. Immutable SkillVersion
+`a434afe8-cc6b-5d80-a4af-cd6819d53e64` was published with content SHA-256
+`f14cd4a975b8a1820971e824b5f82ab9b79dee071a13acb673e6b2019720e13c`.
+
+Skill v2 adds only this general guidance:
+
+> After making a change, always run the reproduction command again and confirm it passes. If it
+> fails, iterate on the fix before proceeding.
+
+## Test Generation family
+
+After Skill v2 publication, a minimal Python Test Generation family was frozen from two independent
+public Git histories. The Agent could only create `agent_regression_test.py`; the deterministic
+grader rejected production edits and required the generated test to fail on before production and
+pass after replacing only the frozen production files.
+
+The first four Runs were retained and excluded at the research layer as `ENVIRONMENT_ERROR`
+evidence because a missing grader shebang caused execution as shell. The Runner's raw outcome was
+`FAIL` rather than `INVALID`, so both values remain explicit in the sanitized report. After fixing
+only that grader entry point, the same Cases, tasks, Skill, Runtime, and metrics were replayed once.
+
+Final valid result:
+
+| Metric | without Skill | with Skill |
+|---|---:|---:|
+| PASS rate | 0.0 | 0.0 |
+| Tokens | 128,311 | 143,771 |
+| Latency ms | 51,133 | 43,351 |
+| Cost microusd | 57,048 | 63,649 |
+
+- W/T/L: `0 / 2 / 0`;
+- invalid Runs: `0`;
+- observed cost: `120,697 microusd`;
+- conclusion: valid negative result, no Skill improvement claim;
+- no candidate search, optimization, or version publication was performed.
+
+The Dataset builder's hidden reference oracle independently proved before-fail/after-pass three
+times per Case before any Agent run.
+
 ## Evidence
 
 Full Trace, pytest output, Skill activation records, patches when present, and replayable audit
-bundles remain under `.agentskill-eval/real-positive-loop/`. Sanitized summaries and bundle digests
-are committed under `experiments/real-positive-skill-loop-2026-08-05/`.
+bundles remain under `.agentskill-eval/real-positive-loop/` and
+`.agentskill-eval/real-positive-loop-2/`. Sanitized summaries and bundle digests are committed under
+`experiments/real-positive-skill-loop-2026-08-05/` and
+`experiments/real-positive-skill-loop-v2-2026-08-05/`.

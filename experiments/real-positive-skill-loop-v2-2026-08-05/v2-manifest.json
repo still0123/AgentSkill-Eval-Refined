@@ -1,0 +1,16 @@
+{
+  "schema_version": "ase/public-skill-version/v1alpha1",
+  "id": "a434afe8-cc6b-5d80-a4af-cd6819d53e64",
+  "skill_name": "python-bug-fix",
+  "version": "2.0.0",
+  "content_sha256": "f14cd4a975b8a1820971e824b5f82ab9b79dee071a13acb673e6b2019720e13c",
+  "parent_content_sha256": "5ff780e023c00cd08232688ec013a47f51926b4e1c8a5171465085ee967bc5d6",
+  "diff_sha256": "e8d7d4d6d6c3112e845f50aef1f8b7ff1f8043df1a2ae4a6e364b7aeb9c93c57",
+  "simulated_evidence": false,
+  "evidence_class": "observed-agent-descriptive",
+  "promotion_workflow_id": "0353ca42-f58c-52d9-afd4-7589c49db1d0",
+  "validation_confirm_decision": "CONFIRMED",
+  "locked_test_decision": "CONFIRMED",
+  "reviewer": "AI-assisted review (OpenAI Codex)",
+  "claim_limit": "Descriptive observed-Agent evidence for frozen public Cases and protocol only."
+}

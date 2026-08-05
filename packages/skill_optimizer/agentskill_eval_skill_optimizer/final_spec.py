@@ -21,7 +21,7 @@ class StrictModel(BaseModel):
 
 
 class FinalGateSpec(StrictModel):
-    min_absolute_gain: float = Field(default=0.01, gt=0, le=1)
+    min_absolute_gain: float = Field(default=0.01, ge=0, le=1)
     max_loss_cases: int = Field(default=0, ge=0)
     max_token_overhead_ratio: float = Field(default=0.25, ge=0)
     min_independent_groups: int = Field(default=2, ge=1)

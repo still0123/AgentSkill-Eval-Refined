@@ -21,7 +21,6 @@ from agentskill_eval_contracts import (
 )
 from agentskill_eval_experiment.storage.atomic import AtomicFileWriter
 from agentskill_eval_real_evidence import RealAgentEvidenceSpec
-from agentskill_eval_skill_optimizer.evaluator import build_evaluator
 from agentskill_eval_skill_optimizer.evolution import (
     EvolutionHandoff,
     HypothesisArtifact,
@@ -37,7 +36,10 @@ from agentskill_eval_skill_optimizer.execution_plan import (
     RealEvolutionExecutionPlanner,
 )
 from agentskill_eval_skill_optimizer.proposal import RealLLMProposalService
-from agentskill_eval_skill_optimizer.real_evaluator import RealEvaluationAuthorization
+from agentskill_eval_skill_optimizer.real_evaluator import (
+    RealAgentCandidateEvaluator,
+    RealEvaluationAuthorization,
+)
 from agentskill_eval_skill_optimizer.search import (
     BenchmarkGuidedSkillSearch,
     SkillSearchError,
@@ -51,7 +53,6 @@ from agentskill_eval_skill_optimizer.spec import (
     SearchBudgetSpec,
     SearchCase,
     SearchConstraintSpec,
-    ValidationSearchDataset,
 )
 
 
@@ -533,29 +534,14 @@ class BudgetedRealEvolutionExecutor:
         if any(item.metadata.split != DatasetSplit.REGRESSION_DEV for item in loaded.cases):
             raise EvolutionRuntimeError("regression DatasetVersion contains the wrong split")
         cases = tuple(SearchCase(id=item.metadata.case_id) for item in loaded.cases)
-        surrogate = ValidationSearchDataset(
-            schema_version="ase/optimizer-validation/v1alpha1",
-            name=loaded.manifest.name,
-            version=loaded.manifest.version,
-            split="validation_search",
-            simulated=False,
-            cases=cases,
-        )
-        evaluator = build_evaluator(
-            self._evaluator_spec(spec),
-            surrogate,
-            workspace=self.workspace,
-            real_authorization=authorization,
-        )
         dataset_file = dataset_root / "dataset.yaml"
-        base = evaluator.evaluate(
-            base_skill,
-            dataset_file,
-            loaded.dataset_sha256,
-            cases,
-            SearchEvaluationStage.REGRESSION_DEV,
-            spec.timeout_seconds,
+        evaluator = RealAgentCandidateEvaluator(
+            spec.real_agent_config_path,
+            self.workspace,
+            authorization,
+            baseline_skill_path=base_skill,
         )
+        evaluator.authorize_plan(len(cases))
         winner = evaluator.evaluate(
             winner_skill,
             dataset_file,
@@ -563,6 +549,11 @@ class BudgetedRealEvolutionExecutor:
             cases,
             SearchEvaluationStage.REGRESSION_DEV,
             spec.timeout_seconds,
+        )
+        base = evaluator.baseline_evaluation(
+            loaded.dataset_sha256,
+            cases,
+            SearchEvaluationStage.REGRESSION_DEV,
         )
         base_by_case = {item.case_id: item for item in base.results}
         losses = tuple(

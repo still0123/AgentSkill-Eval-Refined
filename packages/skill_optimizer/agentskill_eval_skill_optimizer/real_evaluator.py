@@ -109,15 +109,24 @@ class RealAgentCandidateEvaluator:
         self.workspace.mkdir(parents=True, exist_ok=True)
         self.authorization = authorization
         self.attempt_no = attempt_no
-        self.baseline_skill_path = (
-            baseline_skill_path.resolve(strict=True) if baseline_skill_path is not None else None
-        )
+        self.writer = AtomicFileWriter()
+        if baseline_skill_path is None:
+            self.baseline_skill_path = None
+        else:
+            baseline = baseline_skill_path.resolve(strict=True)
+            if baseline.is_dir():
+                self.baseline_skill_path = baseline
+            elif baseline.is_file() and baseline.name == "SKILL.md":
+                self.baseline_skill_path, _ = self._skill_package(baseline)
+            else:
+                raise RealCandidateEvaluationError(
+                    "baseline Skill must be a package directory or SKILL.md"
+                )
         self.baseline_replay_cache = (
             baseline_replay_cache if baseline_replay_cache is not None else {}
         )
         self._baseline_results: Dict[str, SearchCaseResult] = {}
         self._reused_baseline_runs = 0
-        self.writer = AtomicFileWriter()
         self.cache_path = self.workspace / "candidate-case-cache.json"
         self._cache: Dict[str, object] = self._load_cache()
         self._sha = stable_sha256(
@@ -206,6 +215,22 @@ class RealAgentCandidateEvaluator:
                 )
             self._save_cache()
         ordered = tuple(results[item.id] for item in cases)
+        return self._aggregate(ordered, dataset_sha256, stage)
+
+    def baseline_evaluation(
+        self,
+        dataset_sha256: str,
+        cases: Sequence[SearchCase],
+        stage: SearchEvaluationStage,
+    ) -> CandidateEvaluation:
+        """Aggregate the observed baseline arm produced by the latest paired evaluation."""
+
+        try:
+            ordered = tuple(self._baseline_results[item.id] for item in cases)
+        except KeyError as exc:
+            raise RealCandidateEvaluationError(
+                "real paired evidence is missing a baseline result"
+            ) from exc
         return self._aggregate(ordered, dataset_sha256, stage)
 
     def _run_pair(

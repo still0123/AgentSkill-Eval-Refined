@@ -70,6 +70,11 @@ from agentskill_eval_benchmark_gen.split_plan import (
     BenchmarkSplitPlanError,
     SplitAssignments,
 )
+from agentskill_eval_benchmark_gen.test_generation import (
+    TestGenerationBuildResult,
+    TestGenerationDatasetBuilder,
+    TestGenerationError,
+)
 
 __all__ = [
     "AutomaticBenchmarkGenerator",
@@ -119,6 +124,9 @@ __all__ = [
     "SplitLeakage",
     "SourceBundle",
     "SplitDatasetReference",
+    "TestGenerationBuildResult",
+    "TestGenerationDatasetBuilder",
+    "TestGenerationError",
     "audit_loaded_datasets",
     "audit_split_entries",
     "default_demo_dataset_root",

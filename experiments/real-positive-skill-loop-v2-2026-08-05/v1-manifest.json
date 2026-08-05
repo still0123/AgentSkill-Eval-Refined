@@ -1,0 +1,9 @@
+{
+  "schema_version": "ase/public-skill-version/v1alpha1",
+  "skill_name": "python-bug-fix",
+  "version": "1.0.0",
+  "content_sha256": "5ff780e023c00cd08232688ec013a47f51926b4e1c8a5171465085ee967bc5d6",
+  "simulated_evidence": false,
+  "evidence_class": "observed-agent-descriptive",
+  "claim_limit": "Frozen parent Skill for the bounded observed-Agent experiment."
+}

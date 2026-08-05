@@ -35,7 +35,12 @@ AgentSkill-Eval 是一个面向 Agent Skill 的**配对评测与发布门禁系�
 
 ### 评测场景
 
-当前仅支持 **Python Bug Fix** 主线：从真实 Git 历史重建缺陷 Case，通过 before-fail / after-pass / mutation-fail / alternative-pass 四态验证确保 Oracle 质量。
+当前支持两条最小软件工程评测线：
+
+- **Python Bug Fix**：从真实 Git 历史重建缺陷 Case，通过 before-fail / after-pass /
+  mutation-fail / alternative-pass 四态验证 Oracle；
+- **Python Test Generation**：要求 Agent 只写回归测试，Grader 验证生成测试在 before commit
+  失败、after commit 通过，并拒绝生产代码修改。
 
 ## 快速开始
 
@@ -94,6 +99,30 @@ Demo 证据包包含：
 
 相同输入会生成稳定 Experiment ID。在同一 workspace 重跑时复用已有实验，不新增实验目录，
 也不会把根证据包覆盖成另一组结果。
+
+## 真实 Skill v1 → v2 结果
+
+2026-08-05 的受限 observed-Agent 实验在五个独立开源仓库 Case 上完成首个正向闭环：
+
+```text
+Train: v1 produced one valid task failure
+Validation Search: v1 FAIL → v2 PASS (WIN)
+Regression / Confirmation / Locked: 0 LOSS, 0 INVALID
+Aggregate Search→Locked W/T/L: 1 / 3 / 0
+Promotion Gate: PASSED
+Published SkillVersion: python-bug-fix@2.0.0
+Evidence class: OBSERVED / DESCRIPTIVE
+```
+
+Skill v2 只增加一条通用规则：修改后必须重新运行复现命令，失败时继续迭代，不能在没有通过证据
+时结束。它不包含 Case ID、仓库名、代码路径、补丁或答案。样本只有 4 个独立评测 Case，且均
+来自公开 Git 历史；该结果证明一次可审计的工程闭环，不代表普遍性能提升。
+
+第二条 **Python Test Generation** family 只评测 2 个 Case。最终有效配对为
+`W/T/L = 0 / 2 / 0`、`INVALID = 0`：without-Skill 和 with-Skill 都未生成满足
+before-fail / after-pass Oracle 的测试。该负结果被保留，不触发自动优化或版本发布。
+
+详见 [真实正向闭环报告](docs/real-positive-skill-loop.md)。
 
 ## 证据为什么可信
 
@@ -188,10 +217,10 @@ AgentSkill-Eval/
 
 ## 当前边界
 
-- 仅支持 Python Bug Fix 一个评测场景
+- Python Test Generation 仅有最小两 Case 配对评测，尚未实现自动优化
 - 真实实验样本较小，不支持通用性能排名
 - Dashboard 只读本地证据
-- 没有真实 Skill v2 发布（门禁阻止了无增益候选）
+- 已发布的真实 Skill v2 结论仅适用于冻结 Agent、公开 Case、Runtime 与协议
 
 ## License
 

@@ -1,0 +1,11 @@
+--- python-bug-fix@base/SKILL.md
++++ python-bug-fix@2.0.0/SKILL.md
+@@ -21,3 +21,8 @@
+ The final response must summarize the root cause, changed files, verification commands and outcomes.
+ Never claim success without observed test evidence. Never reveal credentials, hidden reasoning, or
+ private environment data.
++
++## Candidate guidance
++
++<!-- mutation:require-post-fix-verification; hypothesis:The Agent omitted verification because the Skill does not require confirming that the fix resolves the failure before reporting success. -->
++- After making a change, always run the reproduction command again and confirm it passes. If it fails, iterate on the fix before proceeding.

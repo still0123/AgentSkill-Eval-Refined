@@ -1,0 +1,29 @@
+schema_version: ase/real-positive-loop-v2-config/v1alpha1
+base_commit: 49657be785354b29c027c90728a0ee8d39ded8f6
+branch: codex/real-positive-skill-loop
+provider: deepseek
+model: deepseek-v4-pro
+runner:
+  name: skill-up
+  version: 0.5.0
+agent:
+  name: qwen-openai-process-agent
+  version: 0.1.2
+skill:
+  parent: python-bug-fix-v1@1.0.0
+  published: python-bug-fix@2.0.0
+proposal:
+  calls: 1
+  candidates: 2
+  temperature: 0.0
+main_loop_budget:
+  max_agent_runs: 9
+  max_cost_microusd: 500000
+test_generation_budget:
+  valid_replay_max_agent_runs: 4
+  valid_replay_max_cost_microusd: 250000
+simulated: false
+evidence_class: observed_agent_descriptive
+claim_limit: >-
+  Descriptive evidence for the exact frozen public Cases, Agent, Skill, Runtime, and protocol
+  only. No population-level performance claim.

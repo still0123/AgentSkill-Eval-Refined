@@ -1,0 +1,43 @@
+{
+  "schema_version": "ase/audit-bundle-digests/v1alpha1",
+  "bundles": [
+    {
+      "role": "train-v1-replay",
+      "sha256": "eb5fcfadfddfaeabc940c03fede1e402d1346e19f48007919c76f6ce13cd8049"
+    },
+    {
+      "role": "validation-search-v1",
+      "sha256": "60fce53a9be5b2f46c1b6967a7b60a92e4ec249057ab43f71662c9a1821b5946"
+    },
+    {
+      "role": "validation-search-candidate-repro",
+      "sha256": "ba4ba6c79f6015256865b920191ef8aa631c39d367f59b6cad16014c62e50574"
+    },
+    {
+      "role": "validation-search-winner",
+      "sha256": "383249a820dff3b7024131f177cafa8b6caf369e125c4cfc0125697fc47b9952"
+    },
+    {
+      "role": "regression-dev",
+      "sha256": "1828cfe011f2b1895f89522fc005702239cd8073825bd2654468a2d5e9ab391e"
+    },
+    {
+      "role": "validation-confirm",
+      "sha256": "7e5fed49e241b1ede851224c3d58d7ff82c0761c1d0f4fc6aba10b9734a99ad1"
+    },
+    {
+      "role": "locked-test",
+      "sha256": "75d24c59291122d0b2f9414c40d0283bcb905c5af69b994409a550c3e903c29e"
+    },
+    {
+      "role": "test-generation-invalid-grader-attempt",
+      "sha256": "4eedac7bbb7b4fc118cb60d2b4e98549eee2899dfe70eba43d823edc240e936e"
+    },
+    {
+      "role": "test-generation-valid-paired",
+      "sha256": "9977ee659d12d0c30199d2cb23d6699cf9b916840648706f09143452af81f5df"
+    }
+  ],
+  "full_bundles_committed": false,
+  "retention": ".agentskill-eval/real-positive-loop*/"
+}

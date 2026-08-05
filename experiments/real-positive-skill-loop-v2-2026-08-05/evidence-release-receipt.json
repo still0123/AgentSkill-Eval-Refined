@@ -1,0 +1,7 @@
+{
+  "schema_version": "ase/evidence-release-receipt/v1alpha1",
+  "release_id": "real-positive-skill-loop-v2-2026-08-05-r2",
+  "release_sha256": "04ea593b840bb68c24d87381cadea416872f58bf67e95d565aa832d0a36706f2",
+  "verified": true,
+  "simulated": false
+}

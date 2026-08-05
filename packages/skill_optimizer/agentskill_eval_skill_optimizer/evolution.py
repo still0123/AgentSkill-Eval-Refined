@@ -37,7 +37,10 @@ from agentskill_eval_skill_optimizer.process_generator import (
     ProcessGeneratorError,
     ProcessHypothesisGenerator,
 )
-from agentskill_eval_skill_optimizer.real_evaluator import RealEvaluationAuthorization
+from agentskill_eval_skill_optimizer.real_evaluator import (
+    RealAgentCandidateEvaluator,
+    RealEvaluationAuthorization,
+)
 from agentskill_eval_skill_optimizer.search import (
     BenchmarkGuidedSkillSearch,
     SkillSearchResult,
@@ -909,28 +912,57 @@ class FailureGuidedSkillEvolution:
             )
             dataset_file = spec.regression_dev_path
             dataset_sha = hashlib.sha256(dataset_file.read_bytes()).hexdigest()
-        evaluator = build_evaluator(
-            spec.evaluator,
-            surrogate,
-            workspace=self.workspace,
-            real_authorization=real_authorization,
-        )
-        base = evaluator.evaluate(
-            base_skill,
-            dataset_file,
-            dataset_sha,
-            dataset_cases,
-            SearchEvaluationStage.REGRESSION_DEV,
-            spec.budget.timeout_seconds,
-        )
-        winner = evaluator.evaluate(
-            winner_skill,
-            dataset_file,
-            dataset_sha,
-            dataset_cases,
-            SearchEvaluationStage.REGRESSION_DEV,
-            spec.budget.timeout_seconds,
-        )
+        if spec.evaluator.type == "real_agent":
+            if (
+                real_authorization is None
+                or spec.evaluator.real_agent_config_path is None
+            ):
+                raise EvolutionError(
+                    "real regression requires config and explicit authorization"
+                )
+            evaluator = RealAgentCandidateEvaluator(
+                spec.evaluator.real_agent_config_path,
+                self.workspace,
+                real_authorization,
+                baseline_skill_path=base_skill,
+            )
+            evaluator.authorize_plan(len(dataset_cases))
+            winner = evaluator.evaluate(
+                winner_skill,
+                dataset_file,
+                dataset_sha,
+                dataset_cases,
+                SearchEvaluationStage.REGRESSION_DEV,
+                spec.budget.timeout_seconds,
+            )
+            base = evaluator.baseline_evaluation(
+                dataset_sha,
+                dataset_cases,
+                SearchEvaluationStage.REGRESSION_DEV,
+            )
+        else:
+            generic_evaluator = build_evaluator(
+                spec.evaluator,
+                surrogate,
+                workspace=self.workspace,
+                real_authorization=real_authorization,
+            )
+            base = generic_evaluator.evaluate(
+                base_skill,
+                dataset_file,
+                dataset_sha,
+                dataset_cases,
+                SearchEvaluationStage.REGRESSION_DEV,
+                spec.budget.timeout_seconds,
+            )
+            winner = generic_evaluator.evaluate(
+                winner_skill,
+                dataset_file,
+                dataset_sha,
+                dataset_cases,
+                SearchEvaluationStage.REGRESSION_DEV,
+                spec.budget.timeout_seconds,
+            )
         base_by_case = {item.case_id: item for item in base.results}
         losses = tuple(
             item.case_id

@@ -159,3 +159,18 @@ Skill v2，也没有启动第二 Skill family。详见
 停止后已修复 FailureBridge 的脱敏行为摘要：它从 Manifest 哈希绑定的结构化 session transcript
 中仅导出固定、Case 无关的只读检查/编辑/测试行为结论，并对未知命令保持 abstain。该修复已用
 保留的 train replay 离线验证，但没有重新调用 Proposal，因此不改变上述失败结论。
+
+## 13. 第二次受限实验与真实 Skill v2
+
+用户单独授权的第二次实验仅改变脱敏 FailureBundle 和 Proposal request，复用原五个冻结 Case。
+修订候选 `require-post-fix-verification` 在 validation_search 产生一个独立 WIN；regression、
+confirmation 和 locked 均为 TIE、0 LOSS、0 INVALID。合计 W/T/L 为 `1 / 3 / 0`。
+
+Promotion Gate 已通过，并以 `AI-assisted review (OpenAI Codex)` 明确记录审核身份。不可变
+`python-bug-fix@2.0.0` 已发布，SkillVersion ID 为
+`a434afe8-cc6b-5d80-a4af-cd6819d53e64`。结果仅是四个公开独立 Case 上的 descriptive evidence，
+不构成普遍性能提升。
+
+主闭环成功后新增最小 Python Test Generation family。两个真实 Git-history Case 的有效配对
+结果为 W/T/L `0 / 2 / 0`、0 INVALID；without/with-Skill 均未生成通过 before-fail /
+after-pass Oracle 的测试。该结果保留为负证据，不进入自动优化或版本发布。
