@@ -10,6 +10,7 @@ benchmark.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -29,6 +30,27 @@ DEFAULT_MAX_TURNS = 8
 DEFAULT_MAX_TOOL_CALLS = 32
 DEFAULT_MAX_TOTAL_INPUT_TOKENS = 600_000
 DEFAULT_MAX_TOTAL_OUTPUT_TOKENS = 8_000
+SKILL_CONTEXT_SCHEMA = "ase/process-agent-skill/v1alpha1"
+SKILL_CONTEXT_PATH = Path(".agentskill-eval/selected-skill.json")
+
+
+def _load_skill_context() -> tuple[str, str]:
+    path = Path.home() / SKILL_CONTEXT_PATH
+    if not path.exists():
+        return "", ""
+    if path.is_symlink() or not path.is_file():
+        raise RuntimeError("Process Agent Skill context must be a regular file")
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, Mapping) or payload.get("schema_version") != SKILL_CONTEXT_SCHEMA:
+        raise RuntimeError("Process Agent Skill context schema is invalid")
+    content = payload.get("content")
+    expected = payload.get("sha256")
+    if not isinstance(content, str) or not content:
+        raise RuntimeError("Process Agent Skill context content is missing")
+    actual = hashlib.sha256(content.encode("utf-8")).hexdigest()
+    if not isinstance(expected, str) or expected != actual:
+        raise RuntimeError("Process Agent Skill context hash mismatch")
+    return content, actual
 
 
 def _json_request(url: str, payload: Mapping[str, Any], api_key: str) -> Mapping[str, Any]:
@@ -65,7 +87,22 @@ def _run_tool(workspace: Path, name: str, arguments: Mapping[str, Any]) -> str:
         path = _workspace_path(workspace, str(arguments.get("path", "")))
         if not path.is_file():
             return "ERROR: file does not exist"
-        return path.read_text(encoding="utf-8", errors="replace")[:MAX_READ_BYTES]
+        offset = arguments.get("offset", 1)
+        limit = arguments.get("limit")
+        if isinstance(offset, bool) or not isinstance(offset, int) or offset < 1:
+            return "ERROR: read_file offset must be a positive integer"
+        if limit is not None and (
+            isinstance(limit, bool) or not isinstance(limit, int) or limit < 1
+        ):
+            return "ERROR: read_file limit must be a positive integer"
+        lines = path.read_text(encoding="utf-8", errors="replace").splitlines(keepends=True)
+        selected = (
+            lines[offset - 1 :]
+            if limit is None
+            else lines[offset - 1 : offset - 1 + limit]
+        )
+        content = "".join(selected)[:MAX_READ_BYTES]
+        return content
     if name == "write_file":
         path = _workspace_path(workspace, str(arguments.get("path", "")))
         content = str(arguments.get("content", ""))
@@ -134,7 +171,11 @@ TOOLS: List[Dict[str, Any]] = [
             "description": "Read a UTF-8 text file in the workspace.",
             "parameters": {
                 "type": "object",
-                "properties": {"path": {"type": "string"}},
+                "properties": {
+                    "path": {"type": "string"},
+                    "offset": {"type": "integer", "minimum": 1},
+                    "limit": {"type": "integer", "minimum": 1},
+                },
                 "required": ["path"],
                 "additionalProperties": False,
             },
@@ -263,8 +304,15 @@ def run(
 ) -> Dict[str, Any]:
     workspace = Path(str(session.get("workspace", "."))).resolve()
     case_id = str(session.get("case_id", ""))
+    test_generation = case_id.startswith("testgen-")
+    skill_content, skill_context_sha256 = _load_skill_context()
     case_hint = ""
-    if "more-itertools" in case_id:
+    if test_generation:
+        case_hint = (
+            " Read only the minimum production code and nearby tests needed to identify the "
+            "public behavior. Do not inspect unrelated files."
+        )
+    elif "more-itertools" in case_id:
         case_hint = (
             " The source file is more_itertools/more.py and the regression test is in "
             "tests/test_more.py. Read at most three focused snippets, then edit the source "
@@ -300,30 +348,50 @@ def run(
             "tests/test_dictutils.py. Read at most three focused snippets, then edit the "
             "source file; do not create a temporary test file."
         )
+    common_contract = (
+        "You are a coding Agent. Work only inside the supplied workspace. "
+        "The absolute workspace path is "
+        + str(workspace)
+        + ". Use relative paths; never use /workspace. Use tools instead of guessing. "
+        "Do not reveal hidden reasoning; finish with a concise summary of changes and "
+        "the observed validation result. "
+    )
+    if test_generation:
+        task_contract = (
+            "This is a regression-test generation task. Create agent_regression_test.py "
+            "with write_file and do not modify production code or existing tests. The new "
+            "standalone test must fail on the current buggy checkout for the described "
+            "behavioral reason and pass after the production defect is fixed. Run "
+            "python3 agent_regression_test.py before finishing. Syntax, import, dependency, "
+            "or environment failures are not valid bug evidence. "
+        )
+    else:
+        task_contract = (
+            "Inspect the relevant files, implement the requested bug fix, and run "
+            "the relevant tests with python3 -m pytest. After locating the relevant "
+            "function, make a minimal focused edit with replace_in_file; never rewrite an "
+            "existing source file with write_file, because file reads can be truncated. "
+            "Before finishing, run python3 -m py_compile on each changed Python file and "
+            "then the narrowest available validation command. Do not spend turns rereading "
+            "unrelated code. Do not create a temporary reproduction test: the benchmark "
+            "grader already contains the regression oracle. If test dependencies are "
+            "unavailable, still apply the source edit before reporting that limitation. "
+            "If a dependency is unavailable, report that once and continue with the "
+            "repository's direct validation script; do not loop. "
+        )
+    skill_contract = ""
+    if skill_content:
+        skill_contract = (
+            "\nFollow this frozen Skill for the current task. "
+            f"Skill content SHA-256: {skill_context_sha256}\n"
+            "<skill>\n"
+            + skill_content
+            + "\n</skill>"
+        )
     messages: List[Dict[str, Any]] = [
         {
             "role": "system",
-            "content": (
-                "You are a coding Agent. Work only inside the supplied workspace. "
-                "The absolute workspace path is "
-                + str(workspace)
-                + ". Use relative paths such as cachetools/lru.py; never use /workspace. "
-                "Inspect the relevant files, implement the requested bug fix, and run "
-                "the relevant tests with python3 -m pytest. Use tools instead of guessing. "
-                "After locating the relevant function, make a minimal focused edit with "
-                "replace_in_file; never rewrite an existing source file with write_file, "
-                "because file reads can be truncated. Before finishing, run python3 -m "
-                "py_compile on each changed Python file and then the narrowest available "
-                "validation command. Do not "
-                "spend turns rereading unrelated code. "
-                "Do not create a temporary reproduction test: the benchmark grader already "
-                "contains the regression oracle. If test dependencies are unavailable, still "
-                "apply the source edit before reporting that limitation. "
-                "Do not reveal hidden reasoning; finish with a concise summary of changes "
-                "and test result. If a dependency is unavailable, report that once and "
-                "continue with the repository's direct validation script; do not loop."
-                + case_hint
-            ),
+            "content": common_contract + task_contract + case_hint + skill_contract,
         }
     ]
     for message in session.get("messages", []):
@@ -341,6 +409,7 @@ def run(
     started = time.monotonic()
     final_message = ""
     edit_nudge_sent = False
+    artifact_nudge_sent = False
     api_key = os.environ.get("OPENAI_API_KEY", "local")
     requested_turns = (
         max_turns if max_turns is not None else session.get("max_turns", DEFAULT_MAX_TURNS)
@@ -415,10 +484,34 @@ def run(
                 messages[-1] = {"role": "assistant", "content": content, "tool_calls": calls}
         if not isinstance(calls, list) or not calls:
             content = message.get("content")
+            artifact_exists = (workspace / "agent_regression_test.py").is_file()
+            if test_generation and not artifact_exists and not artifact_nudge_sent:
+                transcript.append(
+                    {
+                        "role": "assistant",
+                        "content": content if isinstance(content, str) else "",
+                    }
+                )
+                messages.append(
+                    {
+                        "role": "user",
+                        "content": (
+                            "The required agent_regression_test.py does not exist. Call "
+                            "write_file now, then run python3 agent_regression_test.py. "
+                            "Do not modify production code."
+                        ),
+                    }
+                )
+                artifact_nudge_sent = True
+                continue
             final_message = (
                 content
-                if isinstance(content, str)
-                else "Agent completed without a final message"
+                if isinstance(content, str) and content
+                else (
+                    "Agent completed without required agent_regression_test.py."
+                    if test_generation and not artifact_exists
+                    else "Agent completed without a final message"
+                )
             )
             transcript.append({"role": "assistant", "content": final_message})
             break
@@ -453,15 +546,22 @@ def run(
             final_message = "Agent reached the configured tool-call limit."
             break
         if not edit_nudge_sent and len(transcript) >= 4:
+            nudge = (
+                "You have inspected enough. Call write_file now to create exactly "
+                "agent_regression_test.py, then run it with python3. Do not modify "
+                "production code or existing tests."
+                if test_generation
+                else (
+                    "You have inspected enough. You must call replace_in_file now and "
+                    "apply the minimal focused fix; do not only describe a patch or "
+                    "rewrite the whole file. Then run python3 -m py_compile on changed "
+                    "Python files and the most relevant direct validation command."
+                )
+            )
             messages.append(
                 {
                     "role": "user",
-                    "content": (
-                        "You have inspected enough. You must call replace_in_file now and "
-                        "apply the minimal focused fix; do not only describe a patch or "
-                        "rewrite the whole file. Then run python3 -m py_compile on changed "
-                        "Python files and the most relevant direct validation command."
-                    ),
+                    "content": nudge,
                 }
             )
             edit_nudge_sent = True
@@ -491,6 +591,9 @@ def run(
         "tool_calls": tool_calls,
         "final_message": final_message,
         "transcript": transcript,
+        "task_mode": "test_generation" if test_generation else "bug_fix",
+        "skill_context_loaded": bool(skill_content),
+        "skill_context_sha256": skill_context_sha256 or None,
         "artifacts": {"workspace_diff": diff} if diff else {},
     }
 

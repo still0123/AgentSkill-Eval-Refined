@@ -162,3 +162,10 @@ No fix is part of this diagnostic change. A later, separately authorized impleme
 
 The same two frozen Cases should be retained for the first corrected replay. No additional Case is
 needed to validate the harness.
+
+## Follow-up
+
+The task-specific contract, hash-bound treatment Skill handoff, focused reads, empty-completion
+guard, and deterministic tests were implemented. The same two Cases were replayed once: 4 Runs,
+0 INVALID, W/T/L `0 / 2 / 0`. The corrected harness therefore establishes no gain on these two
+Cases. See [Test Generation Runtime Fix and Corrected Replay](./test-generation-runtime-fix.md).

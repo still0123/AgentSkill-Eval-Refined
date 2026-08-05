@@ -205,6 +205,12 @@ The `0 / 2 / 0` result remains an honest record of observed execution, but it is
 evidence about Test Generation Skill efficacy. See
 [Test Generation Negative-Result Diagnosis](./test-generation-negative-result-diagnosis.md).
 
+The Runtime was subsequently repaired without changing the Dataset, Cases, Skill, or grader. A
+new four-Run smoke proved treatment-only Skill context delivery and baseline cleanliness, completed
+with 0 INVALID, and still produced W/T/L `0 / 2 / 0`. This corrected result is valid no-gain
+evidence for the exact two frozen Cases, not a general Skill-efficacy claim. See
+[Test Generation Runtime Fix and Corrected Replay](./test-generation-runtime-fix.md).
+
 ## Evidence
 
 Full Trace, pytest output, Skill activation records, patches when present, and replayable audit

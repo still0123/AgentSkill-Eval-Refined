@@ -646,7 +646,11 @@ class RealAgentEvidenceRunner:
                 name=treatment_name,
                 version=treatment_version,
                 content_sha256=preflight.skill_sha256,
-                injection_mode="skill-up-native-install",
+                injection_mode=(
+                    "skill-up-native-plus-process-context"
+                    if spec.agent.engine == "qwen_openai_process"
+                    else "skill-up-native-install"
+                ),
             ),
             tool_snapshot=tools,
             sandbox_snapshot=sandbox,
@@ -667,6 +671,21 @@ class RealAgentEvidenceRunner:
         if spec.agent.engine_custom:
             engine["custom"] = spec.agent.engine_custom
         secrets = RealEvidencePreflight.secret_values(spec.agent.secret_env_names)
+        baseline_home_files = dict(spec.agent.home_config_files)
+        treatment_home_files = dict(spec.agent.home_config_files)
+        if spec.agent.engine == "qwen_openai_process":
+            context_path = ".agentskill-eval/selected-skill.json"
+            if context_path in treatment_home_files:
+                raise RealEvidenceError(
+                    "Process Agent Skill context conflicts with configured HOME files"
+                )
+            if spec.baseline_skill_path is not None:
+                baseline_home_files.update(
+                    self._process_agent_skill_home_files(spec.baseline_skill_path)
+                )
+            treatment_home_files.update(
+                self._process_agent_skill_home_files(spec.skill_path)
+            )
         runtimes = (
             VariantRuntimeSpec(
                 variant_id=baseline.id,
@@ -679,7 +698,7 @@ class RealAgentEvidenceRunner:
                     if spec.baseline_skill_path is not None
                     else None
                 ),
-                agent_home_files=spec.agent.home_config_files,
+                agent_home_files=baseline_home_files,
                 secret_env=secrets,
             ),
             VariantRuntimeSpec(
@@ -689,7 +708,7 @@ class RealAgentEvidenceRunner:
                 skill_path=spec.skill_path.resolve(strict=True),
                 timeout_seconds=spec.agent.timeout_seconds,
                 max_turns=spec.agent.max_turns,
-                agent_home_files=spec.agent.home_config_files,
+                agent_home_files=treatment_home_files,
                 secret_env=secrets,
             ),
         )
@@ -755,6 +774,21 @@ class RealAgentEvidenceRunner:
         if not isinstance(version, str) or not version:
             raise RealEvidenceError("Skill metadata requires a version")
         return name, version
+
+    @staticmethod
+    def _process_agent_skill_home_files(
+        skill_root: Path,
+    ) -> dict[str, dict[str, object]]:
+        content = (skill_root.resolve(strict=True) / "SKILL.md").read_text(encoding="utf-8")
+        if not content:
+            raise RealEvidenceError("Process Agent Skill content cannot be empty")
+        return {
+            ".agentskill-eval/selected-skill.json": {
+                "schema_version": "ase/process-agent-skill/v1alpha1",
+                "content": content,
+                "sha256": hashlib.sha256(content.encode("utf-8")).hexdigest(),
+            }
+        }
 
     def _persist_attempt_evidence(
         self,
