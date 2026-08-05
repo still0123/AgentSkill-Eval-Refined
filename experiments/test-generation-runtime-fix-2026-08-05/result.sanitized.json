@@ -1,0 +1,53 @@
+{
+  "schema_version": "ase/test-generation-runtime-fix-result/v1alpha1",
+  "status": "COMPLETED_OBSERVED_NO_GAIN",
+  "experiment_id": "b97ec4eb-387b-5336-883c-108e99f58484",
+  "dataset_version_id": "d90135df-d060-562a-9252-29322cc99847",
+  "dataset_sha256": "eb27c384f0fed3fd136a0456bbcffc70829d8d1810c27952035bfbe2935f5390",
+  "skill_tree_sha256": "d1cfd04f321985620117316909ef12807a90f5740aa6161dcc6514f2e271b3f7",
+  "skill_content_sha256": "4906a6fb2e02895b48afd3d9d8eacc1d30547b998fb4ab116363f1cc443babda",
+  "agent_sha256": "95f3352b6fa844e56d7215c114f14bfc286b25a0f6a1c738701b3e42166d479f",
+  "runner_sha256": "b8473aad3fe997f3aa8de1e9bd9bc127e5254b25371567a0e07143afc809c359",
+  "excluded_environment_attempt": {
+    "runs": 4,
+    "invalid_runs": 4,
+    "provider_tokens": 0,
+    "reason": "stale_openai_api_key_http_401"
+  },
+  "corrected_replay": {
+    "completed_runs": 4,
+    "invalid_runs": 0,
+    "win": 0,
+    "tie": 2,
+    "loss": 0,
+    "baseline_pass_runs": 0,
+    "treatment_pass_runs": 0,
+    "baseline_skill_context_loaded_runs": 0,
+    "treatment_skill_context_loaded_runs": 2,
+    "baseline_tokens": 134235,
+    "treatment_tokens": 78835,
+    "baseline_latency_ms": 91020,
+    "treatment_latency_ms": 86787,
+    "baseline_cost_microusd": 61231,
+    "treatment_cost_microusd": 37089,
+    "total_cost_microusd": 98320,
+    "authorized_max_cost_microusd": 250000
+  },
+  "case_results": [
+    {
+      "case": "testgen-more-itertools-islice-release",
+      "baseline": "missing_required_test_file",
+      "treatment": "missing_required_test_file",
+      "classification": "tie_negative"
+    },
+    {
+      "case": "testgen-cachetools-cachedmethod-autospec",
+      "baseline": "no_gradeable_test_file",
+      "treatment": "generated_test_passed_on_buggy_checkout",
+      "classification": "tie_negative"
+    }
+  ],
+  "replay_bundle_sha256": "da6730d4e9d39e8596646c42a4789e01d656f960bdaf5e3be6922fe9c1ef68cf",
+  "simulated": false,
+  "claim_limit": "Valid no-gain evidence for the exact two frozen public Cases, Agent, Skill, Runtime, and grader only."
+}

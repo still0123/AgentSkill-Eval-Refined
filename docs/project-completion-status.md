@@ -173,4 +173,10 @@ Promotion Gate 已通过，并以 `AI-assisted review (OpenAI Codex)` 明确记�
 
 主闭环成功后新增最小 Python Test Generation family。两个真实 Git-history Case 的有效配对
 结果为 W/T/L `0 / 2 / 0`、0 INVALID；without/with-Skill 均未生成通过 before-fail /
-after-pass Oracle 的测试。该结果保留为负证据，不进入自动优化或版本发布。
+after-pass Oracle 的测试。后验 Trace 诊断确认 4 个 Run 都是真实任务失败，但实验复用了
+Bug Fix 专用 Process Agent，且 Treatment Skill 未进入模型上下文，因此不能据此判断
+Test Generation Skill 无效。修复 Runtime 后复用同一 DatasetVersion 和两个 Case 重跑：
+4 Runs、0 INVALID、W/T/L 仍为 `0 / 2 / 0`，且 Treatment Skill context 已直接验证。该结果
+现可解释为冻结两 Case 上的有效无增益证据，但不支持一般化结论；不进入自动优化或版本发布。
+详见 [Test Generation Negative-Result Diagnosis](./test-generation-negative-result-diagnosis.md)
+和 [Runtime Fix and Corrected Replay](./test-generation-runtime-fix.md)。

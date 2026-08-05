@@ -119,10 +119,14 @@ Skill v2 只增加一条通用规则：修改后必须重新运行复现命令�
 来自公开 Git 历史；该结果证明一次可审计的工程闭环，不代表普遍性能提升。
 
 第二条 **Python Test Generation** family 只评测 2 个 Case。最终有效配对为
-`W/T/L = 0 / 2 / 0`、`INVALID = 0`：without-Skill 和 with-Skill 都未生成满足
-before-fail / after-pass Oracle 的测试。该负结果被保留，不触发自动优化或版本发布。
+`W/T/L = 0 / 2 / 0`、`INVALID = 0`。后验 Trace 诊断发现初始实验存在 Bug Fix Prompt 与
+Skill handoff 混杂；修复 Runtime 后复用同一 DatasetVersion 和两个 Case 重跑，Treatment
+Skill 已进入模型上下文，但仍未产生独立 WIN。该结果仅表示冻结两 Case 上无增益，未触发自动
+优化或版本发布。
 
-详见 [真实正向闭环报告](docs/real-positive-skill-loop.md)。
+详见 [真实正向闭环报告](docs/real-positive-skill-loop.md)和
+[Test Generation 负结果诊断](docs/test-generation-negative-result-diagnosis.md)、
+[Runtime 修复与重跑结果](docs/test-generation-runtime-fix.md)。
 
 ## 证据为什么可信
 
@@ -217,7 +221,7 @@ AgentSkill-Eval/
 
 ## 当前边界
 
-- Python Test Generation 仅有最小两 Case 配对评测，尚未实现自动优化
+- Python Test Generation 仅有修复后最小两 Case 无增益证据，不支持一般化结论
 - 真实实验样本较小，不支持通用性能排名
 - Dashboard 只读本地证据
 - 已发布的真实 Skill v2 结论仅适用于冻结 Agent、公开 Case、Runtime 与协议

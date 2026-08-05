@@ -1,3 +1,4 @@
+import hashlib
 from pathlib import Path
 
 import pytest
@@ -26,3 +27,61 @@ def test_real_evidence_rejects_missing_skill_identity(tmp_path: Path) -> None:
 
     with pytest.raises(RealEvidenceError, match="requires a name"):
         RealAgentEvidenceRunner._skill_identity(skill)
+
+
+def test_real_evidence_builds_hash_bound_process_agent_skill_context(
+    tmp_path: Path,
+) -> None:
+    skill = tmp_path / "skill"
+    skill.mkdir()
+    content = "# Test Generation\nWrite a regression test.\n"
+    (skill / "SKILL.md").write_text(content, encoding="utf-8")
+
+    home_files = RealAgentEvidenceRunner._process_agent_skill_home_files(skill)
+
+    assert set(home_files) == {".agentskill-eval/selected-skill.json"}
+    context = home_files[".agentskill-eval/selected-skill.json"]
+    assert context == {
+        "schema_version": "ase/process-agent-skill/v1alpha1",
+        "content": content,
+        "sha256": hashlib.sha256(content.encode("utf-8")).hexdigest(),
+    }
+
+
+def test_real_evidence_uses_explicit_process_context_injection_mode() -> None:
+    assert (
+        RealAgentEvidenceRunner._skill_injection_mode("qwen_openai_process")
+        == "skill-up-native-plus-process-context"
+    )
+    assert (
+        RealAgentEvidenceRunner._skill_injection_mode("qwen_code")
+        == "skill-up-native-install"
+    )
+
+
+def test_real_evidence_validates_process_agent_skill_context() -> None:
+    digest = "a" * 64
+
+    RealAgentEvidenceRunner._validate_process_agent_skill_context(
+        {
+            "skill_context_loaded": True,
+            "skill_context_sha256": digest,
+        },
+        expected_sha256=digest,
+    )
+    RealAgentEvidenceRunner._validate_process_agent_skill_context(
+        {
+            "skill_context_loaded": False,
+            "skill_context_sha256": None,
+        },
+        expected_sha256=None,
+    )
+
+    with pytest.raises(RealEvidenceError, match="Skill context handoff mismatch"):
+        RealAgentEvidenceRunner._validate_process_agent_skill_context(
+            {
+                "skill_context_loaded": False,
+                "skill_context_sha256": None,
+            },
+            expected_sha256=digest,
+        )
