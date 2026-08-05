@@ -7,6 +7,7 @@
 - [`v0.3.0-rc.3` 发布说明](./releases/v0.3.0-rc3.md)
 - [`v0.3.0-rc.2` 发布说明](./releases/v0.3.0-rc2.md)
 - [项目收口状态与证据边界](./project-completion-status.md)
+- [Test Generation 负结果后验诊断](./test-generation-negative-result-diagnosis.md)
 - [答辩与面试讲解手册](./portfolio-demo-and-interview-guide.md)
 - [Skill v1→v2 分阶段执行工作文档](./skill-evolution-execution-roadmap.md)
 

@@ -176,7 +176,7 @@ evidence because a missing grader shebang caused execution as shell. The Runner'
 `FAIL` rather than `INVALID`, so both values remain explicit in the sanitized report. After fixing
 only that grader entry point, the same Cases, tasks, Skill, Runtime, and metrics were replayed once.
 
-Final valid result:
+Final Runner-valid result:
 
 | Metric | without Skill | with Skill |
 |---|---:|---:|
@@ -188,11 +188,22 @@ Final valid result:
 - W/T/L: `0 / 2 / 0`;
 - invalid Runs: `0`;
 - observed cost: `120,697 microusd`;
-- conclusion: valid negative result, no Skill improvement claim;
+- conclusion: four valid task-level FAIL outcomes, but a confounded Skill comparison;
 - no candidate search, optimization, or version publication was performed.
 
 The Dataset builder's hidden reference oracle independently proved before-fail/after-pass three
 times per Case before any Agent run.
+
+Post-hoc Trace diagnosis found that the frozen Process Agent was specialized for production-code
+Bug Fix tasks. Its higher-priority system prompt required a source edit, prohibited creating a
+temporary reproduction test, and emitted a mandatory `replace_in_file` nudge. The Custom Engine
+SessionInput also contained no Skill content, and baseline/treatment model messages were identical
+for each Case. The treatment therefore proved Skill installation but not Skill delivery or
+activation at model-input level.
+
+The `0 / 2 / 0` result remains an honest record of observed execution, but it is not valid negative
+evidence about Test Generation Skill efficacy. See
+[Test Generation Negative-Result Diagnosis](./test-generation-negative-result-diagnosis.md).
 
 ## Evidence
 
