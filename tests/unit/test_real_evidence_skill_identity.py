@@ -46,3 +46,42 @@ def test_real_evidence_builds_hash_bound_process_agent_skill_context(
         "content": content,
         "sha256": hashlib.sha256(content.encode("utf-8")).hexdigest(),
     }
+
+
+def test_real_evidence_uses_explicit_process_context_injection_mode() -> None:
+    assert (
+        RealAgentEvidenceRunner._skill_injection_mode("qwen_openai_process")
+        == "skill-up-native-plus-process-context"
+    )
+    assert (
+        RealAgentEvidenceRunner._skill_injection_mode("qwen_code")
+        == "skill-up-native-install"
+    )
+
+
+def test_real_evidence_validates_process_agent_skill_context() -> None:
+    digest = "a" * 64
+
+    RealAgentEvidenceRunner._validate_process_agent_skill_context(
+        {
+            "skill_context_loaded": True,
+            "skill_context_sha256": digest,
+        },
+        expected_sha256=digest,
+    )
+    RealAgentEvidenceRunner._validate_process_agent_skill_context(
+        {
+            "skill_context_loaded": False,
+            "skill_context_sha256": None,
+        },
+        expected_sha256=None,
+    )
+
+    with pytest.raises(RealEvidenceError, match="Skill context handoff mismatch"):
+        RealAgentEvidenceRunner._validate_process_agent_skill_context(
+            {
+                "skill_context_loaded": False,
+                "skill_context_sha256": None,
+            },
+            expected_sha256=digest,
+        )

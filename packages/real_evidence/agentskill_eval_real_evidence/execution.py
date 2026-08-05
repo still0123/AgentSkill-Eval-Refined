@@ -20,6 +20,7 @@ from agentskill_eval_benchmark_gen import LoadedDataset
 from agentskill_eval_contracts import (
     AgentSnapshot,
     EnvironmentFingerprint,
+    EvaluationOutcome,
     ExperimentManifest,
     ExperimentStatus,
     ExperimentVariant,
@@ -474,6 +475,7 @@ class RealAgentEvidenceRunner:
             return RealEvidenceResult(exhausted, None, None, None, None)
         if execution.completed_runs + execution.invalid_runs != manifest.planned_runs:
             raise RealEvidenceError("execution ended without a complete terminal Run set")
+        self._verify_process_agent_skill_context(spec, experiment.id, variants)
 
         completed = manifest.model_copy(
             update={
@@ -593,6 +595,7 @@ class RealAgentEvidenceRunner:
             rates=rates,
         )
         treatment_name, treatment_version = self._skill_identity(spec.skill_path)
+        injection_mode = self._skill_injection_mode(spec.agent.engine)
         baseline_identity = (
             self._skill_identity(spec.baseline_skill_path)
             if spec.baseline_skill_path is not None
@@ -616,7 +619,7 @@ class RealAgentEvidenceRunner:
                 name=baseline_identity[0],
                 version=baseline_identity[1],
                 content_sha256=preflight.baseline_skill_sha256,
-                injection_mode="skill-up-native-install",
+                injection_mode=injection_mode,
             )
         baseline = ExperimentVariant(
             id=uuid5(experiment_id, "variant:without-skill"),
@@ -646,11 +649,7 @@ class RealAgentEvidenceRunner:
                 name=treatment_name,
                 version=treatment_version,
                 content_sha256=preflight.skill_sha256,
-                injection_mode=(
-                    "skill-up-native-plus-process-context"
-                    if spec.agent.engine == "qwen_openai_process"
-                    else "skill-up-native-install"
-                ),
+                injection_mode=injection_mode,
             ),
             tool_snapshot=tools,
             sandbox_snapshot=sandbox,
@@ -776,6 +775,20 @@ class RealAgentEvidenceRunner:
         return name, version
 
     @staticmethod
+    def _skill_injection_mode(engine: str) -> str:
+        return (
+            "skill-up-native-plus-process-context"
+            if engine == "qwen_openai_process"
+            else "skill-up-native-install"
+        )
+
+    @staticmethod
+    def _skill_content_sha256(skill_root: Path) -> str:
+        return hashlib.sha256(
+            (skill_root.resolve(strict=True) / "SKILL.md").read_bytes()
+        ).hexdigest()
+
+    @staticmethod
     def _process_agent_skill_home_files(
         skill_root: Path,
     ) -> dict[str, dict[str, object]]:
@@ -786,9 +799,71 @@ class RealAgentEvidenceRunner:
             ".agentskill-eval/selected-skill.json": {
                 "schema_version": "ase/process-agent-skill/v1alpha1",
                 "content": content,
-                "sha256": hashlib.sha256(content.encode("utf-8")).hexdigest(),
+                "sha256": RealAgentEvidenceRunner._skill_content_sha256(skill_root),
             }
         }
+
+    @staticmethod
+    def _validate_process_agent_skill_context(
+        payload: dict[str, object], *, expected_sha256: Optional[str]
+    ) -> None:
+        loaded = payload.get("skill_context_loaded")
+        observed_sha256 = payload.get("skill_context_sha256")
+        if expected_sha256 is None:
+            valid = loaded is False and observed_sha256 is None
+        else:
+            valid = loaded is True and observed_sha256 == expected_sha256
+        if not valid:
+            raise RealEvidenceError("Process Agent Skill context handoff mismatch")
+
+    def _verify_process_agent_skill_context(
+        self,
+        spec: RealAgentEvidenceSpec,
+        experiment_id: UUID,
+        variants: Tuple[ExperimentVariant, ExperimentVariant],
+    ) -> None:
+        if spec.agent.engine != "qwen_openai_process":
+            return
+        expected_by_variant = {
+            variants[0].id: (
+                self._skill_content_sha256(spec.baseline_skill_path)
+                if spec.baseline_skill_path is not None
+                else None
+            ),
+            variants[1].id: self._skill_content_sha256(spec.skill_path),
+        }
+        layout = ExperimentLayout(self.workspace, experiment_id)
+        for run in self.experiment_store.list_runs(experiment_id):
+            if run.evaluation_outcome == EvaluationOutcome.INVALID:
+                continue
+            if run.evaluation_outcome is None:
+                raise RealEvidenceError(f"run {run.id} has no terminal evaluation outcome")
+            attempt = self.experiment_store.load_selected_attempt(experiment_id, run)
+            if attempt is None:
+                raise RealEvidenceError(f"terminal run {run.id} has no selected Attempt")
+            root = layout.raw_runner(run.id, attempt.attempt_no)
+            session_results = tuple(root.rglob("session-result.json"))
+            if len(session_results) != 1 or session_results[0].is_symlink():
+                raise RealEvidenceError(
+                    f"run {run.id} must contain one regular SessionResult"
+                )
+            try:
+                payload = json.loads(session_results[0].read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError) as exc:
+                raise RealEvidenceError(
+                    f"run {run.id} SessionResult cannot be read"
+                ) from exc
+            if not isinstance(payload, dict):
+                raise RealEvidenceError(f"run {run.id} SessionResult must be an object")
+            try:
+                self._validate_process_agent_skill_context(
+                    payload,
+                    expected_sha256=expected_by_variant[run.variant_id],
+                )
+            except RealEvidenceError as exc:
+                raise RealEvidenceError(
+                    f"run {run.id} Process Agent Skill context handoff mismatch"
+                ) from exc
 
     def _persist_attempt_evidence(
         self,
