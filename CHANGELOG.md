@@ -5,8 +5,14 @@ after the first stable release.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-08-06
+
 ### Added
 
+- Completed the first observed-Agent Python Bug Fix v1 to v2 promotion loop with W/T/L `1/3/0`,
+  immutable `python-bug-fix@2.0.0`, AI-assisted review, and a verified Evidence Release.
+- Added the two-Case Python Test Generation family and retained its corrected observed no-gain
+  result (`0/2/0`, zero INVALID) without automatic optimization or publication.
 - Stage 3C budgeted real evolution execution with separately authorized `validation_search` and
   `regression_dev` stages, immutable receipts, idempotent replay, regression gating, and a
   confirmation-only handoff that keeps independent and locked data withheld.
@@ -22,6 +28,10 @@ after the first stable release.
 
 ### Fixed
 
+- Added a task-aware Test Generation Process Agent contract, focused file reads, required-artifact
+  completion gate, and hash-bound Skill context delivery.
+- Added fail-closed verification that Process Agent Skill context loaded state and SHA match the
+  frozen baseline/treatment snapshots before formal evidence is generated.
 - Disabled pytest's cache provider inside the offline verifier so test execution cannot mutate
   frozen fixtures and invalidate their audit hashes.
 
