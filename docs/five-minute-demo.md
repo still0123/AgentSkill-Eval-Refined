@@ -9,7 +9,7 @@
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-python3 -m pip install agentskill_eval-0.3.0rc2-py3-none-any.whl
+python3 -m pip install agentskill_eval-0.3.0rc3-py3-none-any.whl
 ```
 
 wheel 已内置离线 Dataset 与 Skill，不要求当前目录存在源码仓库。

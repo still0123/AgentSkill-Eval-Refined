@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "agentskill-eval"
-version = "0.3.0rc2"
+version = "0.3.0rc3"
 description = "Reproducible evaluation and regression analysis for Agent Skills."
 readme = "README.md"
 requires-python = ">=3.9"
