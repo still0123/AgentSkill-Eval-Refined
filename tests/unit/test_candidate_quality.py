@@ -6,9 +6,17 @@ import pytest
 
 from agentskill_eval_contracts import FailureLabel
 from agentskill_eval_skill_optimizer import (
+    BenchmarkGuidedSkillSearch,
     CandidateQualityError,
     CandidateQualityGate,
+    EvaluatorSpec,
     ImprovementHypothesis,
+    MutationSpec,
+    OptimizationSearchSpec,
+    SearchAlgorithmSpec,
+    SearchBudgetSpec,
+    SearchConstraintSpec,
+    SkillSearchError,
 )
 
 
@@ -111,3 +119,76 @@ def test_quality_gate_accepts_observed_test_execution_guidance(tmp_path: Path) -
         item for item in report.candidates if item.candidate_id == "rerun-and-parse"
     )
     assert candidate.accepted is True
+
+
+def test_quality_gate_accepts_exactly_two_hypotheses(tmp_path: Path) -> None:
+    report = CandidateQualityGate(tmp_path).materialize_hypotheses(
+        proposal_job_id="two-candidate-proposal",
+        proposal_manifest_sha256="d" * 64,
+        parent_content=b"# Base Skill\n",
+        hypotheses=(
+            _hypothesis("inspect-first", "Inspect the failure evidence before editing."),
+            _hypothesis(
+                "verify-after",
+                "Run the targeted test and verify the result after editing.",
+            ),
+        ),
+        max_candidates=2,
+    )
+
+    assert len(report.accepted_candidate_ids) == 2
+
+
+def test_one_case_search_rejects_zero_gain_candidates(tmp_path: Path) -> None:
+    skill = tmp_path / "skill"
+    skill.mkdir()
+    (skill / "SKILL.md").write_text("# Base Skill\n", encoding="utf-8")
+    dataset = tmp_path / "validation-search.yaml"
+    dataset.write_text(
+        "schema_version: ase/optimizer-validation/v1alpha1\n"
+        "name: one-case\n"
+        "version: '1'\n"
+        "split: validation_search\n"
+        "simulated: true\n"
+        "cases:\n"
+        "  - id: case-one\n"
+        "    required_terms: [unreachable-marker]\n",
+        encoding="utf-8",
+    )
+    spec = OptimizationSearchSpec(
+        schema_version="ase/optimization-search/v1alpha1",
+        name="one-case-zero-gain",
+        base_skill_path=skill,
+        manual_skill_path=skill,
+        validation_search_path=dataset,
+        mutations=(
+            MutationSpec(
+                id="inspect-first",
+                hypothesis="Inspecting evidence may improve task execution.",
+                instruction="Inspect the available evidence before editing.",
+            ),
+            MutationSpec(
+                id="verify-after",
+                hypothesis="Verification may improve task execution.",
+                instruction="Run the targeted test after editing.",
+            ),
+        ),
+        search=SearchAlgorithmSpec(
+            subset_size=1,
+            promote_search_candidates=1,
+            include_auxiliary_candidates=False,
+        ),
+        constraints=SearchConstraintSpec(min_absolute_gain=0.01),
+        budget=SearchBudgetSpec(
+            max_candidate_case_evaluations=3,
+            timeout_seconds=10,
+        ),
+        evaluator=EvaluatorSpec(
+            type="simulated_keyword",
+            version="test",
+            simulated=True,
+        ),
+    )
+
+    with pytest.raises(SkillSearchError, match="no search-origin candidate"):
+        BenchmarkGuidedSkillSearch(tmp_path / "workspace").run(spec)

@@ -49,8 +49,8 @@ class RealLLMProposalSpec(FrozenModel):
     def generator_must_be_real_and_proposal_only(self) -> "RealLLMProposalSpec":
         if self.generator.type != "deepseek":
             raise ValueError("real LLM proposal MVP requires the DeepSeek OpenAI-compatible API")
-        if not 3 <= self.generator.max_hypotheses <= 5:
-            raise ValueError("real LLM proposal MVP requires three to five candidates")
+        if not 2 <= self.generator.max_hypotheses <= 5:
+            raise ValueError("real LLM proposal MVP requires two to five candidates")
         return self
 
     @classmethod
@@ -105,7 +105,7 @@ class RealLLMProposalPreflight(FrozenModel):
     eligible_failure_count: int = Field(ge=1)
     excluded_failure_count: int = Field(ge=0)
     planned_calls: Literal[1] = 1
-    candidate_count: int = Field(ge=3, le=5)
+    candidate_count: int = Field(ge=2, le=5)
     estimated_max_cost_microusd: int = Field(ge=0)
     parameters: ProposalGeneratorParameters
     source_split: Literal["train"] = "train"
@@ -130,7 +130,7 @@ class RealLLMProposalManifest(FrozenModel):
     base_skill_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     failure_bundle_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     proposals_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
-    proposal_count: int = Field(ge=3, le=5)
+    proposal_count: int = Field(ge=2, le=5)
     input_evidence_class: Literal["observed_train", "simulated_fixture"]
     evidence_class: Literal["real_llm_skill_proposal"] = "real_llm_skill_proposal"
     parameters: ProposalGeneratorParameters

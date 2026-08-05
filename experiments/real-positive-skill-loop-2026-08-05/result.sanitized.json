@@ -1,0 +1,116 @@
+{
+  "schema_version": "ase/real-positive-loop-result/v1alpha1",
+  "status": "STOPPED_AT_VALIDATION_SEARCH_NO_GAIN",
+  "real_v1_failure_obtained": true,
+  "train": {
+    "experiment_id": "e30b0b98-c63f-5cd6-8cf5-0948be997d21",
+    "case_id": "more-itertools-islice-release",
+    "control_outcome": "fail",
+    "treatment_outcome": "fail",
+    "classification": "tie_negative",
+    "invalid_runs": 0,
+    "treatment_skill_installed": true,
+    "failure_label": "VERIFICATION",
+    "patch_produced": false,
+    "target_test_executed_by_agent": false,
+    "input_tokens": {
+      "control": 43354,
+      "treatment": 64661
+    },
+    "latency_ms": {
+      "control": 30227,
+      "treatment": 33936
+    },
+    "cost_microusd": {
+      "control": 19549,
+      "treatment": 28883,
+      "total": 48432
+    }
+  },
+  "proposal": {
+    "job_id": "e832b1de-e208-5c25-81c3-534e6dcd1bad",
+    "request_sha256": "146a7c02553acc9d8d12cb32ab406f31c1cda1e09a4c8c76145060ee01fbc6a8",
+    "calls": 2,
+    "persisted_candidate_count": 2,
+    "successful_call_cost_microusd": 291,
+    "input_tokens": 804,
+    "output_tokens": 313,
+    "candidate_ids": [
+      "verify-test-command-match",
+      "verify-environment-setup"
+    ],
+    "ai_assisted_review": {
+      "passed": true,
+      "case_specific_information_found": false,
+      "answer_or_patch_leakage_found": false
+    }
+  },
+  "validation_search": {
+    "optimization_job_id": "c150fa78-a386-5c9d-8606-bbe51bb2c367",
+    "case_id": "cachetools-cachedmethod-autospec",
+    "invalid_runs": 0,
+    "secret_scans_clean": true,
+    "results": [
+      {
+        "candidate": "python-bug-fix-v1",
+        "pass_rate": 0.0,
+        "win": 0,
+        "tie": 0,
+        "loss": 0,
+        "tokens": 106302,
+        "latency_ms": 33423,
+        "cost_microusd": 47051
+      },
+      {
+        "candidate": "verify-test-command-match",
+        "pass_rate": 0.0,
+        "win": 0,
+        "tie": 1,
+        "loss": 0,
+        "tokens": 122809,
+        "latency_ms": 20878,
+        "cost_microusd": 53867
+      },
+      {
+        "candidate": "verify-environment-setup",
+        "pass_rate": 0.0,
+        "win": 0,
+        "tie": 1,
+        "loss": 0,
+        "tokens": 105390,
+        "latency_ms": 25212,
+        "cost_microusd": 46498
+      }
+    ],
+    "goal_winner": null,
+    "stop_reason": "No candidate produced positive absolute gain; Proposal call limit reached."
+  },
+  "regression_dev": {
+    "executed": false
+  },
+  "validation_confirm": {
+    "executed": false
+  },
+  "locked_test": {
+    "executed": false,
+    "accessed": false
+  },
+  "promotion": {
+    "entered": false,
+    "skill_v2_published": false
+  },
+  "test_generation_skill": {
+    "started": false,
+    "completed": false
+  },
+  "budget": {
+    "agent_runs_used": 8,
+    "agent_runs_limit": 16,
+    "proposal_calls_used": 2,
+    "proposal_calls_limit": 2,
+    "known_cost_microusd": 207471,
+    "conservative_cost_microusd": 210259,
+    "cost_limit_microusd": 2500000
+  },
+  "claim_limit": "Descriptive evidence for the frozen public cases, Agent, Skill, Runtime, and protocol only."
+}

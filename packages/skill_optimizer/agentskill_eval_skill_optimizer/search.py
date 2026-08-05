@@ -10,7 +10,7 @@ import shutil
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, Mapping, Optional, Sequence, Tuple
+from typing import Dict, List, Mapping, Optional, Sequence, Tuple
 from uuid import NAMESPACE_URL, UUID, uuid5
 
 from agentskill_eval_benchmark_gen import DatasetLoader, DatasetSplit
@@ -200,15 +200,10 @@ class BenchmarkGuidedSkillSearch:
             return self._load_completed(job_id)
         definitions = self._candidate_definitions(spec, base_content, manual_content)
         if isinstance(evaluator, RealAgentCandidateEvaluator):
-            if spec.search.subset_size % 2 or (
-                len(dataset.cases) - spec.search.subset_size
-            ) % 2:
-                raise SkillSearchError(
-                    "real Agent search requires even subset and remaining Case counts"
-                )
+            comparator_count = 3 if spec.search.include_auxiliary_candidates else 1
             unique_candidate_cases = (
                 len(definitions) * spec.search.subset_size
-                + (3 + spec.search.promote_search_candidates)
+                + (comparator_count + spec.search.promote_search_candidates)
                 * (len(dataset.cases) - spec.search.subset_size)
             )
             evaluator.authorize_plan(unique_candidate_cases)
@@ -216,9 +211,11 @@ class BenchmarkGuidedSkillSearch:
             uuid5(job_id, f"candidate:{origin.value}:{name}:{_sha256(content)}")
             for name, origin, _parent, _mutations, content in definitions
         )
+        comparator_count = 3 if spec.search.include_auxiliary_candidates else 1
         required_budget = (
             len(definitions) * spec.search.subset_size
-            + (3 + spec.search.promote_search_candidates) * len(dataset.cases)
+            + (comparator_count + spec.search.promote_search_candidates)
+            * (len(dataset.cases) - spec.search.subset_size)
         )
         if spec.budget.max_candidate_case_evaluations < required_budget:
             raise SkillSearchError(
@@ -336,17 +333,23 @@ class BenchmarkGuidedSkillSearch:
             if candidate.status != SkillCandidateStatus.PROMOTED:
                 full_validated.append(candidate)
                 continue
-            evaluation = self._evaluate_candidate(
-                evaluator,
-                candidate,
-                frozen_dataset_file,
-                dataset_sha,
-                dataset.cases,
-                SearchEvaluationStage.FULL,
-                spec.budget.timeout_seconds,
-                curated=curated_source is not None,
-            )
-            job = self._consume_budget(job, len(dataset.cases))
+            subset_evaluation = candidate.evaluations[-1]
+            if subset_evaluation.case_ids == tuple(item.id for item in dataset.cases):
+                evaluation = subset_evaluation.model_copy(
+                    update={"stage": SearchEvaluationStage.FULL}
+                )
+            else:
+                evaluation = self._evaluate_candidate(
+                    evaluator,
+                    candidate,
+                    frozen_dataset_file,
+                    dataset_sha,
+                    dataset.cases,
+                    SearchEvaluationStage.FULL,
+                    spec.budget.timeout_seconds,
+                    curated=curated_source is not None,
+                )
+                job = self._consume_budget(job, len(dataset.cases))
             candidate = self._transition(
                 candidate,
                 SkillCandidateStatus.FULL_VALIDATED,
@@ -451,18 +454,23 @@ class BenchmarkGuidedSkillSearch:
         spec: OptimizationSearchSpec, base: bytes, manual: bytes
     ) -> Tuple[Tuple[str, CandidateOrigin, Optional[str], Tuple[str, ...], bytes], ...]:
         rng = random.Random(spec.search.random_seed)
-        random_source = rng.choice(spec.mutations)
-        definitions = [
-            ("original", CandidateOrigin.ORIGINAL, None, (), base),
-            ("manual", CandidateOrigin.MANUAL, "base", ("manual",), manual),
-            (
-                "random",
-                CandidateOrigin.RANDOM,
-                "base",
-                (f"randomized-{random_source.id}",),
-                BenchmarkGuidedSkillSearch._random_mutate(base, random_source, rng),
-            ),
-        ]
+        definitions: List[
+            Tuple[str, CandidateOrigin, Optional[str], Tuple[str, ...], bytes]
+        ] = [("original", CandidateOrigin.ORIGINAL, None, (), base)]
+        if spec.search.include_auxiliary_candidates:
+            random_source = rng.choice(spec.mutations)
+            definitions.extend(
+                (
+                    ("manual", CandidateOrigin.MANUAL, "base", ("manual",), manual),
+                    (
+                        "random",
+                        CandidateOrigin.RANDOM,
+                        "base",
+                        (f"randomized-{random_source.id}",),
+                        BenchmarkGuidedSkillSearch._random_mutate(base, random_source, rng),
+                    ),
+                )
+            )
         definitions.extend(
             (
                 f"search-{mutation.id}",
@@ -685,6 +693,10 @@ class BenchmarkGuidedSkillSearch:
             if candidate.origin != CandidateOrigin.SEARCH or dominated[candidate.id]:
                 continue
             evaluation = self._full(candidate)
+            if evaluation.pass_rate - base_eval.pass_rate < (
+                spec.constraints.min_absolute_gain
+            ):
+                continue
             losses = sum(
                 base_by_case[result.case_id].passed and not result.passed
                 for result in evaluation.results

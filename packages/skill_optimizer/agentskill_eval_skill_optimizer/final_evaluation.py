@@ -46,6 +46,10 @@ from agentskill_eval_skill_optimizer.final_spec import (
     IndependentFinalEvaluationSpec,
     SimulatedFinalDataset,
 )
+from agentskill_eval_skill_optimizer.real_evaluator import (
+    RealAgentCandidateEvaluator,
+    RealEvaluationAuthorization,
+)
 from agentskill_eval_skill_optimizer.search import OptimizationStore
 from agentskill_eval_skill_optimizer.spec import SearchCase
 
@@ -247,7 +251,12 @@ class IndependentFinalEvaluator:
         self.optimization_store = OptimizationStore(self.workspace)
         self.store = FinalEvaluationStore(self.workspace)
 
-    def run(self, spec: IndependentFinalEvaluationSpec) -> FinalEvaluationResult:
+    def run(
+        self,
+        spec: IndependentFinalEvaluationSpec,
+        *,
+        real_authorization: Optional[RealEvaluationAuthorization] = None,
+    ) -> FinalEvaluationResult:
         optimization = self.optimization_store.load_job(spec.optimization_job_id)
         if (
             optimization.status != OptimizationJobStatus.FROZEN
@@ -270,8 +279,19 @@ class IndependentFinalEvaluator:
             if simulated_dataset is None:
                 raise FinalEvaluationError("simulated evaluator requires a simulated final dataset")
             evaluator = _FinalKeywordEvaluator(simulated_dataset, spec.evaluator.version)
-        else:
+        elif spec.evaluator.type == "process":
             evaluator = ProcessEvaluator(spec.evaluator)
+        else:
+            if real_authorization is None or spec.evaluator.real_agent_config_path is None:
+                raise FinalEvaluationError(
+                    "real final evaluation requires config and explicit authorization"
+                )
+            evaluator = RealAgentCandidateEvaluator(
+                spec.evaluator.real_agent_config_path,
+                self.workspace / "final-evaluator-preflight",
+                real_authorization,
+            )
+            evaluator.authorize_plan(len(prepared.cases))
         optimization_sha = _sha256(model_bytes(optimization))
         semantic_spec = spec.model_dump(mode="json", exclude={"dataset_path"})
         spec_sha = stable_sha256(semantic_spec)
@@ -308,8 +328,8 @@ class IndependentFinalEvaluator:
         self.store.save_job(job)
         job_dir = self.store.job_dir(job.id)
         input_dir = job_dir / "inputs"
-        base_path = input_dir / "base-SKILL.md"
-        winner_path = input_dir / "winner-SKILL.md"
+        base_path = input_dir / "base" / "SKILL.md"
+        winner_path = input_dir / "winner" / "SKILL.md"
         self.store.writer.write(
             base_path, self.optimization_store.skill_path(original).read_bytes()
         )
@@ -319,25 +339,62 @@ class IndependentFinalEvaluator:
         dataset_file = self._freeze_dataset(prepared, input_dir)
 
         try:
-            if job.stage == FinalEvaluationStage.LOCKED_TEST:
-                self.store.reserve_locked_test(
-                    LockedTestReceipt(
-                        optimization_job_id=optimization.id,
-                        final_evaluation_job_id=job.id,
-                        dataset_sha256=prepared.sha256,
-                        evaluator_sha256=evaluator.evaluator_sha256,
-                        consumed_at=_utcnow(),
+            if spec.evaluator.type == "real_agent":
+                if real_authorization is None:
+                    raise FinalEvaluationError(
+                        "real final evaluation requires explicit authorization"
                     )
+                if spec.repeats != 1:
+                    raise FinalEvaluationError(
+                        "real final evaluation currently requires repeats=1"
+                    )
+                if spec.evaluator.real_agent_config_path is None:
+                    raise FinalEvaluationError("real final evaluator config is missing")
+                real_evaluator = RealAgentCandidateEvaluator(
+                    spec.evaluator.real_agent_config_path,
+                    self.store.job_dir(job.id) / "runtime",
+                    real_authorization,
+                    baseline_skill_path=base_path,
                 )
-            base_results, winner_results = self._paired_runs(
-                job,
-                evaluator,
-                prepared,
-                dataset_file,
-                base_path,
-                winner_path,
-                spec.timeout_seconds,
-            )
+                real_evaluator.authorize_plan(len(prepared.cases))
+                if job.stage == FinalEvaluationStage.LOCKED_TEST:
+                    self.store.reserve_locked_test(
+                        LockedTestReceipt(
+                            optimization_job_id=optimization.id,
+                            final_evaluation_job_id=job.id,
+                            dataset_sha256=prepared.sha256,
+                            evaluator_sha256=evaluator.evaluator_sha256,
+                            consumed_at=_utcnow(),
+                        )
+                    )
+                base_results, winner_results = self._real_paired_runs(
+                    real_evaluator,
+                    job,
+                    prepared,
+                    dataset_file,
+                    winner_path,
+                    spec.timeout_seconds,
+                )
+            else:
+                if job.stage == FinalEvaluationStage.LOCKED_TEST:
+                    self.store.reserve_locked_test(
+                        LockedTestReceipt(
+                            optimization_job_id=optimization.id,
+                            final_evaluation_job_id=job.id,
+                            dataset_sha256=prepared.sha256,
+                            evaluator_sha256=evaluator.evaluator_sha256,
+                            consumed_at=_utcnow(),
+                        )
+                    )
+                base_results, winner_results = self._paired_runs(
+                    job,
+                    evaluator,
+                    prepared,
+                    dataset_file,
+                    base_path,
+                    winner_path,
+                    spec.timeout_seconds,
+                )
             comparisons = self._comparisons(base_results, winner_results, prepared.groups)
             report = self._report(job, spec, base_results, winner_results, comparisons)
         except Exception:
@@ -473,6 +530,35 @@ class IndependentFinalEvaluator:
                 else:
                     winner_results.append(evaluation)
         return tuple(base_results), tuple(winner_results)
+
+    @staticmethod
+    def _real_paired_runs(
+        evaluator: RealAgentCandidateEvaluator,
+        job: FinalEvaluationJob,
+        prepared: _PreparedDataset,
+        dataset_file: Path,
+        winner_path: Path,
+        timeout_seconds: int,
+    ) -> Tuple[Tuple[CandidateEvaluation, ...], Tuple[CandidateEvaluation, ...]]:
+        stage = (
+            SearchEvaluationStage.VALIDATION_CONFIRM
+            if job.stage == FinalEvaluationStage.VALIDATION_CONFIRM
+            else SearchEvaluationStage.LOCKED_TEST
+        )
+        winner = evaluator.evaluate(
+            winner_path,
+            dataset_file,
+            prepared.sha256,
+            prepared.cases,
+            stage,
+            timeout_seconds,
+        )
+        baseline = evaluator.baseline_evaluation(
+            prepared.sha256,
+            prepared.cases,
+            stage,
+        )
+        return (baseline,), (winner,)
 
     def _evaluate_once(
         self,

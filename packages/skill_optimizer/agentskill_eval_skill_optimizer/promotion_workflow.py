@@ -1,4 +1,4 @@
-"""Stage 4b integration from a frozen evolution handoff to Fake-only publication."""
+"""Promotion integration from a frozen evolution handoff to immutable publication."""
 
 from __future__ import annotations
 
@@ -40,6 +40,7 @@ from agentskill_eval_skill_optimizer.promotion import (
     SkillVersionPromotionCore,
     SkillVersionPublication,
 )
+from agentskill_eval_skill_optimizer.real_evaluator import RealEvaluationAuthorization
 from agentskill_eval_skill_optimizer.search import OptimizationStore
 
 
@@ -125,11 +126,15 @@ class PromotionWorkflowStore:
 
 
 class PromotionWorkflow:
-    """Integrate a simulated Evolution handoff with existing final evaluation and promotion."""
+    """Integrate an Evolution handoff with existing final evaluation and promotion."""
 
-    CLAIM_LIMIT = (
+    SIMULATED_CLAIM_LIMIT = (
         "Stage 4b Fake/fixture integration evidence only. This is not a real Skill v2 release "
         "and does not establish Agent performance."
+    )
+    OBSERVED_CLAIM_LIMIT = (
+        "Descriptive observed-Agent evidence for the exact frozen Skill, datasets, "
+        "runtime, and protocol only; no population-level performance claim."
     )
 
     def __init__(self, workspace: Path) -> None:
@@ -161,8 +166,6 @@ class PromotionWorkflow:
         except (OSError, ValueError) as exc:
             raise PromotionWorkflowError(f"invalid evolution lineage: {exc}") from exc
         self._validate_handoff(handoff, evolution, regression, handoff_source)
-        if not evolution.simulated:
-            raise PromotionWorkflowError("Stage 4b accepts Fake/fixture evolution evidence only")
 
         job = self.optimization_store.load_job(handoff.optimization_job_id)
         if job.status != OptimizationJobStatus.FROZEN:
@@ -206,7 +209,9 @@ class PromotionWorkflow:
             metadata={
                 "promotion_workflow_id": str(workflow_id),
                 "lineage_sha256": lineage_sha,
-                "evidence_class": "fake-fixture-only",
+                "evidence_class": (
+                    "simulated-fixture" if evolution.simulated else "observed-agent-descriptive"
+                ),
             },
         )
         now = _utcnow()
@@ -223,22 +228,45 @@ class PromotionWorkflow:
             lineage_sha256=lineage_sha,
             lineage=lineage,
             status=PromotionWorkflowStatus.AWAITING_CONFIRMATION,
+            simulated=evolution.simulated,
             created_at=now,
             updated_at=now,
-            claim_limit=self.CLAIM_LIMIT,
+            claim_limit=(
+                self.SIMULATED_CLAIM_LIMIT
+                if evolution.simulated
+                else self.OBSERVED_CLAIM_LIMIT
+            ),
         )
         self.store.save(workflow)
         return workflow
 
     def confirm(
-        self, workflow_id: UUID, spec: IndependentFinalEvaluationSpec
+        self,
+        workflow_id: UUID,
+        spec: IndependentFinalEvaluationSpec,
+        *,
+        real_authorization: Optional[RealEvaluationAuthorization] = None,
     ) -> PromotionWorkflowResult:
-        return self._evaluate(workflow_id, spec, FinalEvaluationStage.VALIDATION_CONFIRM)
+        return self._evaluate(
+            workflow_id,
+            spec,
+            FinalEvaluationStage.VALIDATION_CONFIRM,
+            real_authorization=real_authorization,
+        )
 
     def locked_test(
-        self, workflow_id: UUID, spec: IndependentFinalEvaluationSpec
+        self,
+        workflow_id: UUID,
+        spec: IndependentFinalEvaluationSpec,
+        *,
+        real_authorization: Optional[RealEvaluationAuthorization] = None,
     ) -> PromotionWorkflowResult:
-        return self._evaluate(workflow_id, spec, FinalEvaluationStage.LOCKED_TEST)
+        return self._evaluate(
+            workflow_id,
+            spec,
+            FinalEvaluationStage.LOCKED_TEST,
+            real_authorization=real_authorization,
+        )
 
     def approve(self, workflow_id: UUID, *, reviewer: str, reason: str) -> PromotionWorkflowResult:
         with LocalRunLock(self.store.lock_path(workflow_id)):
@@ -317,6 +345,8 @@ class PromotionWorkflow:
         workflow_id: UUID,
         spec: IndependentFinalEvaluationSpec,
         stage: FinalEvaluationStage,
+        *,
+        real_authorization: Optional[RealEvaluationAuthorization],
     ) -> PromotionWorkflowResult:
         with LocalRunLock(self.store.lock_path(workflow_id)):
             workflow = self.store.load(workflow_id)
@@ -339,9 +369,13 @@ class PromotionWorkflow:
                 raise PromotionWorkflowError(
                     "final-evaluation spec does not match workflow stage/job"
                 )
-            if not spec.evaluator.simulated:
-                raise PromotionWorkflowError("Stage 4b cannot execute real final evaluation")
-            result = self.final_evaluator.run(spec)
+            if spec.evaluator.simulated != workflow.simulated:
+                raise PromotionWorkflowError(
+                    "final evaluator evidence boundary does not match the workflow"
+                )
+            result = self.final_evaluator.run(
+                spec, real_authorization=real_authorization
+            )
             evidence = self._evidence(workflow, result, spec.evaluator.version)
             promotion = (
                 self.promotion_core.record_validation_confirm(
@@ -486,7 +520,8 @@ class PromotionWorkflow:
             released_at=(
                 review.reviewed_at if review is not None else terminal_evidence.recorded_at
             ),
-            claim_limit=self.CLAIM_LIMIT,
+            claim_limit=workflow.claim_limit,
+            simulated=workflow.simulated,
         )
 
     @staticmethod
@@ -496,8 +531,8 @@ class PromotionWorkflow:
         validator_version: str,
     ) -> PromotionEvidenceRef:
         job = result.job
-        if not job.simulated:
-            raise PromotionWorkflowError("Stage 4b final evidence must remain simulated")
+        if job.simulated != workflow.simulated:
+            raise PromotionWorkflowError("final evidence boundary does not match workflow")
         if job.base_skill_sha256 != workflow.base_skill_sha256:
             raise PromotionWorkflowError("final evidence parent Skill hash mismatch")
         if job.winner_skill_sha256 != workflow.winner_skill_sha256:
@@ -511,7 +546,7 @@ class PromotionWorkflow:
             decision=result.report.decision,
             base_skill_sha256=job.base_skill_sha256,
             winner_skill_sha256=job.winner_skill_sha256,
-            simulated=True,
+            simulated=job.simulated,
             validator_version=validator_version,
             recorded_at=job.completed_at,
         )

@@ -3,7 +3,7 @@
 [![Python](https://img.shields.io/badge/Python-3.9%2B-blue)](./pyproject.toml)
 [![License](https://img.shields.io/badge/License-Apache--2.0-green)](./LICENSE)
 [![CI](https://github.com/still0123/AgentSkill-Eval-Refined/actions/workflows/ci.yml/badge.svg)](https://github.com/still0123/AgentSkill-Eval-Refined/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/still0123/AgentSkill-Eval-Refined?include_prereleases)](https://github.com/still0123/AgentSkill-Eval-Refined/releases/tag/v0.3.0-rc.2)
+[![Release](https://img.shields.io/github/v/release/still0123/AgentSkill-Eval-Refined?include_prereleases)](https://github.com/still0123/AgentSkill-Eval-Refined/releases/tag/v0.3.0-rc.3)
 
 AgentSkill-Eval 是一个面向 Agent Skill 的**配对评测与发布门禁系统**。它解决的核心问题是：
 
@@ -14,7 +14,7 @@ AgentSkill-Eval 是一个面向 Agent Skill 的**配对评测与发布门禁系�
 > **AgentSkill-Eval-Refined** 是 AgentSkill-Eval 的聚焦公开版本，保留 Python Bug Fix Skill 评测主线，移除尚未形成真实证据的 MCP、Memory/RAG 和平台化扩展。
 > 原始完整研究版见 [ranmaoxia0123/AgentSkill-Eval](https://github.com/ranmaoxia0123/AgentSkill-Eval)。
 
-当前 Portfolio Release：[`v0.3.0-rc.2`](https://github.com/still0123/AgentSkill-Eval-Refined/releases/tag/v0.3.0-rc.2)。
+当前 Portfolio Release：[`v0.3.0-rc.3`](https://github.com/still0123/AgentSkill-Eval-Refined/releases/tag/v0.3.0-rc.3)。
 
 ## 核心流程
 
@@ -35,7 +35,12 @@ AgentSkill-Eval 是一个面向 Agent Skill 的**配对评测与发布门禁系�
 
 ### 评测场景
 
-当前仅支持 **Python Bug Fix** 主线：从真实 Git 历史重建缺陷 Case，通过 before-fail / after-pass / mutation-fail / alternative-pass 四态验证确保 Oracle 质量。
+当前支持两条最小软件工程评测线：
+
+- **Python Bug Fix**：从真实 Git 历史重建缺陷 Case，通过 before-fail / after-pass /
+  mutation-fail / alternative-pass 四态验证 Oracle；
+- **Python Test Generation**：要求 Agent 只写回归测试，Grader 验证生成测试在 before commit
+  失败、after commit 通过，并拒绝生产代码修改。
 
 ## 快速开始
 
@@ -47,7 +52,7 @@ wheel 已内置离线 Demo Dataset 与 Skill，不要求 clone 源码，也不�
 python3 -m venv .venv
 source .venv/bin/activate
 python3 -m pip install \
-  https://github.com/still0123/AgentSkill-Eval-Refined/releases/download/v0.3.0-rc.2/agentskill_eval-0.3.0rc2-py3-none-any.whl
+  https://github.com/still0123/AgentSkill-Eval-Refined/releases/download/v0.3.0-rc.3/agentskill_eval-0.3.0rc3-py3-none-any.whl
 
 agentskill-eval demo run \
   --workspace .agentskill-eval/portfolio-demo
@@ -95,6 +100,30 @@ Demo 证据包包含：
 相同输入会生成稳定 Experiment ID。在同一 workspace 重跑时复用已有实验，不新增实验目录，
 也不会把根证据包覆盖成另一组结果。
 
+## 真实 Skill v1 → v2 结果
+
+2026-08-05 的受限 observed-Agent 实验在五个独立开源仓库 Case 上完成首个正向闭环：
+
+```text
+Train: v1 produced one valid task failure
+Validation Search: v1 FAIL → v2 PASS (WIN)
+Regression / Confirmation / Locked: 0 LOSS, 0 INVALID
+Aggregate Search→Locked W/T/L: 1 / 3 / 0
+Promotion Gate: PASSED
+Published SkillVersion: python-bug-fix@2.0.0
+Evidence class: OBSERVED / DESCRIPTIVE
+```
+
+Skill v2 只增加一条通用规则：修改后必须重新运行复现命令，失败时继续迭代，不能在没有通过证据
+时结束。它不包含 Case ID、仓库名、代码路径、补丁或答案。样本只有 4 个独立评测 Case，且均
+来自公开 Git 历史；该结果证明一次可审计的工程闭环，不代表普遍性能提升。
+
+第二条 **Python Test Generation** family 只评测 2 个 Case。最终有效配对为
+`W/T/L = 0 / 2 / 0`、`INVALID = 0`：without-Skill 和 with-Skill 都未生成满足
+before-fail / after-pass Oracle 的测试。该负结果被保留，不触发自动优化或版本发布。
+
+详见 [真实正向闭环报告](docs/real-positive-skill-loop.md)。
+
 ## 证据为什么可信
 
 `demo verify` 不信任展示层 JSON，而是以 `audit-bundle.tar` 的内部 Manifest 为锚点，
@@ -119,13 +148,13 @@ Tag Release 由 GitHub Actions 自动构建。wheel、sdist、Demo evidence bund
 均附带 `SHA256SUMS`，核心发布物同时生成 GitHub build provenance。
 
 ```bash
-gh release download v0.3.0-rc.2 \
+gh release download v0.3.0-rc.3 \
   --repo still0123/AgentSkill-Eval-Refined \
   --dir release
 
 cd release
 shasum -a 256 -c SHA256SUMS
-gh attestation verify agentskill_eval-0.3.0rc2-py3-none-any.whl \
+gh attestation verify agentskill_eval-0.3.0rc3-py3-none-any.whl \
   --repo still0123/AgentSkill-Eval-Refined
 ```
 
@@ -188,10 +217,10 @@ AgentSkill-Eval/
 
 ## 当前边界
 
-- 仅支持 Python Bug Fix 一个评测场景
+- Python Test Generation 仅有最小两 Case 配对评测，尚未实现自动优化
 - 真实实验样本较小，不支持通用性能排名
 - Dashboard 只读本地证据
-- 没有真实 Skill v2 发布（门禁阻止了无增益候选）
+- 已发布的真实 Skill v2 结论仅适用于冻结 Agent、公开 Case、Runtime 与协议
 
 ## License
 

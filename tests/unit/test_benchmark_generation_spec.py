@@ -10,6 +10,7 @@ from agentskill_eval_benchmark_gen import (
     BenchmarkSplitPlanError,
     DatasetSplit,
     ExposureZone,
+    OptimizationBenchmarkPlan,
     exposure_zone,
 )
 
@@ -125,3 +126,13 @@ def test_split_plan_derives_one_generation_spec_per_split() -> None:
     assert {item.source_key for item in locked.candidates} == {"cachetools"}
     assert {item.key for item in locked.candidates} == set(plan.splits.locked_test)
     assert {item.key for item in locked.sources} == {"cachetools"}
+
+
+def test_real_positive_loop_plan_freezes_one_case_per_repository() -> None:
+    plan = OptimizationBenchmarkPlan.load(
+        ROOT / "examples/benchmark-sources/real-positive-loop-plan.yaml"
+    )
+
+    assert len(plan.splits) == 5
+    assert all(len(item.candidate_keys) == 1 for item in plan.splits)
+    assert len({item.candidate_keys[0] for item in plan.splits}) == 5

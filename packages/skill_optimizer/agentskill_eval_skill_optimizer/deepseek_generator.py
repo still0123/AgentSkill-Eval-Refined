@@ -62,7 +62,7 @@ class DeepSeekGeneratorInvocationEvidence(FrozenModel):
     request_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     response_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     hypotheses_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
-    hypothesis_count: int = Field(ge=3, le=5)
+    hypothesis_count: int = Field(ge=2, le=5)
     input_tokens: int = Field(ge=0)
     cached_input_tokens: int = Field(ge=0)
     output_tokens: int = Field(ge=0)
@@ -128,7 +128,7 @@ _OUTPUT_SCHEMA = {
 _SYSTEM_PROMPT = """You improve an Agent Skill from audited train failures.
 Return one JSON object only. Produce exactly the requested number of distinct hypotheses using
 the supplied JSON schema shape. The `hypotheses` array must contain exactly
-`required_hypothesis_count` objects (for this request, four objects). Every object MUST include
+`required_hypothesis_count` objects. Every object MUST include
 all five fields: `id`, `failure_label`, `hypothesis`, `instruction`, and `risks`. The `id` is
 required, must be a short lowercase hyphenated identifier, and all ids must be unique; never
 omit it or replace it with a number. Before returning, count the array and check that every
@@ -146,7 +146,7 @@ hidden reasoning, or facts not present in the train input. Do not copy failure e
 
 
 class DeepSeekHypothesisGenerator:
-    """Generate three to five structured proposals in one explicitly authorized API call."""
+    """Generate two to five structured proposals in one explicitly authorized API call."""
 
     def __init__(
         self,

@@ -33,6 +33,7 @@ from agentskill_eval_skill_optimizer import (
     EvolutionRuntimeError,
     EvolutionRuntimeSpec,
     ImprovementHypothesis,
+    RealAgentCandidateEvaluator,
     RealEvaluationAuthorization,
     RegressionGateResult,
     SearchAlgorithmSpec,
@@ -373,6 +374,22 @@ def _fixture(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Evolution
         claim_limit="Fixture-only adaptive execution.",
     )
     return spec, tmp_path / "winner-SKILL.md"
+
+
+def test_real_evaluator_packages_a_baseline_skill_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    spec, _ = _fixture(tmp_path, monkeypatch)
+    evaluator = RealAgentCandidateEvaluator(
+        spec.real_agent_config_path,
+        tmp_path / "evaluator",
+        RealEvaluationAuthorization(True, max_cost_microusd=1, max_agent_runs=1),
+        baseline_skill_path=spec.base_skill_path / "SKILL.md",
+    )
+
+    assert evaluator.baseline_skill_path is not None
+    assert evaluator.baseline_skill_path.is_dir()
+    assert (evaluator.baseline_skill_path / "SKILL.md").read_text() == "# Base\n"
 
 
 def test_budgeted_search_then_regression_is_idempotent_and_tamper_evident(

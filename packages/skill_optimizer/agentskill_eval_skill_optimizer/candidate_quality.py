@@ -153,8 +153,8 @@ class CandidateQualityGate:
         max_candidates: int,
         max_skill_bytes: int,
     ) -> CandidateQualityReport:
-        if len(hypotheses) < 3:
-            raise CandidateQualityError("at least three hypotheses are required")
+        if len(hypotheses) < 2:
+            raise CandidateQualityError("at least two hypotheses are required")
         root = self.workspace / "candidate-skills"
         root.mkdir(parents=True, exist_ok=True)
         base_text = parent_content.decode("utf-8")

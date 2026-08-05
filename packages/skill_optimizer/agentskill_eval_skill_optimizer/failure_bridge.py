@@ -3,16 +3,20 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import os
+import re
+import shlex
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Literal, Optional, Sequence, Tuple
+from typing import Dict, Literal, Mapping, Optional, Sequence, Tuple
 from uuid import UUID
 
 import yaml
 from pydantic import Field, model_validator
 
 from agentskill_eval_contracts import (
+    ArtifactManifest,
     AttributionRole,
     DiagnosticFinding,
     EvaluationOutcome,
@@ -173,6 +177,31 @@ class ObservedFailureSource:
 class ObservedFailureEvidenceBridge:
     """Build train-only optimizer evidence from an observed Skill treatment arm."""
 
+    _MAX_SESSION_RESULT_BYTES = 2_000_000
+    _INSPECTION_TOOLS = {
+        "glob",
+        "list_files",
+        "read_file",
+        "search_files",
+    }
+    _READ_ONLY_COMMANDS = {
+        "cat",
+        "find",
+        "grep",
+        "head",
+        "ls",
+        "pwd",
+        "rg",
+        "tail",
+        "wc",
+    }
+    _TEST_COMMAND = re.compile(
+        r"(?:^|[\s/])(?:pytest|py\.test|tox|nox)(?:\s|$)"
+        r"|(?:^|\s)python(?:\d(?:\.\d+)?)?\s+-m\s+(?:pytest|unittest)(?:\s|$)"
+        r"|(?:^|\s)make\s+\S*test(?:\s|$)",
+        re.IGNORECASE,
+    )
+
     EXCLUDED_LABELS = {
         FailureLabel.ENVIRONMENT,
         FailureLabel.BUDGET,
@@ -291,11 +320,15 @@ class ObservedFailureEvidenceBridge:
                 continue
 
             task_failed_runs += 1
+            behavior_summary = self._observed_behavior_summary(
+                experiment_id, run.id, attempt.attempt_no
+            )
             diagnosis = self._supplement_abstained(diagnosis, trace)
             accepted_findings: list[DiagnosticFinding] = []
             for finding in diagnosis.findings:
                 review_decision = review_by_key.get((run.id, finding.rule_id))
                 candidate = self._apply_review(finding, review_decision)
+                candidate = self._append_behavior_summary(candidate, behavior_summary)
                 review_promoted = (
                     review_decision is not None
                     and review_decision.action == "include"
@@ -692,6 +725,183 @@ class ObservedFailureEvidenceBridge:
             item.model_copy(update={"rationale": sanitize_observed_summary(item.rationale)})
             for item in findings
         )
+
+    @staticmethod
+    def _append_behavior_summary(
+        finding: DiagnosticFinding, behavior_summary: str
+    ) -> DiagnosticFinding:
+        if not behavior_summary or finding.label != FailureLabel.VERIFICATION:
+            return finding
+        return finding.model_copy(
+            update={"rationale": f"{finding.rationale} {behavior_summary}"}
+        )
+
+    def _observed_behavior_summary(
+        self,
+        experiment_id: UUID,
+        run_id: UUID,
+        attempt_no: int,
+    ) -> str:
+        """Return only fully observed, case-agnostic behavior from a pinned transcript."""
+
+        layout = ExperimentLayout(self.workspace, experiment_id)
+        manifest_path = layout.artifact_manifest(run_id, attempt_no)
+        if not manifest_path.is_file():
+            return ""
+        try:
+            manifest = load_model(manifest_path.read_bytes(), ArtifactManifest)
+        except (OSError, ValueError):
+            return ""
+        entries = tuple(
+            item
+            for item in manifest.artifacts
+            if item.path.endswith("/outputs/agent/run/session-result.json")
+        )
+        if len(entries) != 1:
+            return ""
+        entry = entries[0]
+        if entry.size_bytes > self._MAX_SESSION_RESULT_BYTES:
+            return ""
+        attempt_root = layout.attempt_root(run_id, attempt_no)
+        unresolved_source = attempt_root / entry.path
+        if unresolved_source.is_symlink():
+            return ""
+        try:
+            resolved_root = attempt_root.resolve(strict=True)
+            source = unresolved_source.resolve(strict=True)
+            source.relative_to(resolved_root)
+            content = source.read_bytes()
+        except (OSError, ValueError):
+            return ""
+        if len(content) != entry.size_bytes or self._sha(content) != entry.sha256:
+            raise FailureBridgeError("session-result artifact integrity mismatch")
+        try:
+            payload = json.loads(content)
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            return ""
+        calls = self._session_tool_calls(payload)
+        if calls is None:
+            return ""
+        classifications = tuple(
+            self._tool_call_classification(name, arguments)
+            for name, arguments in calls
+        )
+        if classifications and all(item == "read_only" for item in classifications):
+            return (
+                "Structured session evidence recorded only read-only inspection actions; "
+                "no edit action or test-oriented command was observed before deterministic "
+                "grading."
+            )
+        return ""
+
+    @staticmethod
+    def _session_tool_calls(
+        payload: object,
+    ) -> Optional[Tuple[Tuple[str, object], ...]]:
+        if not isinstance(payload, Mapping):
+            return None
+        declared = payload.get("tool_calls")
+        transcript = payload.get("transcript")
+        if not isinstance(declared, int) or declared < 0 or not isinstance(transcript, list):
+            return None
+        calls: list[Tuple[str, object]] = []
+        for message in transcript:
+            if not isinstance(message, Mapping):
+                return None
+            raw_calls = message.get("tool_calls", ())
+            if not isinstance(raw_calls, (list, tuple)):
+                return None
+            for raw_call in raw_calls:
+                if not isinstance(raw_call, Mapping):
+                    return None
+                function = raw_call.get("function")
+                if not isinstance(function, Mapping):
+                    return None
+                name = function.get("name")
+                if not isinstance(name, str):
+                    return None
+                calls.append((name, function.get("arguments")))
+        if len(calls) != declared:
+            return None
+        return tuple(calls)
+
+    @classmethod
+    def _tool_call_classification(cls, name: str, arguments: object) -> str:
+        normalized = name.strip().lower()
+        if normalized in cls._INSPECTION_TOOLS:
+            return "read_only"
+        if normalized != "run_command":
+            return "unknown"
+        if isinstance(arguments, str):
+            try:
+                arguments = json.loads(arguments)
+            except json.JSONDecodeError:
+                return "unknown"
+        if not isinstance(arguments, Mapping):
+            return "unknown"
+        command = arguments.get("command")
+        if not isinstance(command, str) or not command.strip():
+            return "unknown"
+        if cls._TEST_COMMAND.search(command):
+            return "test"
+        return "read_only" if cls._is_strict_read_only_command(command) else "unknown"
+
+    @classmethod
+    def _is_strict_read_only_command(cls, command: str) -> bool:
+        if any(token in command for token in (";", "&&", "||", ">", "<", "`", "$(", "\n")):
+            return False
+        try:
+            lexer = shlex.shlex(command, posix=True, punctuation_chars="|")
+            lexer.whitespace_split = True
+            shell_tokens = list(lexer)
+        except ValueError:
+            return False
+        segments: list[list[str]] = [[]]
+        for token in shell_tokens:
+            if token == "|":
+                segments.append([])
+            else:
+                segments[-1].append(token)
+        for tokens in segments:
+            if not tokens:
+                return False
+            executable = Path(tokens[0]).name
+            if executable == "sed":
+                if any(
+                    token.startswith("-i") or token.startswith("--in-place")
+                    for token in tokens[1:]
+                ):
+                    return False
+                continue
+            if executable == "find" and any(
+                token in {
+                    "-delete",
+                    "-exec",
+                    "-execdir",
+                    "-fls",
+                    "-fprint",
+                    "-fprintf",
+                    "-ok",
+                    "-okdir",
+                }
+                for token in tokens[1:]
+            ):
+                return False
+            if executable == "git":
+                if len(tokens) < 2 or tokens[1] not in {
+                    "diff",
+                    "grep",
+                    "log",
+                    "ls-files",
+                    "rev-parse",
+                    "show",
+                    "status",
+                }:
+                    return False
+                continue
+            if executable not in cls._READ_ONLY_COMMANDS:
+                return False
+        return True
 
     @classmethod
     def _sanitize_diagnoses(

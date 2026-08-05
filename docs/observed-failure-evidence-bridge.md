@@ -57,8 +57,21 @@ Trace 明确记录失败事件时补充以下标签：
 - Memory；
 - Planning。
 
-没有匹配事件时继续保持 `UNKNOWN` 和 `abstained`。规则只使用规范化 Trace，不读取或保存模型
-隐藏思维过程。
+没有匹配事件时继续保持 `UNKNOWN` 和 `abstained`。规则不读取或保存模型隐藏思维过程。
+
+对于已经由 Trace 证明的 `VERIFICATION` task failure，桥接器还可以从 Artifact Manifest
+哈希绑定的单一 `session-result.json` 补充有限的通用行为摘要。只有同时满足以下条件才会输出
+“仅观察到只读检查，未观察到编辑或测试命令”：
+
+- session artifact 的大小和 SHA-256 与不可变 Manifest 完全一致；
+- transcript 中的 tool-call 数量与 Runner 声明值一致；
+- 每个工具调用都能被严格识别为只读文件检查或只读 shell pipeline；
+- 命令中没有重定向、命令替换、复合执行或未知 executable。
+
+出现测试命令、未知工具、无法解析的 shell、Schema 漂移或多份 session artifact 时，桥接器
+保持沉默，不把“缺少可见事件”表述为“动作没有发生”。`workspace_diff` 不参与该判断，因为它
+可能包含 Agent 启动前宿主 worktree 已存在的改动。Proposal 只看到固定通用摘要，不会收到
+工具参数、命令文本、路径、Patch 或测试输出。
 
 ## 人工 review/override
 

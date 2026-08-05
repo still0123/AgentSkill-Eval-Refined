@@ -127,6 +127,18 @@ def test_final_evaluation_simulation_requires_explicit_acknowledgement() -> None
     assert _option(("final", "evaluate"), "allow_simulation").default is False
 
 
+def test_observed_final_and_promotion_require_explicit_budget_options() -> None:
+    for command in (
+        ("final", "evaluate"),
+        ("skill", "promote", "confirm"),
+        ("skill", "promote", "locked"),
+    ):
+        assert _option(command, "confirm_real_run").default is False
+        assert _option(command, "max_cost_microusd").default is None
+        assert _option(command, "max_agent_runs").default is None
+    assert _option(("skill", "promote", "approve"), "confirm_review").default is False
+
+
 def test_real_smoke_requires_explicit_budget_options() -> None:
     result = runner.invoke(
         app,

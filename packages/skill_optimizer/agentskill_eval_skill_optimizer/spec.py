@@ -27,11 +27,13 @@ class SearchAlgorithmSpec(StrictModel):
     algorithm: Literal["successive_halving"] = "successive_halving"
     subset_size: int = Field(ge=1)
     promote_search_candidates: int = Field(default=2, ge=1)
+    include_auxiliary_candidates: bool = True
     random_seed: int = 2026
 
 
 class SearchConstraintSpec(StrictModel):
     max_skill_bytes: int = Field(default=20_000, ge=100)
+    min_absolute_gain: float = Field(default=0.01, gt=0, le=1)
     max_loss_cases: int = Field(default=0, ge=0)
     max_token_overhead_ratio: float = Field(default=0.25, ge=0)
 
@@ -71,7 +73,7 @@ class OptimizationSearchSpec(StrictModel):
     base_skill_path: Path
     manual_skill_path: Path
     validation_search_path: Path
-    mutations: Tuple[MutationSpec, ...] = Field(min_length=3)
+    mutations: Tuple[MutationSpec, ...] = Field(min_length=2)
     search: SearchAlgorithmSpec
     constraints: SearchConstraintSpec = SearchConstraintSpec()
     budget: SearchBudgetSpec
@@ -124,7 +126,7 @@ class ValidationSearchDataset(StrictModel):
     version: str = Field(min_length=1)
     split: Literal["validation_search"]
     simulated: bool
-    cases: Tuple[SearchCase, ...] = Field(min_length=2)
+    cases: Tuple[SearchCase, ...] = Field(min_length=1)
     source_dataset: Optional[str] = None
 
     @model_validator(mode="after")

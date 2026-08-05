@@ -64,6 +64,16 @@ jobs:
             audit-bundle.tar \
             skill-diff.patch \
             trace
+          tar -cf dist/agentskill-eval-real-positive-evidence.tar \
+            -C experiments/real-positive-skill-loop-v2-2026-08-05 \
+            README.md \
+            audit-bundle-digests.json \
+            config.sanitized.yaml \
+            evidence-release-receipt.json \
+            result.sanitized.json \
+            skill-v1-v2.diff \
+            v1-manifest.json \
+            v2-manifest.json
           cp docs/assets/architecture-overview.svg dist/
           cp docs/assets/evidence-verification-flow.svg dist/
           cp docs/assets/dashboard-simulated.png dist/
@@ -96,6 +106,7 @@ jobs:
             dist/*.whl
             dist/*.tar.gz
             dist/agentskill-eval-refined-demo-evidence.tar
+            dist/agentskill-eval-real-positive-evidence.tar
             dist/architecture-overview.svg
             dist/evidence-verification-flow.svg
             dist/dashboard-simulated.png
