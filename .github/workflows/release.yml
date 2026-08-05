@@ -74,6 +74,10 @@ jobs:
             skill-v1-v2.diff \
             v1-manifest.json \
             v2-manifest.json
+          tar -cf dist/agentskill-eval-test-generation-evidence.tar \
+            -C experiments/test-generation-runtime-fix-2026-08-05 \
+            README.md \
+            result.sanitized.json
           cp docs/assets/architecture-overview.svg dist/
           cp docs/assets/evidence-verification-flow.svg dist/
           cp docs/assets/dashboard-simulated.png dist/
@@ -100,13 +104,14 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           name: AgentSkill-Eval Refined Portfolio Release ${{ github.ref_name }}
-          prerelease: true
+          prerelease: ${{ contains(github.ref_name, '-') }}
           body_path: ${{ steps.release_notes.outputs.path }}
           files: |
             dist/*.whl
             dist/*.tar.gz
             dist/agentskill-eval-refined-demo-evidence.tar
             dist/agentskill-eval-real-positive-evidence.tar
+            dist/agentskill-eval-test-generation-evidence.tar
             dist/architecture-overview.svg
             dist/evidence-verification-flow.svg
             dist/dashboard-simulated.png

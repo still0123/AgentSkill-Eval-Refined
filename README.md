@@ -3,7 +3,7 @@
 [![Python](https://img.shields.io/badge/Python-3.9%2B-blue)](./pyproject.toml)
 [![License](https://img.shields.io/badge/License-Apache--2.0-green)](./LICENSE)
 [![CI](https://github.com/still0123/AgentSkill-Eval-Refined/actions/workflows/ci.yml/badge.svg)](https://github.com/still0123/AgentSkill-Eval-Refined/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/still0123/AgentSkill-Eval-Refined?include_prereleases)](https://github.com/still0123/AgentSkill-Eval-Refined/releases/tag/v0.3.0-rc.3)
+[![Release](https://img.shields.io/github/v/release/still0123/AgentSkill-Eval-Refined)](https://github.com/still0123/AgentSkill-Eval-Refined/releases/tag/v0.3.0)
 
 AgentSkill-Eval 是一个面向 Agent Skill 的**配对评测与发布门禁系统**。它解决的核心问题是：
 
@@ -14,7 +14,7 @@ AgentSkill-Eval 是一个面向 Agent Skill 的**配对评测与发布门禁系�
 > **AgentSkill-Eval-Refined** 是 AgentSkill-Eval 的聚焦公开版本，保留 Python Bug Fix Skill 评测主线，移除尚未形成真实证据的 MCP、Memory/RAG 和平台化扩展。
 > 原始完整研究版见 [ranmaoxia0123/AgentSkill-Eval](https://github.com/ranmaoxia0123/AgentSkill-Eval)。
 
-当前 Portfolio Release：[`v0.3.0-rc.3`](https://github.com/still0123/AgentSkill-Eval-Refined/releases/tag/v0.3.0-rc.3)。
+当前稳定版：[`v0.3.0`](https://github.com/still0123/AgentSkill-Eval-Refined/releases/tag/v0.3.0)。
 
 ## 核心流程
 
@@ -52,7 +52,7 @@ wheel 已内置离线 Demo Dataset 与 Skill，不要求 clone 源码，也不�
 python3 -m venv .venv
 source .venv/bin/activate
 python3 -m pip install \
-  https://github.com/still0123/AgentSkill-Eval-Refined/releases/download/v0.3.0-rc.3/agentskill_eval-0.3.0rc3-py3-none-any.whl
+  https://github.com/still0123/AgentSkill-Eval-Refined/releases/download/v0.3.0/agentskill_eval-0.3.0-py3-none-any.whl
 
 agentskill-eval demo run \
   --workspace .agentskill-eval/portfolio-demo
@@ -152,13 +152,13 @@ Tag Release 由 GitHub Actions 自动构建。wheel、sdist、Demo evidence bund
 均附带 `SHA256SUMS`，核心发布物同时生成 GitHub build provenance。
 
 ```bash
-gh release download v0.3.0-rc.3 \
+gh release download v0.3.0 \
   --repo still0123/AgentSkill-Eval-Refined \
   --dir release
 
 cd release
 shasum -a 256 -c SHA256SUMS
-gh attestation verify agentskill_eval-0.3.0rc3-py3-none-any.whl \
+gh attestation verify agentskill_eval-0.3.0-py3-none-any.whl \
   --repo still0123/AgentSkill-Eval-Refined
 ```
 

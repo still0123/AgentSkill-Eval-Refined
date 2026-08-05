@@ -4,6 +4,7 @@
 
 ## 后续执行路线
 
+- [`v0.3.0` 稳定版发布说明](./releases/v0.3.0.md)
 - [`v0.3.0-rc.3` 发布说明](./releases/v0.3.0-rc3.md)
 - [`v0.3.0-rc.2` 发布说明](./releases/v0.3.0-rc2.md)
 - [项目收口状态与证据边界](./project-completion-status.md)
