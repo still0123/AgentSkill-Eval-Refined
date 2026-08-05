@@ -8,8 +8,8 @@
 > AgentSkill-Eval 是一个面向 Agent Skill 的评测、诊断与迭代优化系统。它通过冻结 Agent、
 > 模型、数据集、环境和预算，只改变是否加载 Skill 或 Skill 版本，运行配对实验并保存 Trace、
 > 成本和失败诊断。系统还能从真实 Git 历史重建 Benchmark、筛选 Skill 候选、执行独立 locked
-> evaluation，并用不可变 Manifest 管理 SkillVersion。项目既有零费用确定性 Demo，也有
-> Qwen Code + DeepSeek 的真实执行证据。
+> evaluation，并用不可变 Manifest 管理 SkillVersion。项目既有零费用确定性 Demo，也完成了
+> Python Bug Fix Skill v1→v2 的 observed 正向闭环和 Test Generation 的真实无增益对照。
 
 ## 2. 面试官应该记住的三个点
 
@@ -60,12 +60,13 @@ timeout/budget   → invalid 或预算终止
 
 打开：
 
-- `experiments/real-deepseek-v4-pro-smoke-2026-07-13/`
-- `experiments/real-deepseek-v4-pro-evidence-2026-07-13/`
+- `experiments/real-positive-skill-loop-v2-2026-08-05/`
+- `experiments/test-generation-runtime-fix-2026-08-05/`
 
-说明真实实验固定使用 Qwen Code 0.19.9、skill-up 0.5.0 和 DeepSeek V4 Pro。Smoke 的 4 Run
-全部完成；Evidence 的 12 Run 中 9 completed、3 invalid。结果只支持“真实执行与审计链路
-可用”的描述性结论，不支持普遍增益声明。
+说明真实实验固定 Agent、DeepSeek V4 Pro、skill-up 0.5.0、Case、预算和 grader。Python Bug
+Fix 在 Search 获得 1 个独立 WIN，后续 Regression/Confirmation/Locked 均无 LOSS，合计
+W/T/L `1/3/0`；Test Generation 修复 Runtime 混杂后仍为 `0/2/0`、0 INVALID。两者都是小样本
+描述性证据，不支持普遍增益声明。
 
 ### 3:10–4:00：展示 Benchmark 可信度
 
@@ -93,17 +94,18 @@ observed failure
 → regression_dev
 → confirmation
 → one-shot locked test
-→ human review
+→ AI-assisted / human review
 → immutable SkillVersion
 ```
 
-当前 Promotion 使用 Fake fixture 完成工程验收，真实 v2 尚未发布。
+真实 `python-bug-fix@2.0.0` 已通过 AI-assisted review、confirmation 和 one-shot locked test
+发布；SkillVersion 与 Evidence Release 均不可变。Fake fixture 只保留用于无费用回归测试。
 
 ### 4:40–5:00：用负结果收尾
 
-两次 Stage 3 train smoke 均没有 eligible treatment task failure，因此 proposal 调用没有执行。
-强调这是可信系统的重要行为：invalid 不能伪装成 Skill failure，评测系统不能为了生成 v2 而
-修改标签或借用验证集。
+Test Generation corrected replay 中，两臂都没有通过 before-fail / after-pass Oracle，因此
+系统保留 W/T/L `0/2/0`，没有生成 Proposal、增加 Case 或发布 Skill。强调这是可信系统的重要
+行为：Runtime invalid 不能伪装成 task failure，真实无增益也不能为了演示效果被删除。
 
 ## 4. 架构讲解顺序
 
@@ -124,7 +126,7 @@ Statistics + Failure Diagnosis
           ↓
 Candidate Search + Independent Final Evaluation
           ↓
-Human-gated Immutable Promotion
+Review-gated Immutable Promotion
 ```
 
 ### 核心设计选择
@@ -178,11 +180,11 @@ split；候选经过 leakage lint、regression_dev、confirmation 和一次性 l
 看到 locked 结果后再次修改 Skill，就等于把测试集变成训练信号。系统采用 burn rule：一个
 冻结候选批次只消费一次 locked test，失败后必须使用新的独立测试版本。
 
-### 真实实验为什么没有产生 Skill v2？
+### 真实 Skill v2 的正向结果是否足以证明普遍提升？
 
-Stage 3 的简单 Case 两臂均通过，困难 Case 在循环或预算边界终止，没有完成评分的 treatment
-task failure。系统按协议返回 `INSUFFICIENT` 并停止。继续反复调用直到出现有利样本会造成
-选择偏差，因此项目选择保存负结果。
+不足。Python Bug Fix v2 在冻结协议中得到 W/T/L `1/3/0`，证明一次正向、可审计的发布闭环；
+但独立 Case 只有 4 个，且来自公开 Git 历史，只能描述该 Agent、Runtime、Case 和预算组合。
+项目同时公开 Test Generation `0/2/0`，避免只展示有利结果。
 
 ### 如何保证 API Key 不泄露？
 
@@ -196,7 +198,20 @@ Secret 只从显式允许的环境变量注入，不写入命令参数、Manifes
 环境状态与专项 grader。MCP 关注工具选择、参数、副作用和恢复；RAG 关注 Recall@K、引用、
 faithfulness、污染和记忆更新。
 
-## 6. 项目难点的 STAR 讲法
+## 6. 简历三条
+
+- 基于固定的 `skill-up v0.5.0` 执行内核，自研 Agent Skill 配对评测控制层，冻结
+  Agent/模型/Case/预算，仅改变 Skill，统一输出 PASS/FAIL/INVALID、W/T/L、成本和 Trace。
+- 设计不可变 DatasetVersion/SkillVersion、Evidence Gap 门禁和内容哈希收据，实现
+  Search→Regression→Confirmation→Locked→Review 发布链，并阻止 invalid 或无增益候选发布。
+- 完成真实 Python Bug Fix v1→v2 闭环（W/T/L `1/3/0`、0 LOSS）和 Test Generation
+  corrected no-gain 对照（`0/2/0`、0 INVALID）；发布稳定 `v0.3.0`，附件具备 SHA256 与 SLSA
+  provenance。
+
+边界必须主动说明：Agent Loop、Skill 安装和基础执行复用 `skill-up`；配对协议、证据契约、
+Benchmark 重建、失败诊断、演化门禁和不可变发布是本项目自研。
+
+## 7. 项目难点的 STAR 讲法
 
 ### 难点一：真实 Agent 结果不稳定
 
@@ -211,7 +226,7 @@ faithfulness、污染和记忆更新。
 - Task：重建可执行、可复现且不绑定唯一实现的 Case；
 - Action：冻结 pre-fix fixture，验证 before/after，增加 mutation 与 distinct alternative repair，
   保存 provenance 和 split family；
-- Result：形成 12 个真实历史缺陷家族，其中四个 train Case 发布为不可变 DatasetVersion。
+- Result：形成 20 个真实 Git-history Case，五段 DatasetVersion 各包含四个隔离 Case。
 
 ### 难点三：优化结果容易过拟合
 
@@ -219,14 +234,15 @@ faithfulness、污染和记忆更新。
 - Task：让 v2 发布结论具备独立证据；
 - Action：拆分 search、regression、confirmation、locked test，记录 W/T/L 和父版本谱系，并要求
   人工审核；
-- Result：Fake fixture 已验证完整拒绝/发布状态机；真实 v2 在证据不足时没有被错误发布。
+- Result：首轮无增益候选被停止；第二轮通用候选在独立 Search 获得 WIN，且后续 0 LOSS，
+  最终发布不可变 `python-bug-fix@2.0.0`。
 
-## 7. 不应使用的表述
+## 8. 不应使用的表述
 
 不要说：
 
 - “Skill 成功率提升了 33%”——该数字来自 simulated Demo；
-- “系统自动生成了更好的 Skill v2”——真实 v2 尚未产生；
+- “系统证明 Skill v2 普遍更好”——当前只有 4 个独立评测 Case；
 - “支持 MCP/RAG”——Refined 版已主动移除这些未形成真实证据的场景；
 - “12 个 Case 证明普遍有效”——样本量和独立来源不足；
 - “LLM Judge 能保证正确”——语义评分必须与确定性证据分工。
@@ -235,11 +251,11 @@ faithfulness、污染和记忆更新。
 
 - “完成了可审计的 Skill 配对评测与优化控制链”；
 - “真实实验验证了 Agent Runtime、成本门和证据隔离”；
-- “系统在证据不足时拒绝生成或发布 v2”；
+- “系统在证据不足时拒绝发布，并在独立证据满足门禁后发布 v2”；
 - “Benchmark 使用真实历史缺陷，并通过 mutation 和替代修复验证 grader”；
 - “现有结果是描述性工程证据，正式能力结论需要更多独立 locked Case”。
 
-## 8. 演示前检查清单
+## 9. 演示前检查清单
 
 - 使用最新已合并 `main`；
 - `git status` 干净；

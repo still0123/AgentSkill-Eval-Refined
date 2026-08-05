@@ -1,27 +1,23 @@
 # AgentSkill-Eval 项目收口状态
 
-更新日期：2026-08-04
+更新日期：2026-08-06
 
 基线：`still0123/AgentSkill-Eval-Refined`。Refined 版仅保留 Python Bug Fix 主线，
 原始研究版包含 MCP 和 Memory/RAG Lab 能力，详见 [ranmaoxia0123/AgentSkill-Eval](https://github.com/ranmaoxia0123/AgentSkill-Eval)。
 
-状态：核心工程 MVP 已完成；真实 Skill v2 研究闭环保留为后续实验课题
+状态：稳定版 `v0.3.0` 已发布；真实 Python Bug Fix v2 与 Test Generation 无增益证据均已冻结
 
 ## 1. 当前结论
 
-AgentSkill-Eval 已经能够完整展示一个可信的 Agent Skill 评测系统：冻结 Skill、数据集、
-Agent、Runner 和实验协议，运行 without-Skill/with-Skill 配对实验，保存 Trace、失败诊断、
-成本与审计证据，并支持 Benchmark 生成、候选搜索、独立终评和版本发布控制。
+AgentSkill-Eval 已完成可信 Skill 配对评测、失败诊断、候选搜索、独立终评、不可变发布和
+Evidence Release。Python Bug Fix v2 在冻结协议中取得 W/T/L `1/3/0`，后续阶段 0 LOSS，
+并发布 `python-bug-fix@2.0.0`；Test Generation corrected replay 为 `0/2/0`、0 INVALID，
+保留为同一冻结两 Case 上的真实无增益证据。
 
-项目不再通过反复调用真实模型来“碰”一个有利的失败样本。两次 Stage 3 train smoke 均没有
-产生可用于修改 Skill 的 completed treatment task failure：简单 Case 两臂均通过，困难 Case
-分别因循环或预算边界成为 invalid。系统正确返回 `INSUFFICIENT`，没有把基础设施失败伪装成
-Skill 缺陷，也没有消费已授权但不满足前提的 proposal 调用。
+当前最准确的项目状态是：
 
-因此当前最准确的项目状态是：
-
-> 评测、诊断、搜索与发布控制链路已经完成；真实 v1→v2 的正向案例尚未产生。该负结果是
-> 证据门生效的证明，不是需要继续付费重试的工程故障。
+> `v0.3.0` 已达到可安装、可演示、可审计状态。正向与负向结果均为小样本描述性证据，不支持
+> 普遍性能提升或通用 Agent 排名。
 
 ## 2. 已完成能力
 
@@ -33,22 +29,21 @@ Skill 缺陷，也没有消费已授权但不满足前提的 proposal 调用。
 | Benchmark | 20 个真实 Git 历史缺陷 Case、5 个独立仓库、五段 DatasetVersion、provenance、mutation 与替代修复验证 | locked Case 公开且高污染，仅覆盖首个 Python Bug Fix family |
 | Skill Search | 候选生成、真实/模拟 evaluator、successive halving、regression_dev | adaptive search 结果不等同 locked-test 结论 |
 | Real Evolution Dry Run | Stage 2/3A 绑定、adaptive Process 演练、confirm/locked 收据隔离 | simulated Process 集成证据；未调用模型或 Agent |
-| Real Evolution Execution | 逐阶段预算授权、真实 validation_search、regression_dev、幂等 receipt 与 confirmation handoff | Stage 3C 执行器和 Fake Process 测试已完成；尚未授权本阶段真实付费实验 |
-| 独立终评 | confirmation、一次性 locked test、burn rule | 工程链路已完成 |
-| Promotion | 人工审核、父版本哈希、不可变 SkillVersion、回滚指针 | 当前真实 v2 未发布；Fake fixture 只证明流程 |
-| Evidence Release | `prepare`、`verify`、`inspect` CLI，离线 HTML、diff、索引和审计包 | Stage 5A.2 已用 Fake Promotion fixture 完成端到端验收 |
+| Real Evolution Execution | 逐阶段预算授权、真实 validation_search、regression_dev、幂等 receipt 与 confirmation handoff | Python Bug Fix observed 闭环已完成 |
+| 独立终评 | confirmation、一次性 locked test、burn rule | 真实 v2 confirmation/locked 均为 0 LOSS、0 INVALID |
+| Promotion | AI-assisted review、父版本哈希、不可变 SkillVersion、回滚指针 | `python-bug-fix@2.0.0` 已发布 |
+| Evidence Release | `prepare`、`verify`、`inspect` CLI，离线 HTML、diff、索引和审计包 | 真实 Bug Fix 与 Test Generation 脱敏 evidence 已进入稳定 Release |
 | 可视化 | 本地只读 Dashboard 展示实验、Trace、候选、版本谱系和 Skill Evolution Timeline | 不承担写操作、批准或在线调度 |
 
 ## 3. 已有真实证据
 
-真实 Agent 证据使用 Qwen Code 0.19.9、skill-up 0.5.0 和 DeepSeek V4 Pro：
+真实 Agent 证据使用固定 Process Agent、skill-up 0.5.0 和 DeepSeek V4 Pro，包括：
 
 - 4-Run smoke：4 次完成，验证真实执行、Secret 隔离和审计链路；
 - 12-Run evidence：9 次完成、3 次 invalid，Baseline 66.7%、Treatment 83.3%；
 - Real Optimizer smoke：20 个 Attempt，18 次完成、2 次 invalid，验证真实候选筛选链；
-- 两次 Stage 3 train smoke：均未产生 eligible treatment task failure，proposal 调用数为 0。
-- Proposal-only Stage 1 smoke：真实 DeepSeek 调用 1 次，生成 4 个结构化候选，费用
-  921 microusd；输入为 synthetic 脱敏 train fixture，未执行 search 或 locked test。
+- Python Bug Fix v1→v2：Search 获得 1 个 WIN，后续 0 LOSS，合计 `1/3/0`；
+- Test Generation corrected replay：4 Runs、0 INVALID、W/T/L `0/2/0`。
 
 这些结果都是描述性证据。Case 数量小、来源集中，不能声称 Skill 具有普遍增益。
 
@@ -60,7 +55,7 @@ Skill 缺陷，也没有消费已授权但不满足前提的 proposal 调用。
 agentskill-eval demo run --workspace .agentskill-eval/completion-demo
 ```
 
-2026-07-14 的收口验收结果：
+`v0.3.0` stable wheel 的 2026-08-06 clean-room 验收结果：
 
 ```text
 12 cases × 2 variants × 3 repeats = 72 logical runs
@@ -81,20 +76,20 @@ simulated: true
 1. 用 README 的架构图解释唯一变量配对实验；
 2. 执行一键 Demo，展示 72 个 Run 与离线 HTML 报告；
 3. 打开一个 Trace，说明 task failure 与 infrastructure invalid 的区别；
-4. 展示真实 DeepSeek smoke/evidence 的脱敏报告和 claim limit；
+4. 展示 Python Bug Fix `1/3/0` 与 Test Generation `0/2/0` 的脱敏报告和 claim limit；
 5. 展示 Automatic Benchmark 的 before-fail、after-pass、mutation-fail、alternative-pass；
-6. 展示 Promotion 谱系，同时明确真实 Skill v2 尚未发布；
-7. 以 Stage 3 的 `INSUFFICIENT` 负结果说明系统不会为了正向结论篡改评测口径。
+6. 展示 `python-bug-fix@2.0.0` Promotion 谱系与 AI-assisted review；
+7. 以 Test Generation 无增益结果说明系统不会为了正向结论篡改评测口径。
 
 ## 6. 简历表述建议
 
-> 设计并实现 Agent Skill 评测、诊断与迭代优化系统，支持有无 Skill 配对实验、真实 Agent
-> Runtime、轨迹级失败归因、Git 历史 Benchmark 重建、候选搜索、独立 locked evaluation 和
-> 不可变 SkillVersion 发布；完成 12 个真实缺陷家族的离线验证及 DeepSeek/Qwen Code 真实
-> 执行证据，并通过证据门隔离 task failure、invalid 与 simulated 结果。
+> 基于固定 `skill-up v0.5.0` 执行内核，自研 Agent Skill 配对评测与证据控制层，支持真实
+> Git-history Benchmark、Trace 失败归因、独立 locked evaluation 和不可变 SkillVersion；
+> 完成 Python Bug Fix v1→v2 observed 闭环（W/T/L `1/3/0`）及 Test Generation corrected
+> no-gain 对照（`0/2/0`），发布稳定 `v0.3.0` 并为附件生成 SHA256 与 SLSA provenance。
 
-面试中应主动说明：真实实验提供的是系统可用性与描述性证据，而不是大样本泛化结论；真实
-v1→v2 正向案例仍是后续研究目标。
+面试中应主动说明：真实结果是小样本描述性证据，不是大样本泛化结论；Agent 基础执行复用
+`skill-up`，配对协议、证据契约、Benchmark、演化门禁和不可变发布为本项目自研。
 
 ## 7. 暂停项与恢复条件
 

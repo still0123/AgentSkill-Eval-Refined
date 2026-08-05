@@ -23,7 +23,10 @@ P0 不把“配置中声明了 Skill”当成“Skill 生效”。每个物理 A
 - `discovered/read/activated/followed`：只有上游直接暴露相应事件时才能填写；
 - `unavailable_reasons`：说明字段为什么无法观测。
 
-真实 `skill-up` Adapter 记录编译 `eval.yaml` 和安装 Skill 树的 SHA-256。当前版本无法证明 Agent 读取或遵循了 Skill，因此这些行为字段保持空值。行为增益只能由独立 grader 和配对结果支持。
+真实 `skill-up` Adapter 记录编译 `eval.yaml` 和安装 Skill 树的 SHA-256。通用 Engine 仍无法证明
+Agent 读取或遵循了 Skill，因此这些行为字段保持空值。qwen Process Agent 是显式例外：它在
+SessionResult 中返回 `skill_context_loaded` 与内容 SHA-256，RealEvidenceRunner 在正式报告前
+逐 Run fail-closed 校验；是否遵循 Skill 仍由独立 grader 和配对结果判断。
 
 ## Secret 扫描边界
 

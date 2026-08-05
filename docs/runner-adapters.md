@@ -54,7 +54,10 @@ run-dir/
 
 `validate` 同时返回可审计的安装证据。baseline 必须同时满足编译配置为 `skills: []` 且 `skills/selected` 不存在；treatment 必须满足配置精确指向 `skills/selected`、目录和 `SKILL.md` 存在，并记录编译配置与 Skill 树哈希。Mock Runner 不具备安装能力，因此相关字段为 unsupported，而不会伪造成功。
 
-“Skill 已安装”不等于“Agent 已发现、读取、激活或遵循 Skill”。适配器只有在上游提供直接事件时才能填充这些阶段；`skill-up v0.5.0` 当前不暴露相应事件，所以证据记录明确的 unavailable reason。
+“Skill 已安装”不等于“Agent 已发现、读取、激活或遵循 Skill”。通用 `skill-up v0.5.0`
+Engine 不暴露相应事件，所以证据记录明确的 unavailable reason。qwen Process Agent 通过隔离
+HOME 接收 hash-bound Skill context，并在 SessionResult 返回 loaded 状态与 SHA；真实证据层会
+在发布报告前验证它们。行为遵循仍不能由安装或读取推断。
 
 编译后的 `eval.yaml` 使用 JSON 文本。JSON 是合法 YAML 1.2，因此无需在平台引入另一套 YAML 序列化依赖。
 
