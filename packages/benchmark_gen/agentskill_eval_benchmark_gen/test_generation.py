@@ -98,18 +98,28 @@ class TestGenerationDatasetBuilder:
                     catalog.quality_gate.max_repository_bytes,
                 ),
             )
-            before_hashes = {
-                path: _sha((fixture / path).read_bytes()) for path in item.production_paths
-            }
+            if (fixture / self.TEST_PATH).exists():
+                raise TestGenerationError(
+                    f"fixture already contains reserved generated test path {self.TEST_PATH}"
+                )
+            before_tree_sha256 = self._tree_sha(fixture, exclude={self.TEST_PATH})
             after_files = {
                 path: base64.b64encode(source.blob(after, path)).decode("ascii")
                 for path in item.production_paths
             }
+            after_tree_sha256 = self._tree_sha_with_replacements(
+                fixture, after_files, exclude={self.TEST_PATH}
+            )
             grader_ref = f"evals/fixtures/scripts/{case_id}.py"
             grader_path = output / grader_ref
             grader_path.parent.mkdir(parents=True, exist_ok=True)
             grader_path.write_text(
-                self._grader(before_hashes, after_files),
+                self._grader(
+                    before_tree_sha256,
+                    after_tree_sha256,
+                    item.production_paths,
+                    after_files,
+                ),
                 encoding="utf-8",
             )
             reference_validation_sha256 = self._validate_reference_oracle(
@@ -329,7 +339,7 @@ class TestGenerationDatasetBuilder:
                     encoding="utf-8",
                 )
                 result = subprocess.run(
-                    (sys.executable, str(grader)),
+                    (sys.executable, str(grader), "--reference"),
                     cwd=root,
                     capture_output=True,
                     check=False,
@@ -352,16 +362,21 @@ class TestGenerationDatasetBuilder:
     @classmethod
     def _grader(
         cls,
-        before_hashes: Mapping[str, str],
+        before_tree_sha256: str,
+        after_tree_sha256: str,
+        production_paths: Sequence[str],
         after_files: Mapping[str, str],
     ) -> str:
-        before_json = json.dumps(dict(before_hashes), sort_keys=True)
+        before_tree_json = json.dumps(before_tree_sha256)
+        production_paths_json = json.dumps(tuple(production_paths), sort_keys=True)
         after_json = json.dumps(dict(after_files), sort_keys=True)
         return f"""#!/usr/bin/env python3
 from __future__ import annotations
 
+import ast
 import base64
 import hashlib
+import json
 import os
 from pathlib import Path
 import shutil
@@ -371,7 +386,10 @@ import tempfile
 
 ROOT = Path.cwd()
 TEST = ROOT / {cls.TEST_PATH!r}
-BEFORE = {before_json}
+REFERENCE_RUN = "--reference" in sys.argv[1:]
+BEFORE_TREE_SHA256 = {before_tree_json}
+AFTER_TREE_SHA256 = {json.dumps(after_tree_sha256)}
+PRODUCTION_PATHS = {production_paths_json}
 AFTER = {after_json}
 
 
@@ -412,13 +430,75 @@ def run_test(root: Path) -> int:
     ).returncode
 
 
+def _ignored(relative: str) -> bool:
+    parts = relative.split("/")
+    return (
+        relative == {cls.TEST_PATH!r}
+        or "__pycache__" in parts
+        or ".pytest_cache" in parts
+        or any(part.startswith(".agentskill-eval-test-") for part in parts)
+    )
+
+
+def _tree_sha(root: Path) -> str:
+    entries = []
+    for path in sorted(root.rglob("*")):
+        if not path.is_file() or path.is_symlink():
+            continue
+        relative = path.relative_to(root).as_posix()
+        if _ignored(relative):
+            continue
+        entries.append((relative, sha(path)))
+    payload = json.dumps(entries, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _workspace_matches(root: Path, expected_sha256: str) -> bool:
+    for path in root.rglob("*"):
+        if path.is_symlink():
+            relative = path.relative_to(root).as_posix()
+            if not _ignored(relative):
+                return False
+    return _tree_sha(root) == expected_sha256
+
+
+def _source_inspection_detected() -> bool:
+    try:
+        tree = ast.parse(TEST.read_text(encoding="utf-8"))
+    except (OSError, SyntaxError, UnicodeError):
+        return True
+    forbidden_modules = {{"ast", "hashlib", "inspect"}}
+    forbidden_attributes = {{"open", "read", "read_bytes", "read_text", "stat"}}
+    production_paths = set(PRODUCTION_PATHS)
+    production_names = {{Path(path).name for path in production_paths}}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            if any(alias.name.split(".", 1)[0] in forbidden_modules for alias in node.names):
+                return True
+        if isinstance(node, ast.ImportFrom) and node.module:
+            if node.module.split(".", 1)[0] in forbidden_modules:
+                return True
+        if isinstance(node, ast.Call):
+            if isinstance(node.func, ast.Name) and node.func.id == "open":
+                return True
+            if isinstance(node.func, ast.Attribute) and node.func.attr in forbidden_attributes:
+                return True
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            value = node.value.replace("\\\\", "/")
+            if value in production_paths or Path(value).name in production_names:
+                return True
+    return False
+
+
 def main() -> int:
     if not TEST.is_file() or TEST.is_symlink() or TEST.stat().st_size > 50000:
         return 2
-    if any(sha(ROOT / path) != expected for path, expected in BEFORE.items()):
+    if not REFERENCE_RUN and _source_inspection_detected():
+        return 6
+    if not REFERENCE_RUN and not _workspace_matches(ROOT, BEFORE_TREE_SHA256):
         return 3
     before_exit = run_test(ROOT)
-    if any(sha(ROOT / path) != expected for path, expected in BEFORE.items()):
+    if not REFERENCE_RUN and not _workspace_matches(ROOT, BEFORE_TREE_SHA256):
         return 4
     with tempfile.TemporaryDirectory(prefix="ase-testgen-") as temporary:
         after_root = Path(temporary) / "repo"
@@ -433,7 +513,11 @@ def main() -> int:
             target = after_root / relative
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes(base64.b64decode(encoded))
+        if not REFERENCE_RUN and not _workspace_matches(after_root, AFTER_TREE_SHA256):
+            return 4
         after_exit = run_test(after_root)
+        if not REFERENCE_RUN and not _workspace_matches(after_root, AFTER_TREE_SHA256):
+            return 4
     if before_exit == 0 or after_exit != 0:
         return 5
     print("PASS: generated regression test fails before and passes after")
@@ -445,10 +529,31 @@ if __name__ == "__main__":
 """
 
     @staticmethod
-    def _tree_sha(root: Path) -> str:
+    def _tree_sha(root: Path, *, exclude: set[str] | None = None) -> str:
+        excluded = exclude or set()
         entries = [
             (path.relative_to(root).as_posix(), _sha(path.read_bytes()))
             for path in sorted(root.rglob("*"))
-            if path.is_file()
+            if path.is_file() and path.relative_to(root).as_posix() not in excluded
         ]
+        return stable_sha256(entries)
+
+    @staticmethod
+    def _tree_sha_with_replacements(
+        root: Path,
+        replacements: Mapping[str, str],
+        *,
+        exclude: set[str] | None = None,
+    ) -> str:
+        excluded = exclude or set()
+        replacement_bytes = {
+            path: base64.b64decode(content) for path, content in replacements.items()
+        }
+        entries = []
+        for path in sorted(root.rglob("*")):
+            relative = path.relative_to(root).as_posix()
+            if not path.is_file() or relative in excluded:
+                continue
+            content = replacement_bytes.get(relative, path.read_bytes())
+            entries.append((relative, _sha(content)))
         return stable_sha256(entries)

@@ -10,9 +10,10 @@
 ## 1. 当前结论
 
 AgentSkill-Eval 已完成可信 Skill 配对评测、失败诊断、候选搜索、独立终评、不可变发布和
-Evidence Release。Python Bug Fix v2 在冻结协议中取得 W/T/L `1/3/0`，后续阶段 0 LOSS，
-并发布 `python-bug-fix@2.0.0`；Test Generation corrected replay 为 `0/2/0`、0 INVALID，
-保留为同一冻结两 Case 上的真实无增益证据。
+Evidence Release。Python Bug Fix 候选在冻结协议中取得 W/T/L `1/3/0`，后续阶段 0 LOSS，
+并保留历史 `python-bug-fix@2.0.0`；它是旧“无回归即可批准”门禁下的 non-regression candidate，
+不是独立终评已经证明更好的 `verified-improved` 版本。Test Generation corrected replay 为
+`0/2/0`、0 INVALID，保留为同一冻结两 Case 上的真实无增益证据。
 
 当前最准确的项目状态是：
 

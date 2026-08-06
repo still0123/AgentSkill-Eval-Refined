@@ -102,21 +102,25 @@ Demo 证据包包含：
 
 ## 真实 Skill v1 → v2 结果
 
-2026-08-05 的受限 observed-Agent 实验在五个独立开源仓库 Case 上完成首个正向闭环：
+2026-08-05 的受限 observed-Agent 实验在五个独立开源仓库 Case 上完成首个候选演化闭环：
 
 ```text
 Train: v1 produced one valid task failure
 Validation Search: v1 FAIL → v2 PASS (WIN)
 Regression / Confirmation / Locked: 0 LOSS, 0 INVALID
 Aggregate Search→Locked W/T/L: 1 / 3 / 0
-Promotion Gate: PASSED
-Published SkillVersion: python-bug-fix@2.0.0
+Historical Promotion Gate: PASSED (legacy no-loss rule)
+Published historical candidate: python-bug-fix@2.0.0
 Evidence class: OBSERVED / DESCRIPTIVE
 ```
 
 Skill v2 只增加一条通用规则：修改后必须重新运行复现命令，失败时继续迭代，不能在没有通过证据
 时结束。它不包含 Case ID、仓库名、代码路径、补丁或答案。样本只有 4 个独立评测 Case，且均
-来自公开 Git 历史；该结果证明一次可审计的工程闭环，不代表普遍性能提升。
+来自公开 Git 历史；该结果证明一次可审计的候选演化闭环，不代表独立终评已证明普遍性能提升。
+
+当前发布门已收紧：只有 confirmation 或 locked test 至少观察到一个独立 WIN 且满足正增益阈值，
+才可标记为 `verified-improved`。只有 0 LOSS 的历史候选仍可作为 non-regression artifact 展示，
+不能作为 Skill 已被证明更好的证据。
 
 第二条 **Python Test Generation** family 只评测 2 个 Case。最终有效配对为
 `W/T/L = 0 / 2 / 0`、`INVALID = 0`。后验 Trace 诊断发现初始实验存在 Bug Fix Prompt 与

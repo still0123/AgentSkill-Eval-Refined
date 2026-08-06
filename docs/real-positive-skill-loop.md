@@ -2,11 +2,13 @@
 
 ## Status
 
-`COMPLETED_OBSERVED_POSITIVE_LOOP`
+`COMPLETED_OBSERVED_CANDIDATE_LOOP`
 
 The first bounded attempt stopped at validation_search with zero gain. After a fail-closed
 FailureBridge recovery fix, one separately authorized Proposal/Search round completed the full
-observed-Agent loop and published immutable `python-bug-fix@2.0.0`.
+observed-Agent candidate loop and published historical immutable `python-bug-fix@2.0.0`. Under the
+current release policy this artifact is non-regression evidence, not a verified-improvement claim,
+because the independent confirmation and locked stages contained no WIN.
 
 ## Attempt 1: retained negative result
 
@@ -154,7 +156,8 @@ The second attempt consumed:
 - 9 new Agent Runs;
 - 378,446 microusd including both Proposal candidates and all gates.
 
-Promotion workflow `0353ca42-f58c-52d9-afd4-7589c49db1d0` passed. Review was recorded as
+The historical promotion workflow `0353ca42-f58c-52d9-afd4-7589c49db1d0` passed under the former
+no-loss gate. Review was recorded as
 `AI-assisted review (OpenAI Codex)`, not human review. Immutable SkillVersion
 `a434afe8-cc6b-5d80-a4af-cd6819d53e64` was published with content SHA-256
 `f14cd4a975b8a1820971e824b5f82ab9b79dee071a13acb673e6b2019720e13c`.
