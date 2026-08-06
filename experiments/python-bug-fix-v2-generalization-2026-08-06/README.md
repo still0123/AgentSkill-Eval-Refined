@@ -2,7 +2,7 @@
 
 ## Status
 
-`PRE_REGISTERED_RUNTIME_FROZEN`
+`READY_FOR_EVALUATION`
 
 No evaluation Case run has started. No result is claimed.
 
@@ -56,6 +56,9 @@ zero invalid observations and zero metered cost on excluded Case
 `cachetools-cachedmethod-autospec`. Both arms failed the task (`TIE_NEGATIVE`), so this smoke
 validates only the execution chain and contributes no efficacy evidence. Exact report and bundle
 hashes are frozen in the protocol.
+
+The committed [`run_matrix.py`](run_matrix.py) driver executes the six DatasetVersions in frozen
+order. Its SHA-256 is part of the protocol.
 
 ## Decision boundary
 

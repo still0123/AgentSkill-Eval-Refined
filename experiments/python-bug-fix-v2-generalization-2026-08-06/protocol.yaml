@@ -1,5 +1,5 @@
 schema_version: ase/python-bug-fix-v2-generalization/v1alpha1
-status: PRE_REGISTERED_RUNTIME_FROZEN
+status: READY_FOR_EVALUATION
 registered_before_agent_runs: true
 base_commit: f27228f87e3ac36cfba15674872b3e938cb380d1
 skills:
@@ -23,6 +23,7 @@ runtime:
   model_config_sha256: 08762352ba9fded858f24bdd7b8d2fe61aabe7bce1dfdb663db242d574c3e678
   tokenizer_sha256: a8506e7111b80c6d8635951a02eab0f4e1a8e4e5772da83846579e97b16f61bf
   python: 3.12.13
+  controller_python: 3.13.14
   mlx: 0.32.0
   mlx_lm: 0.29.1
   transformers: 4.57.6
@@ -30,6 +31,9 @@ runtime:
   process_agent_sha256: bb071419527de0c051bb1a3680a296cd7dc8575a12522f3b01d1d451ca13d4ea
   skill_up_version: 0.5.0
   skill_up_sha256: b8473aad3fe997f3aa8de1e9bd9bc127e5254b25371567a0e07143afc809c359
+  runtime_adapter_commit: 4a37e47
+  evidence_contract_commit: 213e6bf
+  matrix_driver_sha256: e13482ab239f7a0d585428edb9093350630b8230aa7983e99de482eba9373ecc
   temperature: 0.0
   observed_metered_cost_microusd: 0
 runtime_validation:
@@ -77,12 +81,12 @@ protocol:
   case_count: 19
   paired_agent_runs: 114
   repeats: 3
-  execution_order: alternating_v1_v2_by_case_and_repeat
+  execution_order: deterministic_block_randomization_seed_2026
   grader: deterministic_before_fail_after_pass
   selection_uses_agent_scores: false
   early_stop: forbidden_except_safety_or_infrastructure_failure
-  runtime_change_after_first_run: forbidden
-  case_change_after_first_run: forbidden
+  runtime_change_after_first_evaluation_run: forbidden
+  case_change_after_first_evaluation_run: forbidden
 gates:
   invalid_pairs: 0
   max_loss_cases: 0
