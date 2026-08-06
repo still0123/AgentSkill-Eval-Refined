@@ -5,7 +5,7 @@ from __future__ import annotations
 import random
 import statistics
 from dataclasses import dataclass
-from typing import Callable, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
+from typing import AbstractSet, Callable, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 from uuid import UUID
 
 from pydantic import Field
@@ -50,6 +50,7 @@ class WtlSummary(FrozenModel):
     tie_positive: int = Field(ge=0)
     tie_negative: int = Field(ge=0)
     loss: int = Field(ge=0)
+    invalid: int = Field(default=0, ge=0)
 
 
 class CaseComparison(FrozenModel):
@@ -93,6 +94,7 @@ class ExperimentStatistics(FrozenModel):
     independence_group_count: int = Field(ge=0)
     complete_block_ratio: float = Field(ge=0, le=1)
     valid_block_ratio: float = Field(ge=0, le=1)
+    invalid_case_count: int = Field(default=0, ge=0)
     inference_ready: bool
     inference_note: str
     bootstrap_resamples: int = Field(ge=1)
@@ -190,14 +192,29 @@ class ExperimentAnalyzer:
         capability_cases = self._case_rates(valid_blocks, datums, config, valid_only=True)
         primary = self._estimand(primary_cases, config)
         capability = self._estimand(capability_cases, config)
-        comparisons = self._case_comparisons(primary_cases, config.majority_threshold)
-        groups = {block.independence_group for block in blocks}
-        inference_ready = len(groups) >= config.min_independent_groups
-        note = (
-            "confirmatory group threshold satisfied"
-            if inference_ready
-            else "descriptive only: too few independent groups"
+        invalid_case_ids = {
+            block.case_id
+            for block in blocks
+            if not (
+                datums[(block.id, config.control_variant_id)].is_valid
+                and datums[(block.id, config.treatment_variant_id)].is_valid
+            )
+        }
+        comparisons = self._case_comparisons(
+            primary_cases,
+            config.majority_threshold,
+            invalid_case_ids=invalid_case_ids,
         )
+        groups = {block.independence_group for block in blocks}
+        inference_ready = (
+            not invalid_case_ids and len(groups) >= config.min_independent_groups
+        )
+        if invalid_case_ids:
+            note = "descriptive only: invalid observations are present"
+        elif inference_ready:
+            note = "confirmatory group threshold satisfied"
+        else:
+            note = "descriptive only: too few independent groups"
         return ExperimentStatistics(
             experiment_id=experiment_id,
             control_variant_id=config.control_variant_id,
@@ -207,6 +224,7 @@ class ExperimentAnalyzer:
             independence_group_count=len(groups),
             complete_block_ratio=len(complete_blocks) / len(blocks),
             valid_block_ratio=len(valid_blocks) / len(blocks),
+            invalid_case_count=len(invalid_case_ids),
             inference_ready=inference_ready,
             inference_note=note,
             bootstrap_resamples=config.bootstrap_resamples,
@@ -350,7 +368,10 @@ class ExperimentAnalyzer:
 
     @staticmethod
     def _case_comparisons(
-        cases: Mapping[UUID, Tuple[str, float, float]], threshold: float
+        cases: Mapping[UUID, Tuple[str, float, float]],
+        threshold: float,
+        *,
+        invalid_case_ids: AbstractSet[UUID] = frozenset(),
     ) -> List[CaseComparison]:
         comparisons = []
         for case_id, (group, control, treatment) in sorted(
@@ -358,7 +379,9 @@ class ExperimentAnalyzer:
         ):
             control_pass = control >= threshold
             treatment_pass = treatment >= threshold
-            if not control_pass and treatment_pass:
+            if case_id in invalid_case_ids:
+                classification = "invalid"
+            elif not control_pass and treatment_pass:
                 classification = "win"
             elif control_pass and not treatment_pass:
                 classification = "loss"
@@ -380,7 +403,10 @@ class ExperimentAnalyzer:
 
     @staticmethod
     def _wtl(cases: Sequence[CaseComparison]) -> WtlSummary:
-        counts = {name: 0 for name in ("win", "tie_positive", "tie_negative", "loss")}
+        counts = {
+            name: 0
+            for name in ("win", "tie_positive", "tie_negative", "loss", "invalid")
+        }
         for case in cases:
             counts[case.classification] += 1
         return WtlSummary(**counts)

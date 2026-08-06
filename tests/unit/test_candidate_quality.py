@@ -1,10 +1,22 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from pathlib import Path
+from types import SimpleNamespace
+from typing import Literal, cast
+from uuid import uuid4
 
 import pytest
 
-from agentskill_eval_contracts import FailureLabel
+from agentskill_eval_contracts import (
+    CandidateEvaluation,
+    CandidateOrigin,
+    FailureLabel,
+    SearchCaseResult,
+    SearchEvaluationStage,
+    SkillCandidate,
+    SkillCandidateStatus,
+)
 from agentskill_eval_skill_optimizer import (
     BenchmarkGuidedSkillSearch,
     CandidateQualityError,
@@ -192,3 +204,75 @@ def test_one_case_search_rejects_zero_gain_candidates(tmp_path: Path) -> None:
 
     with pytest.raises(SkillSearchError, match="no search-origin candidate"):
         BenchmarkGuidedSkillSearch(tmp_path / "workspace").run(spec)
+
+
+def test_search_excludes_invalid_candidate_from_pareto_selection(tmp_path: Path) -> None:
+    Outcome = Literal["pass", "fail", "invalid"]
+
+    def evaluation(
+        outcomes: tuple[Outcome, Outcome], tokens: tuple[int, int]
+    ) -> CandidateEvaluation:
+        results = tuple(
+            SearchCaseResult(
+                case_id=f"case-{index}",
+                passed=outcome == "pass",
+                score=1 if outcome == "pass" else 0,
+                input_tokens=token_count,
+                output_tokens=0,
+                latency_ms=token_count,
+                outcome=outcome,
+            )
+            for index, (outcome, token_count) in enumerate(zip(outcomes, tokens), start=1)
+        )
+        return CandidateEvaluation(
+            stage=SearchEvaluationStage.FULL,
+            dataset_sha256="d" * 64,
+            evaluator_sha256="e" * 64,
+            case_ids=tuple(item.case_id for item in results),
+            results=results,
+            pass_rate=sum(item.passed for item in results) / len(results),
+            mean_score=sum(item.score for item in results) / len(results),
+            total_tokens=sum(tokens),
+            total_latency_ms=sum(tokens),
+            total_cost_microusd=None,
+            simulated=False,
+            evaluated_at=datetime.now(timezone.utc),
+        )
+
+    def candidate(
+        origin: CandidateOrigin,
+        outcomes: tuple[Outcome, Outcome],
+        tokens: tuple[int, int],
+        content_bytes: int,
+    ) -> SkillCandidate:
+        return cast(
+            SkillCandidate,
+            SimpleNamespace(
+                id=uuid4(),
+                origin=origin,
+                status=SkillCandidateStatus.FULL_VALIDATED,
+                evaluations=(evaluation(outcomes, tokens),),
+                content_bytes=content_bytes,
+            ),
+        )
+
+    original = candidate(CandidateOrigin.ORIGINAL, ("fail", "fail"), (10, 10), 100)
+    invalid = candidate(CandidateOrigin.SEARCH, ("pass", "invalid"), (5, 5), 50)
+    valid = candidate(CandidateOrigin.SEARCH, ("pass", "fail"), (11, 11), 100)
+    spec = cast(
+        OptimizationSearchSpec,
+        SimpleNamespace(
+            constraints=SearchConstraintSpec(
+                min_absolute_gain=0.1,
+                max_loss_cases=0,
+                max_token_overhead_ratio=0.25,
+            )
+        ),
+    )
+
+    winner, _ = BenchmarkGuidedSkillSearch(tmp_path)._select_winner(
+        (original, invalid, valid),
+        spec,
+    )
+
+    assert winner.id == valid.id

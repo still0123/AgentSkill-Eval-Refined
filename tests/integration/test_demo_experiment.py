@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import io
 import json
+import tarfile
 from pathlib import Path
 
 import pytest
@@ -19,6 +21,26 @@ from agentskill_eval_experiment import (
 ROOT = Path(__file__).resolve().parents[2]
 DATASET = ROOT / "examples/datasets/python-review-demo"
 SKILL = ROOT / "examples/skills/python-review-v1"
+
+
+def _rewrite_bundle(
+    source: Path,
+    destination: Path,
+    *,
+    drop: str | None = None,
+    extra: tarfile.TarInfo | None = None,
+) -> None:
+    with tarfile.open(source, mode="r:") as original, tarfile.open(
+        destination, mode="w"
+    ) as rewritten:
+        for member in original.getmembers():
+            if member.name == drop:
+                continue
+            content = original.extractfile(member)
+            assert content is not None
+            rewritten.addfile(member, io.BytesIO(content.read()))
+        if extra is not None:
+            rewritten.addfile(extra, io.BytesIO(b""))
 
 
 def test_mock_demo_runs_72_logical_runs_and_writes_labeled_reports(tmp_path: Path) -> None:
@@ -86,6 +108,7 @@ def test_mock_demo_runs_72_logical_runs_and_writes_labeled_reports(tmp_path: Pat
     assert statistics.wtl.loss == 1
     assert statistics.wtl.tie_positive == 5
     assert statistics.wtl.tie_negative == 1
+    assert statistics.wtl.invalid == 0
     assert statistics.inference_ready is False
     assert statistics.tokens.control_mean == 150
     assert statistics.tokens.treatment_mean == 260
@@ -93,6 +116,7 @@ def test_mock_demo_runs_72_logical_runs_and_writes_labeled_reports(tmp_path: Pat
     html = result.report_paths.html_path.read_text(encoding="utf-8")
     assert "SIMULATED DEMO" in html
     assert "not Agent or Skill performance evidence" in html
+    assert verification["wtl"]["invalid"] == 0
     bundle = json.loads(result.report_paths.json_path.read_text(encoding="utf-8"))
     assert bundle["experiment"]["protocol_snapshot"]["demo_only"] is True
     trace_data = bundle["trace_intelligence"]
@@ -125,6 +149,33 @@ def test_mock_demo_runs_72_logical_runs_and_writes_labeled_reports(tmp_path: Pat
     tampered.write_bytes(corrupted)
     with pytest.raises(BundleError, match="digest mismatch"):
         ReplayBundleWriter.verify(tampered)
+
+    missing = tmp_path / "missing.tar"
+    _rewrite_bundle(first_bundle.path, missing, drop=verified.files[0].path)
+    with pytest.raises(BundleError, match="file set"):
+        ReplayBundleWriter.verify(missing)
+
+    extra_info = tarfile.TarInfo("unexpected.json")
+    extra_info.size = 0
+    extra = tmp_path / "extra.tar"
+    _rewrite_bundle(first_bundle.path, extra, extra=extra_info)
+    with pytest.raises(BundleError, match="file set"):
+        ReplayBundleWriter.verify(extra)
+
+    unsafe_info = tarfile.TarInfo("../escape")
+    unsafe_info.size = 0
+    unsafe = tmp_path / "unsafe.tar"
+    _rewrite_bundle(first_bundle.path, unsafe, extra=unsafe_info)
+    with pytest.raises(BundleError, match="unsafe bundle member"):
+        ReplayBundleWriter.verify(unsafe)
+
+    symlink_info = tarfile.TarInfo("linked")
+    symlink_info.type = tarfile.SYMTYPE
+    symlink_info.linkname = "bundle-manifest.json"
+    symlink = tmp_path / "symlink.tar"
+    _rewrite_bundle(first_bundle.path, symlink, extra=symlink_info)
+    with pytest.raises(BundleError, match="unsafe bundle member"):
+        ReplayBundleWriter.verify(symlink)
 
     index_path = workspace / "evidence-index.json"
     original_index = index_path.read_bytes()

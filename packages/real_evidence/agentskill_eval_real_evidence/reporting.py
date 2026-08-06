@@ -81,6 +81,7 @@ class RealEvidenceReportWriter:
         }
         report = RealExperimentReport(
             run=run,
+            preflight=preflight,
             dataset_version_id=preflight.dataset_version_id,
             dataset_name=preflight.dataset_name,
             dataset_version=preflight.dataset_version,
@@ -122,6 +123,16 @@ class RealEvidenceReportWriter:
             provider=run.provider,
             model=run.model,
             real_run_confirmed=run.real_run_confirmed,
+            statistics_semantics_version="ase/statistics/v0.4",
+            valid_block_ratio=statistics.valid_block_ratio,
+            inference_ready=statistics.inference_ready,
+            capability_baseline_pass_rate=(
+                statistics.sensitivity_capability.control_pass_rate
+            ),
+            capability_treatment_pass_rate=(
+                statistics.sensitivity_capability.treatment_pass_rate
+            ),
+            capability_absolute_gain=statistics.sensitivity_capability.absolute_gain,
             inference_note=statistics.inference_note,
             claim_limit=run.claim_limit,
         )
@@ -203,7 +214,12 @@ table{{border-collapse:collapse;width:100%}}th,td{{border:1px solid #aaa;padding
 <dt>Baseline Skill hash</dt><dd><code>{esc(report.baseline_skill_sha256 or "none")}</code></dd></dl>
 <h2>Outcome</h2><p>Baseline {esc(report.baseline_pass_rate)} · Treatment
 {esc(report.treatment_pass_rate)} · Absolute gain {esc(report.absolute_gain)} · Invalid
-{report.invalid_runs}</p><p>{esc(report.inference_note)}</p>
+{report.invalid_runs}</p>
+<p>Primary estimand: {esc(report.primary_estimand)} · Valid block ratio:
+{esc(report.valid_block_ratio)} · Inference ready: {str(report.inference_ready).lower()}</p>
+<p>Valid-only sensitivity: baseline {esc(report.capability_baseline_pass_rate)} · treatment
+{esc(report.capability_treatment_pass_rate)} · gain {esc(report.capability_absolute_gain)}</p>
+<p>{esc(report.inference_note)}</p>
 <h2>Cases</h2><table><thead><tr><th>Case</th><th>Group</th><th>Baseline</th>
 <th>Treatment</th><th>Gain</th><th>Class</th></tr></thead><tbody>{case_rows}</tbody></table>
 <h2>Efficiency</h2><pre>{esc(report.token_summary)}\n{esc(report.latency_summary)}\n

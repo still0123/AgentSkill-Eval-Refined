@@ -234,6 +234,7 @@ class FinalEvaluationStore:
             f"<p>Decision: {html.escape(report.decision.value)}</p>"
             f"<p>Base: {report.base_pass_rate:.3f}; winner: {report.winner_pass_rate:.3f}; "
             f"gain: {report.absolute_gain:+.3f}</p>"
+            f"<p>Invalid cases: {report.invalid_count}</p>"
             f"<p>{html.escape(report.decision_reason)}</p>"
             f"<p><strong>Claim limit:</strong> {html.escape(report.claim_limit)}</p>"
             "<table border='1'><thead><tr><th>Case</th><th>Group</th><th>Base</th>"
@@ -613,9 +614,11 @@ class IndependentFinalEvaluator:
         winner_by_case = IndependentFinalEvaluator._case_values(winner)
         comparisons = []
         for case_id in base[0].case_ids:
-            base_pass, base_score = base_by_case[case_id]
-            winner_pass, winner_score = winner_by_case[case_id]
-            if winner_pass > base_pass:
+            base_pass, base_score, base_invalid = base_by_case[case_id]
+            winner_pass, winner_score, winner_invalid = winner_by_case[case_id]
+            if base_invalid or winner_invalid:
+                classification = PairClassification.INVALID
+            elif winner_pass > base_pass:
                 classification = PairClassification.WIN
             elif winner_pass < base_pass:
                 classification = PairClassification.LOSS
@@ -639,7 +642,7 @@ class IndependentFinalEvaluator:
     @staticmethod
     def _case_values(
         evaluations: Sequence[CandidateEvaluation],
-    ) -> Dict[str, Tuple[float, float]]:
+    ) -> Dict[str, Tuple[float, float, bool]]:
         values: Dict[str, list[SearchCaseResult]] = {}
         for evaluation in evaluations:
             for result in evaluation.results:
@@ -648,6 +651,7 @@ class IndependentFinalEvaluator:
             case_id: (
                 sum(item.passed for item in rows) / len(rows),
                 sum(item.score for item in rows) / len(rows),
+                any(item.outcome == "invalid" for item in rows),
             )
             for case_id, rows in values.items()
         }
@@ -674,7 +678,10 @@ class IndependentFinalEvaluator:
             spec.gates.bootstrap_resamples,
             spec.gates.bootstrap_seed,
         )
-        if counts[PairClassification.LOSS] > spec.gates.max_loss_cases:
+        if counts[PairClassification.INVALID]:
+            decision = FinalDecision.INVALID
+            reason = "invalid observation blocks final evaluation"
+        elif counts[PairClassification.LOSS] > spec.gates.max_loss_cases:
             decision = FinalDecision.REGRESSION
             reason = "loss-case gate exceeded"
         elif overhead is not None and overhead > spec.gates.max_token_overhead_ratio:
@@ -683,7 +690,7 @@ class IndependentFinalEvaluator:
         elif groups < spec.gates.min_independent_groups:
             decision = FinalDecision.DESCRIPTIVE_ONLY
             reason = "too few independent groups for confirmation"
-        elif gain_ci_low >= spec.gates.min_absolute_gain:
+        elif gain > 0 and gain_ci_low >= spec.gates.min_absolute_gain:
             decision = FinalDecision.CONFIRMED
             reason = "all gates passed, including the group-bootstrap lower confidence bound"
         else:
@@ -717,11 +724,17 @@ class IndependentFinalEvaluator:
             gain_ci_high=gain_ci_high,
             bootstrap_resamples=spec.gates.bootstrap_resamples,
             bootstrap_seed=spec.gates.bootstrap_seed,
+            decision_rule_version="ase/final-decision/v0.4",
+            min_absolute_gain=spec.gates.min_absolute_gain,
+            max_loss_cases=spec.gates.max_loss_cases,
+            max_token_overhead_ratio=spec.gates.max_token_overhead_ratio,
+            min_independent_groups=spec.gates.min_independent_groups,
             token_overhead_ratio=overhead,
             win_count=counts[PairClassification.WIN],
             tie_positive_count=counts[PairClassification.TIE_POSITIVE],
             tie_negative_count=counts[PairClassification.TIE_NEGATIVE],
             loss_count=counts[PairClassification.LOSS],
+            invalid_count=counts[PairClassification.INVALID],
             independent_group_count=groups,
             decision=decision,
             decision_reason=reason,

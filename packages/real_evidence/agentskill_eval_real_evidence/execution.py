@@ -220,7 +220,32 @@ class RealEvidenceStore:
         return path
 
     def load_report(self, experiment_id: UUID) -> RealExperimentReport:
-        return load_model(self.report_json(experiment_id).read_bytes(), RealExperimentReport)
+        path = self.report_json(experiment_id)
+        content = path.read_bytes()
+        sidecar = path.with_suffix(".sha256")
+        if (
+            not sidecar.is_file()
+            or sidecar.read_text(encoding="utf-8").strip() != hashlib.sha256(content).hexdigest()
+        ):
+            raise RealEvidenceError("real experiment report integrity mismatch")
+        return load_model(content, RealExperimentReport)
+
+    def verify_completed(
+        self, experiment_id: UUID
+    ) -> Tuple[RealEvidenceRunManifest, RealExperimentReport, Path]:
+        run = self.load_run(experiment_id)
+        if run.status != RealEvidenceStatus.COMPLETED:
+            raise RealEvidenceError("completed real-evidence run is required")
+        report = self.load_report(experiment_id)
+        if report.run != run:
+            raise RealEvidenceError("real experiment report run manifest mismatch")
+        bundle = self.workspace / "real-evidence-bundles" / f"{experiment_id}.tar"
+        manifest = ReplayBundleWriter.verify(bundle)
+        if manifest.experiment_id != experiment_id:
+            raise RealEvidenceError("replay bundle belongs to another experiment")
+        if hashlib.sha256(bundle.read_bytes()).hexdigest() != report.replay_bundle_sha256:
+            raise RealEvidenceError("replay bundle hash does not match real experiment report")
+        return run, report, bundle
 
 
 class CostingRunnerAdapter:
@@ -939,11 +964,11 @@ class RealAgentEvidenceRunner:
         return hashlib.sha256(response.encode()).hexdigest() if isinstance(response, str) else None
 
     def _load_completed(self, manifest: RealEvidenceRunManifest) -> RealEvidenceResult:
-        report = self.store.load_report(manifest.experiment_id)
-        bundle = self.workspace / "real-evidence-bundles" / f"{manifest.experiment_id}.tar"
-        ReplayBundleWriter.verify(bundle)
+        run, report, bundle = self.store.verify_completed(manifest.experiment_id)
+        if run != manifest:
+            raise RealEvidenceError("persisted completed run changed during verification")
         return RealEvidenceResult(
-            manifest,
+            run,
             report,
             self.store.report_json(manifest.experiment_id),
             self.store.report_html(manifest.experiment_id),

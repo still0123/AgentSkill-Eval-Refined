@@ -380,6 +380,7 @@ class DemoEvidencePack:
             "tie_positive": wtl.get("tie_positive", 0),
             "tie_negative": wtl.get("tie_negative", 0),
             "loss": wtl.get("loss", 0),
+            "invalid": wtl.get("invalid", 0),
             "cases": [
                 {
                     "case_id": c.get("case_id"),
@@ -617,6 +618,7 @@ class DemoEvidencePack:
                 "tie_positive": paired.get("tie_positive", 0),
                 "tie_negative": paired.get("tie_negative", 0),
                 "loss": paired.get("loss", 0),
+                "invalid": paired.get("invalid", 0),
             },
         }
 
@@ -647,6 +649,7 @@ def _paired_results_from_report(report: Dict[str, Any]) -> Dict[str, Any]:
         "tie_positive": _int_value(wtl.get("tie_positive"), "tie_positive"),
         "tie_negative": _int_value(wtl.get("tie_negative"), "tie_negative"),
         "loss": _int_value(wtl.get("loss"), "loss"),
+        "invalid": _int_value(wtl.get("invalid", 0), "invalid"),
         "cases": [
             {
                 "case_id": _dict_value(item, "case comparison").get("case_id"),

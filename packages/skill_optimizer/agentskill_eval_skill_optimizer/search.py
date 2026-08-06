@@ -679,17 +679,24 @@ class BenchmarkGuidedSkillSearch:
         full = [item for item in candidates if item.status == SkillCandidateStatus.FULL_VALIDATED]
         original = next(item for item in full if item.origin == CandidateOrigin.ORIGINAL)
         base_eval = self._full(original)
+        if any(item.outcome == "invalid" for item in base_eval.results):
+            raise SkillSearchError("base full validation contains invalid cases")
+        valid_full = [
+            item
+            for item in full
+            if not any(result.outcome == "invalid" for result in self._full(item).results)
+        ]
         dominated: Dict[UUID, Tuple[UUID, ...]] = {}
         for candidate in full:
             dominators = tuple(
                 other.id
-                for other in full
+                for other in valid_full
                 if other.id != candidate.id and self._dominates(other, candidate)
             )
             dominated[candidate.id] = dominators
         feasible = []
         base_by_case = {item.case_id: item for item in base_eval.results}
-        for candidate in full:
+        for candidate in valid_full:
             if candidate.origin != CandidateOrigin.SEARCH or dominated[candidate.id]:
                 continue
             evaluation = self._full(candidate)

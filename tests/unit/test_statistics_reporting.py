@@ -225,7 +225,9 @@ def test_group_weighted_statistics_invalid_sensitivity_and_efficiency(tmp_path: 
     assert result.independence_group_count == 2
     assert result.complete_block_ratio == 1
     assert result.valid_block_ratio == pytest.approx(5 / 6)
-    assert result.inference_ready is True
+    assert result.invalid_case_count == 1
+    assert result.inference_ready is False
+    assert result.inference_note == "descriptive only: invalid observations are present"
 
     primary = result.primary_assignment_based
     assert primary.control_pass_rate == pytest.approx(0.75)
@@ -240,9 +242,10 @@ def test_group_weighted_statistics_invalid_sensitivity_and_efficiency(tmp_path: 
     assert capability.absolute_gain == pytest.approx(0.25)
     assert result.wtl.model_dump() == {
         "win": 1,
-        "tie_positive": 2,
+        "tie_positive": 1,
         "tie_negative": 0,
         "loss": 0,
+        "invalid": 1,
     }
     assert result.variants[1].invalid_runs == 1
     assert result.tokens.control_mean == pytest.approx(100)

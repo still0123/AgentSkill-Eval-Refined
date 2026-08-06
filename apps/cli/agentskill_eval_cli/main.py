@@ -264,7 +264,7 @@ def real_report(
             )
         )
         raise typer.Exit(code=1)
-    report = store.load_report(experiment_id)
+    _run, report, _bundle = store.verify_completed(experiment_id)
     typer.echo(
         json.dumps(
             {
@@ -351,6 +351,7 @@ def final_evaluate(
                 "base_pass_rate": result.report.base_pass_rate,
                 "decision": result.report.decision.value,
                 "job_id": str(result.job.id),
+                "invalid_count": result.report.invalid_count,
                 "loss_count": result.report.loss_count,
                 "report_html": str(result.report_html),
                 "report_json": str(result.report_json),

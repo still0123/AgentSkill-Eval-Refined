@@ -14,6 +14,7 @@ from agentskill_eval_contracts import (
     ArtifactManifest,
     AttemptStatus,
     EvaluationOutcome,
+    ExecutableSnapshot,
     ExecutionStatus,
     ExperimentVariant,
     FinalDecision,
@@ -23,6 +24,13 @@ from agentskill_eval_contracts import (
     PromotionLineageArtifact,
     PromotionWorkflowRecord,
     PromotionWorkflowStatus,
+    RealCaseEvidence,
+    RealEvidenceClass,
+    RealEvidenceRunManifest,
+    RealEvidenceStatus,
+    RealExperimentReport,
+    RealPreflightReport,
+    RealRunMode,
     Run,
     RunAttempt,
     RunnerSnapshot,
@@ -311,4 +319,188 @@ def test_observed_promotion_workflow_requires_observed_evidence() -> None:
     with pytest.raises(ValidationError, match="evidence boundary"):
         PromotionWorkflowRecord.model_validate(
             {**payload, "confirmation": confirmation.model_copy(update={"simulated": True})}
+        )
+
+
+def test_completed_real_evidence_requires_every_authorized_run() -> None:
+    now = datetime.now(timezone.utc)
+    payload = {
+        "experiment_id": uuid4(),
+        "mode": RealRunMode.SMOKE,
+        "status": RealEvidenceStatus.COMPLETED,
+        "config_sha256": DIGEST_A,
+        "preflight_sha256": DIGEST_B,
+        "simulated": False,
+        "evidence_class": RealEvidenceClass.OBSERVED_AGENT,
+        "provider": "local",
+        "model": "model",
+        "real_run_confirmed": True,
+        "max_cost_microusd": 10,
+        "max_agent_runs": 2,
+        "planned_runs": 2,
+        "completed_runs": 1,
+        "invalid_runs": 0,
+        "observed_or_reserved_cost_microusd": 1,
+        "started_at": now,
+        "completed_at": now,
+        "claim_limit": "exact frozen evidence only",
+    }
+
+    with pytest.raises(ValidationError, match="every planned run"):
+        RealEvidenceRunManifest.model_validate(payload)
+
+    with pytest.raises(ValidationError, match="exceed authorization"):
+        RealEvidenceRunManifest.model_validate({**payload, "completed_runs": 1, "invalid_runs": 2})
+
+    with pytest.raises(ValidationError, match="cost exceeds authorization"):
+        RealEvidenceRunManifest.model_validate(
+            {
+                **payload,
+                "completed_runs": 2,
+                "observed_or_reserved_cost_microusd": 11,
+            }
+        )
+
+
+def test_real_case_evidence_recomputes_gain_and_classification() -> None:
+    payload = {
+        "case_id": "case-one",
+        "independence_group": "group-one",
+        "baseline_pass_rate": 0.25,
+        "treatment_pass_rate": 0.75,
+        "absolute_gain": 0.5,
+        "classification": "win",
+    }
+
+    RealCaseEvidence.model_validate(payload)
+    with pytest.raises(ValidationError, match="gain does not match"):
+        RealCaseEvidence.model_validate({**payload, "absolute_gain": 0.25})
+    with pytest.raises(ValidationError, match="classification does not match"):
+        RealCaseEvidence.model_validate({**payload, "classification": "loss"})
+
+
+def test_v04_real_report_binds_preflight_lineage() -> None:
+    now = datetime.now(timezone.utc)
+    experiment_id = uuid4()
+    dataset_version_id = uuid4()
+    preflight = RealPreflightReport(
+        config_sha256=DIGEST_A,
+        dataset_version_id=dataset_version_id,
+        dataset_name="dataset",
+        dataset_version="1.0.0",
+        dataset_sha256=DIGEST_B,
+        case_ids=("case-one",),
+        skill_sha256="c" * 64,
+        baseline_skill_sha256="d" * 64,
+        runner=ExecutableSnapshot(
+            name="runner",
+            version="0.5.0",
+            path="/runner",
+            sha256="e" * 64,
+        ),
+        agent=ExecutableSnapshot(
+            name="agent",
+            version="1.0.0",
+            path="/agent",
+            sha256="f" * 64,
+        ),
+        provider="local",
+        model="model",
+        simulated=False,
+        evidence_class=RealEvidenceClass.OBSERVED_AGENT,
+        smoke_runs=2,
+        evidence_runs=6,
+        estimated_input_tokens_per_run=1,
+        estimated_output_tokens_per_run=1,
+        estimated_cost_per_run_microusd=1,
+        secret_env_names=(),
+        checked_at=now,
+    )
+    run = RealEvidenceRunManifest(
+        experiment_id=experiment_id,
+        mode=RealRunMode.SMOKE,
+        status=RealEvidenceStatus.COMPLETED,
+        config_sha256=preflight.config_sha256,
+        preflight_sha256=stable_sha256(preflight.model_dump(mode="json")),
+        simulated=False,
+        evidence_class=RealEvidenceClass.OBSERVED_AGENT,
+        provider="local",
+        model="model",
+        real_run_confirmed=True,
+        max_cost_microusd=2,
+        max_agent_runs=2,
+        planned_runs=2,
+        completed_runs=2,
+        invalid_runs=0,
+        observed_or_reserved_cost_microusd=2,
+        started_at=now,
+        completed_at=now,
+        claim_limit="exact frozen evidence only",
+    )
+    payload = {
+        "run": run,
+        "preflight": preflight,
+        "dataset_version_id": dataset_version_id,
+        "dataset_name": "dataset",
+        "dataset_version": "1.0.0",
+        "dataset_sha256": DIGEST_B,
+        "runner_snapshot": RunnerSnapshot(
+            name="skill-up",
+            version="0.5.0",
+            binary_sha256="e" * 64,
+            config={"agent_executable_sha256": "f" * 64},
+        ),
+        "agent_snapshot": AgentSnapshot(
+            engine="process",
+            engine_version="1.0.0",
+            model="model",
+        ),
+        "skill_sha256": "c" * 64,
+        "baseline_skill_sha256": "d" * 64,
+        "baseline_pass_rate": 0,
+        "treatment_pass_rate": 0,
+        "absolute_gain": 0,
+        "wtl": {
+            "win": 0,
+            "tie_positive": 0,
+            "tie_negative": 1,
+            "loss": 0,
+            "invalid": 0,
+        },
+        "invalid_runs": 0,
+        "token_summary": {},
+        "latency_summary": {},
+        "cost_summary": {},
+        "cases": (
+            RealCaseEvidence(
+                case_id="case-one",
+                independence_group="group-one",
+                baseline_pass_rate=0,
+                treatment_pass_rate=0,
+                absolute_gain=0,
+                classification="tie_negative",
+            ),
+        ),
+        "attempt_evidence_paths": ("runs/one", "runs/two"),
+        "capability_unavailable": (),
+        "replay_bundle_path": "real-evidence-bundles/evidence.tar",
+        "replay_bundle_sha256": "1" * 64,
+        "simulated": False,
+        "evidence_class": RealEvidenceClass.OBSERVED_AGENT,
+        "provider": "local",
+        "model": "model",
+        "real_run_confirmed": True,
+        "statistics_semantics_version": "ase/statistics/v0.4",
+        "valid_block_ratio": 1,
+        "capability_baseline_pass_rate": 0,
+        "capability_treatment_pass_rate": 0,
+        "capability_absolute_gain": 0,
+        "inference_note": "descriptive only",
+        "claim_limit": "exact frozen evidence only",
+    }
+
+    RealExperimentReport.model_validate(payload)
+    with pytest.raises(ValidationError, match="dataset identity"):
+        RealExperimentReport.model_validate(
+            {**payload, "dataset_sha256": "9" * 64}
         )
