@@ -52,6 +52,8 @@ class RealEvidencePreflight:
             baseline_skill_sha256=baseline_skill_sha,
             runner=runner,
             agent=agent,
+            agent_engine=spec.agent.engine,
+            agent_engine_version=spec.agent.engine_version,
             provider=spec.agent.provider,
             model=spec.agent.model,
             simulated=spec.simulated,

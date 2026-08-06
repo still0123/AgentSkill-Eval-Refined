@@ -404,6 +404,8 @@ def test_v04_real_report_binds_preflight_lineage() -> None:
             path="/agent",
             sha256="f" * 64,
         ),
+        agent_engine="process",
+        agent_engine_version="1.0.0",
         provider="local",
         model="model",
         simulated=False,

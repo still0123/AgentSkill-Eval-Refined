@@ -55,6 +55,8 @@ class RealPreflightReport(FrozenModel):
     baseline_skill_sha256: Optional[HexDigest] = None
     runner: ExecutableSnapshot
     agent: ExecutableSnapshot
+    agent_engine: Optional[str] = Field(default=None, min_length=1)
+    agent_engine_version: Optional[str] = Field(default=None, min_length=1)
     provider: str = Field(min_length=1)
     model: str = Field(min_length=1)
     simulated: bool
@@ -255,7 +257,10 @@ class RealExperimentReport(FrozenModel):
             or self.runner_snapshot.binary_sha256 != preflight.runner.sha256
             or self.runner_snapshot.config.get("agent_executable_sha256")
             != preflight.agent.sha256
-            or self.agent_snapshot.engine_version != preflight.agent.version
+            or preflight.agent_engine is None
+            or preflight.agent_engine_version is None
+            or self.agent_snapshot.engine != preflight.agent_engine
+            or self.agent_snapshot.engine_version != preflight.agent_engine_version
             or self.agent_snapshot.model != preflight.model
             or self.skill_sha256 != preflight.skill_sha256
             or self.baseline_skill_sha256 != preflight.baseline_skill_sha256
