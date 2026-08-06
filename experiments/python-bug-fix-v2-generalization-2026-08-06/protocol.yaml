@@ -1,0 +1,106 @@
+schema_version: ase/python-bug-fix-v2-generalization/v1alpha1
+status: PRE_REGISTERED_RUNTIME_FROZEN
+registered_before_agent_runs: true
+base_commit: f27228f87e3ac36cfba15674872b3e938cb380d1
+skills:
+  v1:
+    path: examples/skills/python-bug-fix-v1
+    sha256: 5ff780e023c00cd08232688ec013a47f51926b4e1c8a5171465085ee967bc5d6
+  v2:
+    path: examples/skills/python-bug-fix-v2
+    sha256: f14cd4a975b8a1820971e824b5f82ab9b79dee071a13acb673e6b2019720e13c
+dataset_release:
+  original_release_sha256: aa0b0ad1a38c8f6580cc0c962140565b5f4cba0db17441999df7e1e9cdf5b7ab
+  original_case_count: 20
+  funcy_release_sha256: 24ef413eb1d9e52d2a8896879bb5ad7902a4e3d3745b4f6a75cbedb41fb46509
+  funcy_dataset_version_id: cdb9f85b-d3a1-577f-b33d-8df2f5bafbbf
+runtime:
+  provider: local_mlx
+  endpoint: http://127.0.0.1:18002/v1
+  model: mlx-community/Qwen2.5-Coder-7B-Instruct-4bit
+  model_revision: 019cc73c45c770444708a6dd8690c66243cc5c80
+  model_weights_sha256: 56a3d94706833f753e6c6b47ea57af8ef638cd8cc1d74eca1142ba640b26060e
+  model_config_sha256: 08762352ba9fded858f24bdd7b8d2fe61aabe7bce1dfdb663db242d574c3e678
+  tokenizer_sha256: a8506e7111b80c6d8635951a02eab0f4e1a8e4e5772da83846579e97b16f61bf
+  python: 3.12.13
+  mlx: 0.32.0
+  mlx_lm: 0.29.1
+  transformers: 4.57.6
+  server_sha256: 5babe917b24b55026fd2c48580a31b3a061908d76d74efce4368b81d392ee93e
+  process_agent_sha256: bb071419527de0c051bb1a3680a296cd7dc8575a12522f3b01d1d451ca13d4ea
+  skill_up_version: 0.5.0
+  skill_up_sha256: b8473aad3fe997f3aa8de1e9bd9bc127e5254b25371567a0e07143afc809c359
+  temperature: 0.0
+  observed_metered_cost_microusd: 0
+runtime_validation:
+  synthetic_tool_smoke: passed
+  excluded_case_smoke: cachetools-cachedmethod-autospec
+  excluded_case_smoke_status: passed_execution_chain
+  excluded_case_smoke_experiment_id: 9e0644c2-98da-5a2a-ae7f-3de2939aa3fe
+  excluded_case_smoke_report_sha256: 85a36d5b0d825174d9e4f389de73da6462f7179b80451f134208bf8868c3258c
+  excluded_case_smoke_bundle_sha256: e83afc796ef59581aaf93363b803a1a02a52293f590f46639f418336390a226d
+  excluded_case_smoke_outcome: TIE_NEGATIVE
+  excluded_case_smoke_included_in_efficacy_evidence: false
+excluded_prior_exposure:
+  - more-itertools-islice-release
+  - cachetools-cachedmethod-autospec
+  - boltons-lri-replacement
+  - humanize-intcomma-string-ndigits
+  - pydash-empty-intersperse
+evaluation_cases:
+  train_unseen:
+    - more-itertools-split-after-empty-tail
+    - more-itertools-last-reversed-none
+    - more-itertools-sample-strict-counts
+  validation_search_unseen:
+    - cachetools-hashkey-pickle
+    - cachetools-cachedmethod-bound-key
+    - cachetools-ttl-boundary-expiration
+  regression_dev_unseen:
+    - boltons-split-maxsplit-zero
+    - boltons-bytes2human-boundary
+    - boltons-truncated-traceback
+  validation_confirm_unseen:
+    - humanize-scientific-negative-sign
+    - humanize-intcomma-zero-precision
+    - humanize-metric-precision-floor
+  locked_test_unseen:
+    - pydash-reversed-in-range
+    - pydash-dict-to-list
+    - pydash-false-math-operands
+  new_repository_funcy:
+    - funcy-throttle-timedelta
+    - funcy-cache-invalidate-idempotent
+    - funcy-retry-list-errors
+    - funcy-cache-mixed-arguments
+protocol:
+  case_count: 19
+  paired_agent_runs: 114
+  repeats: 3
+  execution_order: alternating_v1_v2_by_case_and_repeat
+  grader: deterministic_before_fail_after_pass
+  selection_uses_agent_scores: false
+  early_stop: forbidden_except_safety_or_infrastructure_failure
+  runtime_change_after_first_run: forbidden
+  case_change_after_first_run: forbidden
+gates:
+  invalid_pairs: 0
+  max_loss_cases: 0
+  max_token_overhead_ratio: 0.25
+  minimum_decisive_wins_for_case_sign_test: 5
+  one_sided_sign_test_alpha: 0.05
+  new_repository_funcy_min_wins: 1
+  new_repository_funcy_max_losses: 0
+decisions:
+  CONFIRMED_EXPANDED_SUPPORT: all gates pass
+  NOT_CONFIRMED: valid execution completes but any positive-evidence gate fails
+  REGRESSION: any loss or token-overhead gate fails
+  INVALID: any pair is invalid or protocol identity changes
+claim_limit: >-
+  At most expanded descriptive support across 23 observed public cases and six repositories,
+  including the original four-case release evidence. Public Git-history contamination remains
+  high. Passing cannot prove population-level or universal effectiveness.
+zero_cost_policy:
+  paid_api_calls_allowed: false
+  github_hosted_runners_allowed: false
+  required_runtime: local_model_with_zero_metered_cost

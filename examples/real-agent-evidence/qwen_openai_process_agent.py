@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import html
 import json
 import os
 import re
@@ -279,6 +280,43 @@ def _legacy_tool_calls(content: str) -> List[Dict[str, Any]]:
                 "type": "function",
                 "function": {
                     "name": match.group(1),
+                    "arguments": json.dumps(arguments, ensure_ascii=False),
+                },
+            }
+        )
+    inline = re.compile(
+        r"""<function\s+name="([A-Za-z_][A-Za-z0-9_]*)"\s+arguments='(\{.*\})'\s*/>""",
+        re.DOTALL,
+    )
+    for index, match in enumerate(inline.finditer(content), start=len(calls)):
+        calls.append(
+            {
+                "id": "legacy-tool-" + str(index),
+                "type": "function",
+                "function": {
+                    "name": match.group(1),
+                    "arguments": html.unescape(match.group(2)),
+                },
+            }
+        )
+    fenced = re.compile(r"```json\s*(.*?)\s*```", re.DOTALL)
+    for block in fenced.findall(content):
+        try:
+            payload = json.loads(block)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(payload, Mapping):
+            continue
+        name = payload.get("name")
+        arguments = payload.get("arguments")
+        if not isinstance(name, str) or not isinstance(arguments, Mapping):
+            continue
+        calls.append(
+            {
+                "id": "legacy-tool-" + str(len(calls)),
+                "type": "function",
+                "function": {
+                    "name": name,
                     "arguments": json.dumps(arguments, ensure_ascii=False),
                 },
             }

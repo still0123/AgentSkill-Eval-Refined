@@ -17,6 +17,38 @@ def _module():
     return module
 
 
+def test_qwen25_inline_xml_tool_call_is_parsed() -> None:
+    module = _module()
+
+    calls = module._legacy_tool_calls(
+        '```xml\n<function name="read_file" arguments=\'{"path": "README.md"}\'/>\n```'
+    )
+
+    assert calls == [
+        {
+            "id": "legacy-tool-0",
+            "type": "function",
+            "function": {
+                "name": "read_file",
+                "arguments": '{"path": "README.md"}',
+            },
+        }
+    ]
+
+
+def test_qwen25_fenced_json_tool_call_is_parsed() -> None:
+    module = _module()
+
+    calls = module._legacy_tool_calls(
+        '```json\n{"name":"read_file","arguments":{"path":"README.md"}}\n```'
+    )
+
+    assert calls[0]["function"] == {
+        "name": "read_file",
+        "arguments": '{"path": "README.md"}',
+    }
+
+
 def test_replace_in_file_edits_one_focused_region_without_truncating(tmp_path: Path) -> None:
     module = _module()
     source = tmp_path / "large.py"
