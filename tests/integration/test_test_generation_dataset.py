@@ -118,6 +118,32 @@ def test_test_generation_grader_requires_before_fail_after_pass(
         text=True,
     )
     assert accepted.returncode == 0, accepted.stderr
+    generated_test.write_text(
+        "from pathlib import Path\n"
+        "raise SystemExit(0 if Path('module.py').read_text() != '' else 1)\n",
+        encoding="utf-8",
+    )
+    source_inspection = subprocess.run(
+        (sys.executable, str(grader)),
+        cwd=fixture,
+        capture_output=True,
+        check=False,
+    )
+    assert source_inspection.returncode == 6
+    generated_test.write_text(
+        "from module import value\n"
+        "assert value() == 2, 'value must follow the documented contract'\n",
+        encoding="utf-8",
+    )
+    (fixture / "unapproved.py").write_text("# mutation\n", encoding="utf-8")
+    unapproved_edit = subprocess.run(
+        (sys.executable, str(grader)),
+        cwd=fixture,
+        capture_output=True,
+        check=False,
+    )
+    assert unapproved_edit.returncode == 3
+    (fixture / "unapproved.py").unlink()
     (fixture / "module.py").write_text(
         "def value():\n    return 2\n",
         encoding="utf-8",

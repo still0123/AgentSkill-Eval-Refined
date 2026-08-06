@@ -683,6 +683,9 @@ class IndependentFinalEvaluator:
         elif groups < spec.gates.min_independent_groups:
             decision = FinalDecision.DESCRIPTIVE_ONLY
             reason = "too few independent groups for confirmation"
+        elif counts[PairClassification.WIN] == 0:
+            decision = FinalDecision.NOT_CONFIRMED
+            reason = "no independent winning Case was observed"
         elif gain_ci_low >= spec.gates.min_absolute_gain:
             decision = FinalDecision.CONFIRMED
             reason = "all gates passed, including the group-bootstrap lower confidence bound"

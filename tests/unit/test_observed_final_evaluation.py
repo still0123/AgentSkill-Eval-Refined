@@ -6,6 +6,8 @@ from types import SimpleNamespace
 from typing import cast
 from uuid import uuid4
 
+import pytest
+
 from agentskill_eval_contracts import (
     CandidateEvaluation,
     FinalEvaluationJob,
@@ -133,5 +135,6 @@ def test_real_final_pair_reconstructs_baseline_and_winner() -> None:
     assert winner[0].stage == SearchEvaluationStage.VALIDATION_CONFIRM
 
 
-def test_final_gate_can_explicitly_confirm_no_loss() -> None:
-    assert FinalGateSpec(min_absolute_gain=0).min_absolute_gain == 0
+def test_final_gate_rejects_zero_gain_confirmation_threshold() -> None:
+    with pytest.raises(ValueError):
+        FinalGateSpec(min_absolute_gain=0)
