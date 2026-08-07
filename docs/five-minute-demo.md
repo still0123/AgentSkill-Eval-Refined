@@ -9,7 +9,7 @@
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-python3 -m pip install agentskill_eval-0.3.0-py3-none-any.whl
+python3 -m pip install agentskill_eval-0.4.0-py3-none-any.whl
 ```
 
 wheel 已内置离线 Dataset 与 Skill，不要求当前目录存在源码仓库。
@@ -26,7 +26,7 @@ agentskill-eval demo run \
 ```text
 12 Cases × 2 Arms × 3 Repeats = 72 Runs
 Invalid: 0
-W/T/L: 5 / 6 / 1
+WIN / TIE_POSITIVE / TIE_NEGATIVE / LOSS / INVALID: 5 / 5 / 1 / 1 / 0
 Evidence Class: SIMULATED DEMO
 ```
 
@@ -45,7 +45,7 @@ Evidence Class: SIMULATED DEMO
 - Control 和 Treatment 使用同一个 Case、Runner、环境和预算；
 - 唯一实验变量是是否加载 Skill；
 - 单次 Run 判定为 PASS、FAIL 或 INVALID；
-- 配对 Case 汇总为 WIN、TIE 或 LOSS。
+- 配对 Case 汇总为 WIN、TIE_POSITIVE、TIE_NEGATIVE、LOSS 或 INVALID。
 
 ## 4. 查看 Trace
 

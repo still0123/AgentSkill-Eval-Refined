@@ -2,8 +2,7 @@
 
 [![Python](https://img.shields.io/badge/Python-3.9%2B-blue)](./pyproject.toml)
 [![License](https://img.shields.io/badge/License-Apache--2.0-green)](./LICENSE)
-[![CI](https://github.com/still0123/AgentSkill-Eval-Refined/actions/workflows/ci.yml/badge.svg)](https://github.com/still0123/AgentSkill-Eval-Refined/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/still0123/AgentSkill-Eval-Refined)](https://github.com/still0123/AgentSkill-Eval-Refined/releases/tag/v0.3.0)
+[![Release](https://img.shields.io/github/v/release/still0123/AgentSkill-Eval-Refined)](https://github.com/still0123/AgentSkill-Eval-Refined/releases)
 
 AgentSkill-Eval 是一个面向 Agent Skill 的**配对评测与发布门禁系统**。它解决的核心问题是：
 
@@ -14,7 +13,8 @@ AgentSkill-Eval 是一个面向 Agent Skill 的**配对评测与发布门禁系�
 > **AgentSkill-Eval-Refined** 是 AgentSkill-Eval 的聚焦公开版本，保留 Python Bug Fix Skill 评测主线，移除尚未形成真实证据的 MCP、Memory/RAG 和平台化扩展。
 > 原始完整研究版见 [ranmaoxia0123/AgentSkill-Eval](https://github.com/ranmaoxia0123/AgentSkill-Eval)。
 
-当前稳定版：[`v0.3.0`](https://github.com/still0123/AgentSkill-Eval-Refined/releases/tag/v0.3.0)。
+当前版本：`v0.4.0` Evidence-Grade。全部质量门和发布构建在本地执行，不使用付费 API、
+GitHub-hosted runner 或其他付费云服务。
 
 ## 核心流程
 
@@ -29,7 +29,7 @@ AgentSkill-Eval 是一个面向 Agent Skill 的**配对评测与发布门禁系�
 | 层级 | 判定 | 含义 |
 |---|---|---|
 | 单次 Run | PASS / FAIL / INVALID | 确定性 Grader 判定，INVALID 表示基础设施异常 |
-| 配对 Case | WIN / TIE / LOSS | 同题 Control vs Treatment 比较 |
+| 配对 Case | WIN / TIE_POSITIVE / TIE_NEGATIVE / LOSS / INVALID | 同题 Control vs Treatment 比较 |
 | 实验统计 | AbsoluteGain + 95% CI | 两级 cluster bootstrap，样本不足时标记 `inference_ready=false` |
 | 版本发布 | 五阶段门禁 | Search → Regression → Confirm → Locked → 人工审核 |
 
@@ -52,7 +52,7 @@ wheel 已内置离线 Demo Dataset 与 Skill，不要求 clone 源码，也不�
 python3 -m venv .venv
 source .venv/bin/activate
 python3 -m pip install \
-  https://github.com/still0123/AgentSkill-Eval-Refined/releases/download/v0.3.0/agentskill_eval-0.3.0-py3-none-any.whl
+  https://github.com/still0123/AgentSkill-Eval-Refined/releases/download/v0.4.0/agentskill_eval-0.4.0-py3-none-any.whl
 
 agentskill-eval demo run \
   --workspace .agentskill-eval/portfolio-demo
@@ -75,7 +75,7 @@ python3 -m pip install -e ".[dev]"
 ```text
 12 Cases × 2 Arms × 3 Repeats = 72 Runs
 Invalid: 0
-W/T/L: 5 / 6 / 1
+WIN / TIE_POSITIVE / TIE_NEGATIVE / LOSS / INVALID: 5 / 5 / 1 / 1 / 0
 Evidence Bundle: VERIFIED
 Cost: $0
 Evidence Class: SIMULATED DEMO
@@ -124,6 +124,32 @@ Skill handoff 混杂；修复 Runtime 后复用同一 DatasetVersion 和两个 C
 Skill 已进入模型上下文，但仍未产生独立 WIN。该结果仅表示冻结两 Case 上无增益，未触发自动
 优化或版本发布。
 
+### v2 扩展验证
+
+2026-08-07 使用第二种 Agent Runtime
+`local MLX + Qwen2.5-Coder-7B-Instruct-4bit + process Agent`，在 6 个独立开源仓库的
+19 个未见 Case 上完成 3 次重复、共 114 个 observed-Agent Run：
+
+```text
+Completed / invalid Runs: 114 / 0
+WIN / TIE_POSITIVE / TIE_NEGATIVE / LOSS / INVALID: 0 / 0 / 19 / 0 / 0
+v1 pass rate: 0.0
+v2 pass rate: 0.0
+absolute gain: 0.0
+decision: NOT_CONFIRMED
+metered cost: 0
+```
+
+这是有效的无增益结果，不是正向确认，也不是回归。两版均为 0/19，说明该冻结 Runtime
+出现 floor effect；不能据此推断 Skill v2 普遍无效。结果和协议见
+[`result.sanitized.json`](experiments/python-bug-fix-v2-generalization-2026-08-06/result.sanitized.json)
+与
+[`protocol.yaml`](experiments/python-bug-fix-v2-generalization-2026-08-06/protocol.yaml)。
+
+当前公开 observed Evidence 包含正向、小样本无增益和扩展未确认结果，没有观察到真实
+`REGRESSION`。系统仍把任何 Case 退化保留为 `LOSS`，触发 `REGRESSION` 或发布拒绝，不会
+把它折叠成 tie 或删除。
+
 详见 [真实正向闭环报告](docs/real-positive-skill-loop.md)和
 [Test Generation 负结果诊断](docs/test-generation-negative-result-diagnosis.md)、
 [Runtime 修复与重跑结果](docs/test-generation-runtime-fix.md)。
@@ -148,19 +174,21 @@ Skill 已进入模型上下文，但仍未产生独立 WIN。该结果仅表示�
 
 ## Release 完整性
 
-Tag Release 由 GitHub Actions 自动构建。wheel、sdist、Demo evidence bundle、图稿和演示文档
-均附带 `SHA256SUMS`，核心发布物同时生成 GitHub build provenance。
+Release 只在本地 clean-room 构建和验收。wheel、sdist 与 provenance 文件进入
+`SHA256SUMS`；GitHub Release 仅上传已验证字节，不运行 hosted workflow。
 
 ```bash
-gh release download v0.3.0 \
+gh release download v0.4.0 \
   --repo still0123/AgentSkill-Eval-Refined \
   --dir release
 
 cd release
 shasum -a 256 -c SHA256SUMS
-gh attestation verify agentskill_eval-0.3.0-py3-none-any.whl \
-  --repo still0123/AgentSkill-Eval-Refined
+python3 -m json.tool build-provenance.json >/dev/null
 ```
+
+`build-provenance.json` 记录 Git commit、Python、构建工具、artifact SHA-256、clean-room
+Demo 验收和零费用策略。它是本地可复核 provenance，不冒充第三方签名或云端 attestation。
 
 ## 五分钟演示
 
@@ -208,8 +236,8 @@ AgentSkill-Eval/
 | 领域契约 | Pydantic v2 |
 | 存储 | 本地内容寻址 Blob + SHA-256 |
 | 评测 | 确定性 Grader + 两级 cluster bootstrap |
-| 工程质量 | Ruff, mypy, pytest, GitHub Actions |
-| 发布可信度 | SHA256SUMS + GitHub build provenance |
+| 工程质量 | 本地 Ruff、mypy、pytest、Dashboard tests/build |
+| 发布可信度 | SHA256SUMS + 本地 build provenance + clean-room install |
 
 ## 核心设计原则
 
@@ -222,7 +250,8 @@ AgentSkill-Eval/
 ## 当前边界
 
 - Python Test Generation 仅有修复后最小两 Case 无增益证据，不支持一般化结论
-- 真实实验样本较小，不支持通用性能排名
+- 扩展实验在固定本地 Runtime 上出现 0/19 floor effect，不支持普遍有效或普遍无效结论
+- 所有真实实验均来自公开 Git 历史，污染风险高，不支持通用性能排名
 - Dashboard 只读本地证据
 - 已发布的真实 Skill v2 结论仅适用于冻结 Agent、公开 Case、Runtime 与协议
 

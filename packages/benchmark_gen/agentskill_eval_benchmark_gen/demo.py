@@ -244,6 +244,9 @@ class DemoExperimentRunner:
             protocol_snapshot={
                 "demo_only": True,
                 "evidence_mode": "simulated_fixture",
+                "evaluation_split": ",".join(
+                    sorted({item.metadata.split.value for item in dataset.cases})
+                ),
                 "repeats": config.repeats,
                 "random_seed": config.random_seed,
                 "skill_protocol": "natural_trigger",

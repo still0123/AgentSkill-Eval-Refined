@@ -9,7 +9,8 @@
 > 模型、数据集、环境和预算，只改变是否加载 Skill 或 Skill 版本，运行配对实验并保存 Trace、
 > 成本和失败诊断。系统还能从真实 Git 历史重建 Benchmark、筛选 Skill 候选、执行独立 locked
 > evaluation，并用不可变 Manifest 管理 SkillVersion。项目既有零费用确定性 Demo，也完成了
-> Python Bug Fix Skill v1→v2 的 observed 正向闭环和 Test Generation 的真实无增益对照。
+> Python Bug Fix Skill v1→v2 的 observed 正向闭环、Test Generation 无增益对照，以及
+> 6 仓库 19 Case、114 Runs 的第二 Runtime 扩展验证。
 
 ## 2. 面试官应该记住的三个点
 
@@ -67,6 +68,11 @@ timeout/budget   → invalid 或预算终止
 Fix 在 Search 获得 1 个独立 WIN，后续 Regression/Confirmation/Locked 均无 LOSS，合计
 W/T/L `1/3/0`；Test Generation 修复 Runtime 混杂后仍为 `0/2/0`、0 INVALID。两者都是小样本
 描述性证据，不支持普遍增益声明。
+
+再打开 `experiments/python-bug-fix-v2-generalization-2026-08-06/result.sanitized.json`：
+本地 MLX + Qwen2.5-Coder process Runtime 完成 114/114 Runs，得到
+`0 WIN / 19 TIE_NEGATIVE / 0 LOSS / 0 INVALID`。结论是 `NOT_CONFIRMED`，不是回归；两版
+0/19 是 Runtime floor effect，不能推断 Skill 普遍无效。
 
 ### 3:10–4:00：展示 Benchmark 可信度
 
@@ -182,9 +188,9 @@ split；候选经过 leakage lint、regression_dev、confirmation 和一次性 l
 
 ### 真实 Skill v2 的正向结果是否足以证明普遍提升？
 
-不足。Python Bug Fix v2 在冻结协议中得到 W/T/L `1/3/0`，证明一次正向、可审计的发布闭环；
-但独立 Case 只有 4 个，且来自公开 Git 历史，只能描述该 Agent、Runtime、Case 和预算组合。
-项目同时公开 Test Generation `0/2/0`，避免只展示有利结果。
+不足。首次闭环的 4 个 Case 得到 `1/3/0`；扩展到第二 Runtime、6 个仓库、19 个未见 Case 后，
+两版均为 0/19，决策为 `NOT_CONFIRMED`。这证明系统能保存正向和无增益证据，但不能证明 Skill
+普遍有效或普遍无效。公开 Git 历史还具有高污染风险。
 
 ### 如何保证 API Key 不泄露？
 
@@ -205,8 +211,9 @@ faithfulness、污染和记忆更新。
 - 设计不可变 DatasetVersion/SkillVersion、Evidence Gap 门禁和内容哈希收据，实现
   Search→Regression→Confirmation→Locked→Review 发布链，并阻止 invalid 或无增益候选发布。
 - 完成真实 Python Bug Fix v1→v2 闭环（W/T/L `1/3/0`、0 LOSS）和 Test Generation
-  corrected no-gain 对照（`0/2/0`、0 INVALID）；发布稳定 `v0.3.0`，附件具备 SHA256 与 SLSA
-  provenance。
+  corrected no-gain 对照（`0/2/0`、0 INVALID），并在第二 Runtime 完成 114 Runs 扩展验证
+  （`0/19`、`NOT_CONFIRMED`）；发布 `v0.4.0` 本地 clean-room artifact、SHA256 与可复核
+  build provenance。
 
 边界必须主动说明：Agent Loop、Skill 安装和基础执行复用 `skill-up`；配对协议、证据契约、
 Benchmark 重建、失败诊断、演化门禁和不可变发布是本项目自研。

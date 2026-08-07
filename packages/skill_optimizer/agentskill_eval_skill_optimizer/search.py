@@ -6,6 +6,7 @@ import hashlib
 import html
 import json
 import random
+import re
 import shutil
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -486,13 +487,47 @@ class BenchmarkGuidedSkillSearch:
     @staticmethod
     def _mutate(base: bytes, mutations: Sequence[MutationSpec]) -> bytes:
         text = base.decode("utf-8").rstrip()
-        blocks = ["\n\n## Candidate guidance"]
+        appended = []
         for mutation in mutations:
-            blocks.append(
-                f"\n\n<!-- mutation:{mutation.id}; hypothesis:{mutation.hypothesis} -->\n"
-                f"- {mutation.instruction.strip()}"
+            if mutation.operation == "replace_section":
+                text = BenchmarkGuidedSkillSearch._replace_section(text, mutation)
+            else:
+                appended.append(mutation)
+        if appended:
+            text += "\n\n## Candidate guidance"
+            for mutation in appended:
+                text += (
+                    f"\n\n<!-- mutation:{mutation.id}; hypothesis:{mutation.hypothesis} -->\n"
+                    f"- {mutation.instruction.strip()}"
+                )
+        return (text.rstrip() + "\n").encode("utf-8")
+
+    @staticmethod
+    def _replace_section(text: str, mutation: MutationSpec) -> str:
+        headings = list(re.finditer(r"^(#{1,6})[ \t]+(.+?)[ \t]*$", text, re.MULTILINE))
+        matches = [
+            (index, heading)
+            for index, heading in enumerate(headings)
+            if heading.group(2) == mutation.target_section
+        ]
+        if len(matches) != 1:
+            raise SkillSearchError(
+                f"replace_section target {mutation.target_section!r} matched "
+                f"{len(matches)} sections"
             )
-        return (text + "".join(blocks) + "\n").encode("utf-8")
+        index, heading = matches[0]
+        level = len(heading.group(1))
+        section_end = next(
+            (item.start() for item in headings[index + 1 :] if len(item.group(1)) <= level),
+            len(text),
+        )
+        replacement = (
+            f"\n\n<!-- mutation:{mutation.id}; hypothesis:{mutation.hypothesis} -->\n"
+            f"{mutation.instruction.strip()}"
+        )
+        if section_end < len(text):
+            replacement += "\n\n"
+        return text[: heading.end()] + replacement + text[section_end:]
 
     @staticmethod
     def _random_mutate(base: bytes, mutation: MutationSpec, rng: random.Random) -> bytes:
@@ -503,6 +538,8 @@ class BenchmarkGuidedSkillSearch:
             id=f"randomized-{mutation.id}",
             hypothesis="Equal-size random word-order mutation comparator.",
             instruction=randomized,
+            operation=mutation.operation,
+            target_section=mutation.target_section,
         )
         return BenchmarkGuidedSkillSearch._mutate(base, (surrogate,))
 

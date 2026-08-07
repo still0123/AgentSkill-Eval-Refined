@@ -754,6 +754,7 @@ class RealAgentEvidenceRunner:
                     "evidence_class": spec.evidence_class.value,
                     "real_run_confirmed": spec.evidence_class == RealEvidenceClass.OBSERVED_AGENT,
                     "mode": mode.value,
+                    "evaluation_split": preflight.evaluation_split,
                     "repeats": 1 if mode == RealRunMode.SMOKE else spec.protocol.evidence_repeats,
                     "random_seed": spec.protocol.random_seed,
                     "claim_limit": self._claim_limit(spec, mode),

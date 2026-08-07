@@ -49,6 +49,7 @@ class RealPreflightReport(FrozenModel):
     dataset_version_id: UUID
     dataset_name: str = Field(min_length=1)
     dataset_version: str = Field(min_length=1)
+    evaluation_split: Optional[str] = Field(default=None, min_length=1)
     dataset_sha256: HexDigest
     case_ids: Tuple[str, ...] = Field(min_length=1)
     skill_sha256: HexDigest
@@ -184,6 +185,7 @@ class RealExperimentReport(FrozenModel):
     dataset_version_id: UUID
     dataset_name: str = Field(min_length=1)
     dataset_version: str = Field(min_length=1)
+    evaluation_split: Optional[str] = Field(default=None, min_length=1)
     dataset_sha256: HexDigest
     runner_snapshot: RunnerSnapshot
     agent_snapshot: AgentSnapshot
@@ -249,6 +251,7 @@ class RealExperimentReport(FrozenModel):
             self.dataset_version_id != preflight.dataset_version_id
             or self.dataset_name != preflight.dataset_name
             or self.dataset_version != preflight.dataset_version
+            or self.evaluation_split != preflight.evaluation_split
             or self.dataset_sha256 != preflight.dataset_sha256
         ):
             raise ValueError("report dataset identity does not match preflight")

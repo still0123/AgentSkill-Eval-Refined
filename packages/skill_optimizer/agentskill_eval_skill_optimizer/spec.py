@@ -21,6 +21,16 @@ class MutationSpec(StrictModel):
     id: str = Field(pattern=r"^[a-z0-9][a-z0-9-]{2,79}$")
     hypothesis: str = Field(min_length=10)
     instruction: str = Field(min_length=10)
+    operation: Literal["append", "replace_section"] = "append"
+    target_section: Optional[str] = Field(default=None, min_length=1, max_length=200)
+
+    @model_validator(mode="after")
+    def section_target_matches_operation(self) -> "MutationSpec":
+        if self.operation == "replace_section" and self.target_section is None:
+            raise ValueError("replace_section mutation requires target_section")
+        if self.operation == "append" and self.target_section is not None:
+            raise ValueError("append mutation cannot declare target_section")
+        return self
 
 
 class SearchAlgorithmSpec(StrictModel):

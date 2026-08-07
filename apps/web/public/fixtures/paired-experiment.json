@@ -10,6 +10,8 @@
     "dataset_version_id": "10000000-0000-4000-8000-000000000002",
     "protocol_snapshot": {
       "evidence_mode": "simulated_fixture",
+      "evidence_class": "SIMULATED_DEMO",
+      "evaluation_split": "demo",
       "demo_only": true,
       "claim_limit": "UI and controller demonstration only; no performance claim"
     }
@@ -41,6 +43,8 @@
     "independence_group_count": 4,
     "complete_block_ratio": 1,
     "valid_block_ratio": 0.8333,
+    "invalid_case_count": 1,
+    "primary_estimand": "assignment_based_conservative",
     "inference_ready": true,
     "inference_note": "synthetic descriptive fixture; confirmatory claims prohibited",
     "bootstrap_resamples": 10000,
@@ -64,7 +68,7 @@
       "included_cases": 5,
       "included_groups": 4
     },
-    "wtl": { "win": 2, "tie_positive": 2, "tie_negative": 1, "loss": 1 },
+    "wtl": { "win": 2, "tie_positive": 2, "tie_negative": 1, "loss": 0, "invalid": 1 },
     "cases": [
       {
         "case_id": "py-null-guard",
@@ -128,7 +132,7 @@
         "treatment_pass_rate": 0,
         "control_status": "pass",
         "treatment_status": "invalid",
-        "classification": "loss",
+        "classification": "invalid",
         "invalid_reason": "runner_timeout",
         "token_delta": 491,
         "latency_delta": 30000

@@ -4,6 +4,9 @@
 
 ## 后续执行路线
 
+- [`v0.4.0` Evidence-Grade 发布说明](./releases/v0.4.0.md)
+- [`v0.4.0` 规格](./v0.4.0-evidence-grade-spec.md)
+- [`v0.4.0` 验收清单](./v0.4.0-acceptance-checklist.md)
 - [`v0.3.0` 稳定版发布说明](./releases/v0.3.0.md)
 - [`v0.3.0-rc.3` 发布说明](./releases/v0.3.0-rc3.md)
 - [`v0.3.0-rc.2` 发布说明](./releases/v0.3.0-rc2.md)

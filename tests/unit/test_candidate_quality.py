@@ -42,6 +42,64 @@ def _hypothesis(candidate_id: str, instruction: str) -> ImprovementHypothesis:
     )
 
 
+def test_default_mutation_keeps_append_behavior() -> None:
+    mutation = MutationSpec(
+        id="verify-after",
+        hypothesis="Verification may improve task execution.",
+        instruction="Run the targeted test after editing.",
+    )
+
+    content = BenchmarkGuidedSkillSearch._mutate(b"# Skill\n", (mutation,)).decode()
+
+    assert mutation.operation == "append"
+    assert "## Candidate guidance" in content
+    assert "- Run the targeted test after editing." in content
+
+
+def test_structured_mutation_replaces_named_section() -> None:
+    mutation = MutationSpec(
+        id="replace-workflow",
+        hypothesis="A complete workflow may improve task execution.",
+        instruction="Inspect, edit, run the targeted test, and verify the result.",
+        operation="replace_section",
+        target_section="Workflow",
+    )
+    base = (
+        b"# Skill\n\n## Workflow\n\nOld workflow.\n\n"
+        b"### Detail\n\nOld detail.\n\n## Limits\n\nKeep this.\n"
+    )
+
+    content = BenchmarkGuidedSkillSearch._mutate(base, (mutation,)).decode()
+
+    assert "Old workflow." not in content
+    assert "Old detail." not in content
+    assert "## Limits\n\nKeep this." in content
+    assert "<!-- mutation:replace-workflow;" in content
+    assert "Inspect, edit, run the targeted test, and verify the result." in content
+
+
+@pytest.mark.parametrize(
+    "base, match_count",
+    [
+        (b"# Skill\n\n## Other\n", 0),
+        (b"# Skill\n\n## Workflow\n\nOne.\n\n## Workflow\n\nTwo.\n", 2),
+    ],
+)
+def test_structured_mutation_rejects_missing_or_duplicate_section(
+    base: bytes, match_count: int
+) -> None:
+    mutation = MutationSpec(
+        id="replace-workflow",
+        hypothesis="A complete workflow may improve task execution.",
+        instruction="Inspect, edit, run the targeted test, and verify the result.",
+        operation="replace_section",
+        target_section="Workflow",
+    )
+
+    with pytest.raises(SkillSearchError, match=rf"matched {match_count} sections"):
+        BenchmarkGuidedSkillSearch._mutate(base, (mutation,))
+
+
 def test_quality_gate_materializes_candidates_and_records_rejections(tmp_path: Path) -> None:
     gate = CandidateQualityGate(tmp_path)
     base = (

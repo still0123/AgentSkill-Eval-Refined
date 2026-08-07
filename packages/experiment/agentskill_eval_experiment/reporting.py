@@ -134,6 +134,12 @@ class StaticReportWriter:
         evidence_rows = self._evidence_rows(experiment.id, names)
         scope_banner = self._scope_banner(experiment)
         trace_section = self._trace_section(trace_data)
+        protocol = experiment.protocol_snapshot
+        evidence_class = protocol.get(
+            "evidence_class", protocol.get("evidence_mode", "unavailable")
+        )
+        evaluation_split = protocol.get("evaluation_split", "unavailable")
+        invalid_runs = sum(item.invalid_runs for item in result.variants)
         return f"""<!doctype html>
 <html lang="en">
 <head>
@@ -162,6 +168,16 @@ th {{ font-size: .86rem; }} code {{ overflow-wrap: anywhere; }}
 <h1>{self._escape(experiment.name)}</h1>
 <p><code>{self._escape(str(experiment.id))}</code></p></header>
 {scope_banner}
+<section><h2>Evidence identity</h2><div class="grid">
+<div class="card"><div>Evidence class</div>
+<div class="value">{self._escape(str(evidence_class))}</div></div>
+<div class="card"><div>Primary estimand</div>
+<div class="value">assignment_based_conservative</div></div>
+<div class="card"><div>Evaluation split</div>
+<div class="value">{self._escape(str(evaluation_split))}</div></div>
+<div class="card"><div>Invalid cases / runs</div>
+<div class="value">{result.invalid_case_count} / {invalid_runs}</div></div>
+</div></section>
 <section><h2>Primary assignment-based estimate</h2>
 <p class="muted">Invalid terminal runs count as failures. Groups receive equal weight.</p>
 <div class="grid">
@@ -187,6 +203,7 @@ th {{ font-size: .86rem; }} code {{ overflow-wrap: anywhere; }}
 <div class="card"><div>Tie+</div><div class="value">{result.wtl.tie_positive}</div></div>
 <div class="card"><div>Tie−</div><div class="value">{result.wtl.tie_negative}</div></div>
 <div class="card"><div>Loss</div><div class="value">{result.wtl.loss}</div></div>
+<div class="card"><div>Invalid</div><div class="value">{result.wtl.invalid}</div></div>
 </div></section>
 <section><h2>Run validity</h2><table><thead><tr>
 <th>Variant</th><th>Assigned</th><th>Pass</th><th>Fail</th><th>Invalid</th>

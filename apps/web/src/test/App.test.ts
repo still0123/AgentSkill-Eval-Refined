@@ -1,9 +1,13 @@
 import { fireEvent, render, screen } from '@testing-library/vue'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import App from '../App.vue'
 import MetricCard from '../components/MetricCard.vue'
+
+vi.mock('../components/ResearchChart.vue', () => ({
+  default: { template: '<div data-testid="research-chart" />' },
+}))
 
 describe('dashboard page', () => {
   it('renders navigation, privacy boundary, empty state and import controls', async () => {
@@ -28,6 +32,29 @@ describe('dashboard page', () => {
     ]) {
       expect(screen.getByRole('button', { name: new RegExp(label) })).toBeTruthy()
     }
+  })
+
+  it('labels v0.4 evidence semantics explicitly', async () => {
+    const { container } = render(App)
+    const content = readFileSync(
+      resolve(process.cwd(), 'public', 'fixtures', 'paired-experiment.json'),
+      'utf8',
+    )
+    const file = new File([content], 'paired-experiment.json', { type: 'application/json' })
+    Object.defineProperty(file, 'text', { value: async () => content })
+    const input = container.querySelector('input[type="file"]') as HTMLInputElement
+    Object.defineProperty(input, 'files', { value: [file], configurable: true })
+
+    await fireEvent.update(input)
+
+    expect(await screen.findByText('EVIDENCE CLASS')).toBeTruthy()
+    expect(screen.getByText('SIMULATED_DEMO')).toBeTruthy()
+    expect(screen.getByText('Primary estimand')).toBeTruthy()
+    expect(screen.getByText('assignment_based_conservative')).toBeTruthy()
+    expect(screen.getByText('Evaluation split')).toBeTruthy()
+    expect(screen.getByText('demo')).toBeTruthy()
+    expect(screen.getByText('Invalid cases / runs')).toBeTruthy()
+    expect(screen.getByText('1 / 1')).toBeTruthy()
   })
 
   it('renders the complete evolution timeline, winner, artifact and escaped patch', async () => {

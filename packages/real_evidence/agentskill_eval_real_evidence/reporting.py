@@ -85,6 +85,7 @@ class RealEvidenceReportWriter:
             dataset_version_id=preflight.dataset_version_id,
             dataset_name=preflight.dataset_name,
             dataset_version=preflight.dataset_version,
+            evaluation_split=preflight.evaluation_split,
             dataset_sha256=preflight.dataset_sha256,
             runner_snapshot=baseline.runner_snapshot,
             agent_snapshot=baseline.agent_snapshot,
@@ -205,6 +206,7 @@ table{{border-collapse:collapse;width:100%}}th,td{{border:1px solid #aaa;padding
 <dt>real run confirmed</dt><dd>{str(report.real_run_confirmed).lower()}</dd>
 <dt>dataset</dt><dd>{esc(report.dataset_name)}@{esc(report.dataset_version)} ·
 <code>{esc(report.dataset_sha256)}</code></dd>
+<dt>evaluation split</dt><dd>{esc(report.evaluation_split or "unavailable")}</dd>
 <dt>runner</dt><dd>{esc(report.runner_snapshot.name)} {esc(report.runner_snapshot.version)} ·
 <code>{esc(report.runner_snapshot.binary_sha256)}</code></dd>
 <dt>agent</dt><dd>{esc(report.agent_snapshot.engine)} {esc(report.agent_snapshot.engine_version)} ·

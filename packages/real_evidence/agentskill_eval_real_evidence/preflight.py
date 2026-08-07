@@ -46,6 +46,7 @@ class RealEvidencePreflight:
             dataset_version_id=dataset_identity,
             dataset_name=dataset.manifest.name,
             dataset_version=dataset.manifest.version,
+            evaluation_split=version.split,
             dataset_sha256=dataset.dataset_sha256,
             case_ids=spec.case_ids,
             skill_sha256=skill_sha,

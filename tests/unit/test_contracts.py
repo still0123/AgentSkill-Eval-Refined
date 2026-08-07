@@ -388,6 +388,7 @@ def test_v04_real_report_binds_preflight_lineage() -> None:
         dataset_version_id=dataset_version_id,
         dataset_name="dataset",
         dataset_version="1.0.0",
+        evaluation_split="validation_confirm",
         dataset_sha256=DIGEST_B,
         case_ids=("case-one",),
         skill_sha256="c" * 64,
@@ -445,6 +446,7 @@ def test_v04_real_report_binds_preflight_lineage() -> None:
         "dataset_version_id": dataset_version_id,
         "dataset_name": "dataset",
         "dataset_version": "1.0.0",
+        "evaluation_split": "validation_confirm",
         "dataset_sha256": DIGEST_B,
         "runner_snapshot": RunnerSnapshot(
             name="skill-up",
@@ -505,4 +507,8 @@ def test_v04_real_report_binds_preflight_lineage() -> None:
     with pytest.raises(ValidationError, match="dataset identity"):
         RealExperimentReport.model_validate(
             {**payload, "dataset_sha256": "9" * 64}
+        )
+    with pytest.raises(ValidationError, match="dataset identity"):
+        RealExperimentReport.model_validate(
+            {**payload, "evaluation_split": "locked_test"}
         )

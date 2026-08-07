@@ -50,6 +50,27 @@ const traceIntel = computed<any>(
   () => experiment.value?.data.trace_intelligence ?? { traces: [], diagnoses: [], pair_diffs: [] },
 )
 const isDemo = computed(() => state.value.reports.some((r) => r.synthetic || r.simulated))
+const evidenceClass = computed(
+  () =>
+    exp.value.protocol_snapshot?.evidence_class ??
+    exp.value.protocol_snapshot?.evidence_mode ??
+    null,
+)
+const evaluationSplit = computed(() => exp.value.protocol_snapshot?.evaluation_split ?? null)
+const primaryEstimand = computed(
+  () =>
+    stats.value.primary_estimand ??
+    (stats.value.primary_assignment_based ? 'assignment_based_conservative' : null),
+)
+const invalidCases = computed(
+  () => stats.value.invalid_case_count ?? stats.value.wtl?.invalid ?? null,
+)
+const invalidRuns = computed(() => {
+  const rows = stats.value.variants
+  return Array.isArray(rows)
+    ? rows.reduce((total: number, item: any) => total + (item.invalid_runs ?? 0), 0)
+    : null
+})
 const evolutionTimeline = computed(() =>
   buildEvolutionTimeline(state.value.reports, releaseManifestHash.value),
 )
@@ -420,9 +441,9 @@ function clearData() {
               ><strong>{{ exp.dataset_name ?? exp.dataset_version_id ?? 'N/A' }}</strong>
             </div>
             <div>
-              <span>MODE</span
+              <span>EVIDENCE CLASS</span
               ><Badge :tone="experiment.simulated ? 'warn' : 'info'">{{
-                experiment.simulated ? 'SIMULATED' : 'REAL / OBSERVED'
+                available(evidenceClass)
               }}</Badge>
             </div>
           </div>
@@ -447,7 +468,7 @@ function clearData() {
             <MetricCard
               label="VALID / INVALID BLOCKS"
               :value="`${pct(stats.valid_block_ratio)} / ${pct(stats.valid_block_ratio == null ? null : 1 - stats.valid_block_ratio)}`"
-              :detail="`${stats.run_count ?? 0} terminal runs`"
+              :detail="`${available(invalidCases)} invalid cases / ${available(invalidRuns)} invalid runs`"
             />
           </div>
           <div class="two-column">
@@ -471,6 +492,18 @@ function clearData() {
                 </div>
               </header>
               <dl class="data-list">
+                <div>
+                  <dt>Primary estimand</dt>
+                  <dd>{{ available(primaryEstimand) }}</dd>
+                </div>
+                <div>
+                  <dt>Evaluation split</dt>
+                  <dd>{{ available(evaluationSplit) }}</dd>
+                </div>
+                <div>
+                  <dt>Invalid cases / runs</dt>
+                  <dd>{{ available(invalidCases) }} / {{ available(invalidRuns) }}</dd>
+                </div>
                 <div>
                   <dt>Independence groups</dt>
                   <dd>{{ stats.independence_group_count ?? 'N/A' }}</dd>
@@ -534,6 +567,9 @@ function clearData() {
             </div>
             <div>
               <span>LOSS</span><strong class="negative">{{ stats.wtl?.loss ?? 0 }}</strong>
+            </div>
+            <div>
+              <span>INVALID</span><strong>{{ available(invalidCases) }}</strong>
             </div>
             <div>
               <span>VISIBLE</span><strong>{{ filteredCases.length }} / {{ cases.length }}</strong>
