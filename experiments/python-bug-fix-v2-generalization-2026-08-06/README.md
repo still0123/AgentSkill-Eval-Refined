@@ -2,7 +2,7 @@
 
 ## Status
 
-`READY_FOR_RESTARTED_RUNTIME_SMOKE`
+`READY_FOR_RESTARTED_EVALUATION`
 
 A previous partial matrix attempt was interrupted and its `/private/tmp` artifacts were removed by
 external cleanup. No partial outcome is counted or claimed. The restarted attempt has not run any
@@ -58,9 +58,10 @@ Execution uses the local zero-metered-cost
 weights, tokenizer, server wrapper, process Agent, and `skill-up` binary are hash-bound in
 [`protocol.yaml`](protocol.yaml).
 
-A synthetic tool-use smoke passed. The earlier full Runner smoke artifact was lost with the partial
-matrix and must be rerun on excluded Case `cachetools-cachedmethod-autospec` before the restarted
-evaluation. Neither smoke contributes efficacy evidence.
+A synthetic tool-use smoke passed. The restarted full Runner smoke completed two terminal Runs
+with zero invalid observations on excluded Case `cachetools-cachedmethod-autospec`; both arms
+failed (`TIE_NEGATIVE`). Exact hashes are frozen in the protocol. Neither smoke contributes
+efficacy evidence.
 
 The committed [`run_matrix.py`](run_matrix.py) driver executes the six DatasetVersions in frozen
 order. Its SHA-256 is part of the protocol.

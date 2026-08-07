@@ -1,5 +1,5 @@
 schema_version: ase/python-bug-fix-v2-generalization/v1alpha2
-status: READY_FOR_RESTARTED_RUNTIME_SMOKE
+status: READY_FOR_RESTARTED_EVALUATION
 registered_before_agent_runs: true
 base_commit: f27228f87e3ac36cfba15674872b3e938cb380d1
 restart:
@@ -57,7 +57,11 @@ runtime_validation:
   synthetic_tool_smoke: passed
   excluded_case_smoke: cachetools-cachedmethod-autospec
   previous_excluded_case_smoke_status: ARTIFACT_LOST
-  restart_excluded_case_smoke_status: pending
+  restart_excluded_case_smoke_status: passed_execution_chain
+  restart_excluded_case_smoke_experiment_id: 9e0644c2-98da-5a2a-ae7f-3de2939aa3fe
+  restart_excluded_case_smoke_report_sha256: 1b8386f1a582a8629e507699531bdf2f552b0d5ab07fee3f989abf4e7bdcad58
+  restart_excluded_case_smoke_bundle_sha256: 50ccd08e0b9c3d66569b6d70cb231b19de722c5b84679b747ea379d202ad7006
+  restart_excluded_case_smoke_outcome: TIE_NEGATIVE
   excluded_case_smoke_included_in_efficacy_evidence: false
 excluded_prior_exposure:
   - more-itertools-islice-release
