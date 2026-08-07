@@ -2,11 +2,11 @@
 
 ## Status
 
-`READY_FOR_RESTARTED_EVALUATION`
+`COMPLETED_NOT_CONFIRMED`
 
 A previous partial matrix attempt was interrupted and its `/private/tmp` artifacts were removed by
-external cleanup. No partial outcome is counted or claimed. The restarted attempt has not run any
-evaluation Case.
+external cleanup. No partial outcome is counted or claimed. No evaluation Case from that lost
+attempt is included in the final result.
 
 ## Question
 
@@ -66,8 +66,26 @@ efficacy evidence.
 The committed [`run_matrix.py`](run_matrix.py) driver executes the six DatasetVersions in frozen
 order. Its SHA-256 is part of the protocol.
 
+## Result
+
+The restarted matrix completed all 114 planned Runs:
+
+- 19 Cases across 6 repositories, with 3 repeats per arm;
+- 114 task `FAIL`, 0 infrastructure `INVALID`;
+- `0 WIN / 0 TIE_POSITIVE / 19 TIE_NEGATIVE / 0 LOSS`;
+- v1 pass rate `0.0`, v2 pass rate `0.0`, absolute gain `0.0`;
+- global token overhead `-27.16%`, observed metered cost `0`;
+- Funcy new-repository gate: `0 WIN / 4 TIE_NEGATIVE / 0 LOSS`.
+
+Decision: `NOT_CONFIRMED`. No task regression was observed, but v2 produced no positive outcome
+and failed both preregistered positive-evidence gates. This is a floor-effect result under the
+pinned local Qwen2.5-Coder Runtime, not proof that v2 is universally ineffective.
+
+Machine-readable negative evidence:
+[`result.sanitized.json`](result.sanitized.json).
+
 ## Decision boundary
 
-Passing supports only expanded descriptive evidence. It does not prove universal effectiveness:
-the histories are public, Cases within a repository are correlated, and only Funcy is a completely
-new repository relative to the original release.
+The result does not confirm general effectiveness. Histories are public, Cases within a repository
+are correlated, and Runtime capability is a major boundary. The six full reports and replay
+bundles passed offline verification; only sanitized hashes and metrics are committed.

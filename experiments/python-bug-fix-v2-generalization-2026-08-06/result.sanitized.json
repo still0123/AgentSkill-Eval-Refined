@@ -1,0 +1,174 @@
+{
+  "schema_version": "ase/python-bug-fix-v2-generalization-result/v1alpha1",
+  "status": "COMPLETED",
+  "decision": "NOT_CONFIRMED",
+  "decision_reason": "No evaluation Case produced a decisive win; the new-repository win gate also failed.",
+  "evidence_class": "observed_agent",
+  "simulated": false,
+  "protocol_revision": "ase/python-bug-fix-v2-generalization/v1alpha2",
+  "previous_partial_attempt": {
+    "status": "ABORTED_INFRASTRUCTURE_ARTIFACT_LOSS",
+    "artifacts_available": false,
+    "included_in_result": false
+  },
+  "runtime": {
+    "provider": "local_mlx",
+    "model": "mlx-community/Qwen2.5-Coder-7B-Instruct-4bit",
+    "model_revision": "019cc73c45c770444708a6dd8690c66243cc5c80",
+    "model_weights_sha256": "56a3d94706833f753e6c6b47ea57af8ef638cd8cc1d74eca1142ba640b26060e",
+    "skill_up_sha256": "b8473aad3fe997f3aa8de1e9bd9bc127e5254b25371567a0e07143afc809c359",
+    "process_agent_sha256": "bb071419527de0c051bb1a3680a296cd7dc8575a12522f3b01d1d451ca13d4ea",
+    "observed_metered_cost_microusd": 0
+  },
+  "skills": {
+    "v1_sha256": "5ff780e023c00cd08232688ec013a47f51926b4e1c8a5171465085ee967bc5d6",
+    "v2_sha256": "f14cd4a975b8a1820971e824b5f82ab9b79dee071a13acb673e6b2019720e13c"
+  },
+  "sample": {
+    "repositories": 6,
+    "cases": 19,
+    "repeats_per_arm": 3,
+    "planned_runs": 114,
+    "completed_runs": 114,
+    "invalid_runs": 0,
+    "valid_block_ratio": 1.0
+  },
+  "outcome": {
+    "baseline_pass_rate": 0.0,
+    "treatment_pass_rate": 0.0,
+    "absolute_gain": 0.0,
+    "win": 0,
+    "tie_positive": 0,
+    "tie_negative": 19,
+    "loss": 0,
+    "invalid": 0,
+    "decisive_cases": 0,
+    "sign_test": "not_applicable_no_decisive_cases"
+  },
+  "efficiency": {
+    "baseline_tokens": 1055178,
+    "treatment_tokens": 768626,
+    "token_overhead_ratio": -0.2715674511788532,
+    "baseline_latency_ms": 4813160,
+    "treatment_latency_ms": 4155078,
+    "latency_overhead_ratio": -0.1367255607542654
+  },
+  "gates": {
+    "invalid_pairs": {
+      "limit": 0,
+      "observed": 0,
+      "passed": true
+    },
+    "max_loss_cases": {
+      "limit": 0,
+      "observed": 0,
+      "passed": true
+    },
+    "max_token_overhead_ratio": {
+      "limit": 0.25,
+      "observed": -0.2715674511788532,
+      "passed": true
+    },
+    "minimum_decisive_wins_for_case_sign_test": {
+      "limit": 5,
+      "observed": 0,
+      "passed": false
+    },
+    "new_repository_funcy_min_wins": {
+      "limit": 1,
+      "observed": 0,
+      "passed": false
+    },
+    "new_repository_funcy_max_losses": {
+      "limit": 0,
+      "observed": 0,
+      "passed": true
+    }
+  },
+  "repositories": [
+    {
+      "name": "more-itertools",
+      "cases": 3,
+      "runs": 18,
+      "win": 0,
+      "tie_negative": 3,
+      "loss": 0,
+      "invalid": 0,
+      "token_overhead_ratio": 0.003168143646310293,
+      "experiment_id": "0a59f460-a431-525e-a6b6-67df1d956273",
+      "report_sha256": "2999f0cb3290204bdcfbffc79b8acbd4f34de7ab0a838afbbc39a65f2105fd37",
+      "bundle_sha256": "790a673fc0f144019e3306beca678936488cac736792b8795a7cccfb4ab8a0ca"
+    },
+    {
+      "name": "cachetools",
+      "cases": 3,
+      "runs": 18,
+      "win": 0,
+      "tie_negative": 3,
+      "loss": 0,
+      "invalid": 0,
+      "token_overhead_ratio": -0.8798460241001258,
+      "experiment_id": "507974ac-4886-520c-8eb6-4e30664d3985",
+      "report_sha256": "092a9e1fba0934c2ed368456a8d9ef077e01e48809410ea4c50455db910fe71c",
+      "bundle_sha256": "6050dcdccf1e2b83e6da1f8740cb0860996fa8aff3bed61b2dd7cefec48e2d65"
+    },
+    {
+      "name": "boltons",
+      "cases": 3,
+      "runs": 18,
+      "win": 0,
+      "tie_negative": 3,
+      "loss": 0,
+      "invalid": 0,
+      "token_overhead_ratio": -0.9425071406323519,
+      "experiment_id": "a606db86-f55f-52d1-a6b1-d8075614c532",
+      "report_sha256": "b034d98167802146217af7afa2ced532b964fabc7b222f94856679e2a2e859c3",
+      "bundle_sha256": "d98206201623ee01b1e191137e6f289354af5aa77b664c8743ae3bc39fc822df"
+    },
+    {
+      "name": "humanize",
+      "cases": 3,
+      "runs": 18,
+      "win": 0,
+      "tie_negative": 3,
+      "loss": 0,
+      "invalid": 0,
+      "token_overhead_ratio": 5.62551428732458,
+      "experiment_id": "202984d7-dfef-5f36-ac28-1d90862aefc6",
+      "report_sha256": "497be1e2c04a4064b37136278b0105b0726f4614a39e7d939d2574d0285f2b29",
+      "bundle_sha256": "079fa630b14353dbac9dc7090b64240ca307ff268271740fdaa0d43be6df9685"
+    },
+    {
+      "name": "pydash",
+      "cases": 3,
+      "runs": 18,
+      "win": 0,
+      "tie_negative": 3,
+      "loss": 0,
+      "invalid": 0,
+      "token_overhead_ratio": -0.08187997947216556,
+      "experiment_id": "7f87c41e-9d7a-5448-bfde-3666c88cf8d5",
+      "report_sha256": "2ce44913ab7854317727d4a2a5bb89e22f94b1767e7ceb126b526f09df616aad",
+      "bundle_sha256": "7124e73b7915a0d6a192ad3e6334e882374def93220c8b96af7ae04f8c84abfb"
+    },
+    {
+      "name": "funcy",
+      "cases": 4,
+      "runs": 24,
+      "win": 0,
+      "tie_negative": 4,
+      "loss": 0,
+      "invalid": 0,
+      "token_overhead_ratio": -0.20588001082992247,
+      "experiment_id": "923eeff0-d01b-548a-ba24-ba30ebd2e9bb",
+      "report_sha256": "02353e5c2993f1b2a04cc490392a5e28177b6697bd4e1573414434d3edef9260",
+      "bundle_sha256": "d98bcb9647a2b19c4d69f947b0d58ba186f82d032b14e1ac6da8a33e5a0ae8c2"
+    }
+  ],
+  "evidence": {
+    "local_summary_sha256": "a30eca2485a61c2b19e5b4e6ce7b24f38b60f3b0ff331cee68df5b8508ff602d",
+    "local_evidence_root": "<LOCAL_EVIDENCE_ROOT>",
+    "offline_verification": "passed_for_all_six_reports_and_replay_bundles"
+  },
+  "claim_limit": "The result does not confirm v2 general effectiveness. It shows only that both frozen Skills achieved 0/19 Case passes under the pinned local Qwen2.5-Coder runtime. Public-history contamination remains high, and no population-level claim is supported."
+}

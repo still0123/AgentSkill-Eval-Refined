@@ -1,5 +1,5 @@
 schema_version: ase/python-bug-fix-v2-generalization/v1alpha2
-status: READY_FOR_RESTARTED_EVALUATION
+status: COMPLETED_NOT_CONFIRMED
 registered_before_agent_runs: true
 base_commit: f27228f87e3ac36cfba15674872b3e938cb380d1
 restart:
@@ -118,10 +118,26 @@ decisions:
   NOT_CONFIRMED: valid execution completes but any positive-evidence gate fails
   REGRESSION: any loss or token-overhead gate fails
   INVALID: any pair is invalid or protocol identity changes
+result:
+  decision: NOT_CONFIRMED
+  completed_runs: 114
+  invalid_runs: 0
+  win: 0
+  tie_positive: 0
+  tie_negative: 19
+  loss: 0
+  baseline_pass_rate: 0.0
+  treatment_pass_rate: 0.0
+  absolute_gain: 0.0
+  global_token_overhead_ratio: -0.2715674511788532
+  funcy_wins: 0
+  local_summary_sha256: a30eca2485a61c2b19e5b4e6ce7b24f38b60f3b0ff331cee68df5b8508ff602d
+  sanitized_result_sha256: 0381e324ac40c581a66e41b3ae269c1cb74b8f9392243b2e33e985368ac8b37f
 claim_limit: >-
-  At most expanded descriptive support across 23 observed public cases and six repositories,
-  including the original four-case release evidence. Public Git-history contamination remains
-  high. Passing cannot prove population-level or universal effectiveness.
+  This result does not confirm v2 general effectiveness. It shows only that both frozen Skills
+  achieved zero passes across 19 new public Git-history Cases under the pinned local Runtime.
+  The earlier four-Case positive release remains separate evidence. Public-history contamination
+  remains high, and no population-level or universal effectiveness claim is supported.
 zero_cost_policy:
   paid_api_calls_allowed: false
   github_hosted_runners_allowed: false
