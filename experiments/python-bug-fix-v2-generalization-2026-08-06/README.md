@@ -2,9 +2,11 @@
 
 ## Status
 
-`READY_FOR_EVALUATION`
+`READY_FOR_RESTARTED_RUNTIME_SMOKE`
 
-No evaluation Case run has started. No result is claimed.
+A previous partial matrix attempt was interrupted and its `/private/tmp` artifacts were removed by
+external cleanup. No partial outcome is counted or claimed. The restarted attempt has not run any
+evaluation Case.
 
 ## Question
 
@@ -34,12 +36,17 @@ before-fail, after-pass, mutation-fail, and distinct-alternative-pass checks. It
 aa0b0ad1a38c8f6580cc0c962140565b5f4cba0db17441999df7e1e9cdf5b7ab
 ```
 
-The new four-Case Funcy DatasetVersion passed the same offline checks:
+The new four-Case Funcy DatasetVersion passed the same offline checks under its required Python 3.9
+oracle runtime:
 
 ```text
-release SHA-256: 24ef413eb1d9e52d2a8896879bb5ad7902a4e3d3745b4f6a75cbedb41fb46509
 DatasetVersion: cdb9f85b-d3a1-577f-b33d-8df2f5bafbbf
+Dataset content SHA-256: 2590b7716a63ec93d8bdea6b4e6538bc48f8083e33646c39bcd14b196203c085
 ```
+
+The previous Funcy release wrapper hash could not be reproduced after artifact loss. Protocol
+revision `v1alpha2` therefore records both that negative provenance result and the newly rebuilt
+release, instead of silently reusing the old hash.
 
 Generated DatasetVersion directories remain local because they contain reconstructed public
 repository fixtures. Public evidence will contain hashes, metrics, and sanitized provenance only.
@@ -51,11 +58,9 @@ Execution uses the local zero-metered-cost
 weights, tokenizer, server wrapper, process Agent, and `skill-up` binary are hash-bound in
 [`protocol.yaml`](protocol.yaml).
 
-A synthetic tool-use smoke passed. The full Runner smoke then completed two terminal Runs with
-zero invalid observations and zero metered cost on excluded Case
-`cachetools-cachedmethod-autospec`. Both arms failed the task (`TIE_NEGATIVE`), so this smoke
-validates only the execution chain and contributes no efficacy evidence. Exact report and bundle
-hashes are frozen in the protocol.
+A synthetic tool-use smoke passed. The earlier full Runner smoke artifact was lost with the partial
+matrix and must be rerun on excluded Case `cachetools-cachedmethod-autospec` before the restarted
+evaluation. Neither smoke contributes efficacy evidence.
 
 The committed [`run_matrix.py`](run_matrix.py) driver executes the six DatasetVersions in frozen
 order. Its SHA-256 is part of the protocol.

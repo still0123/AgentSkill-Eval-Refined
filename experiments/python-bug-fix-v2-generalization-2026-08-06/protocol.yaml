@@ -1,7 +1,14 @@
-schema_version: ase/python-bug-fix-v2-generalization/v1alpha1
-status: READY_FOR_EVALUATION
+schema_version: ase/python-bug-fix-v2-generalization/v1alpha2
+status: READY_FOR_RESTARTED_RUNTIME_SMOKE
 registered_before_agent_runs: true
 base_commit: f27228f87e3ac36cfba15674872b3e938cb380d1
+restart:
+  previous_protocol_commit: 4a64ccb9e2a6e4f7849a7e7b8e5e28cf9f685f77
+  previous_attempt_status: ABORTED_INFRASTRUCTURE_ARTIFACT_LOSS
+  previous_partial_artifacts_available: false
+  previous_partial_results_counted: false
+  restart_registered_before_agent_runs: true
+  reason: external_cleanup_removed_private_tmp_after_user_interruption
 skills:
   v1:
     path: examples/skills/python-bug-fix-v1
@@ -12,8 +19,18 @@ skills:
 dataset_release:
   original_release_sha256: aa0b0ad1a38c8f6580cc0c962140565b5f4cba0db17441999df7e1e9cdf5b7ab
   original_case_count: 20
-  funcy_release_sha256: 24ef413eb1d9e52d2a8896879bb5ad7902a4e3d3745b4f6a75cbedb41fb46509
+  previous_funcy_release_sha256_unreproducible: 24ef413eb1d9e52d2a8896879bb5ad7902a4e3d3745b4f6a75cbedb41fb46509
+  funcy_rebuilt_release_content_sha256: a6f9c111f427310c9df5e21639c1a8241d4bcc8db4a0647b417a20a6c329e044
+  funcy_rebuilt_manifest_sha256: 784b1b0c97091b0a337b731c2daf818fd311fce50d0e1ecc7c8f4e54d6f35b96
   funcy_dataset_version_id: cdb9f85b-d3a1-577f-b33d-8df2f5bafbbf
+  funcy_dataset_content_sha256: 2590b7716a63ec93d8bdea6b4e6538bc48f8083e33646c39bcd14b196203c085
+  dataset_loader_sha256:
+    more_itertools: ed124b99b231ebb397687a48d407b7f084d7bd7b2c75bc840ce883f162394d36
+    cachetools: 6fcf9e8ebaf4c5851ad09a82e7586830895629fa16c965f90bc62abe6a2c4be1
+    boltons: f4fd9f11a0a9864e07229a39b64a4f657d7cd82dde5f5dc6fc74c27fa13302a3
+    humanize: e417fed44c40964555e956b49a0c13d8164af75245d5636edac14c94c0eacbb7
+    pydash: 2fca16d49dc3e282ef8c92730345b3c645455856c74d6a89c9d440a6aa4239d3
+    funcy: eefd39ddc1a5683b61bd2e0aab34a188c340ca6723c1e9ab6332cc20a0f4531b
 runtime:
   provider: local_mlx
   endpoint: http://127.0.0.1:18002/v1
@@ -39,11 +56,8 @@ runtime:
 runtime_validation:
   synthetic_tool_smoke: passed
   excluded_case_smoke: cachetools-cachedmethod-autospec
-  excluded_case_smoke_status: passed_execution_chain
-  excluded_case_smoke_experiment_id: 9e0644c2-98da-5a2a-ae7f-3de2939aa3fe
-  excluded_case_smoke_report_sha256: 85a36d5b0d825174d9e4f389de73da6462f7179b80451f134208bf8868c3258c
-  excluded_case_smoke_bundle_sha256: e83afc796ef59581aaf93363b803a1a02a52293f590f46639f418336390a226d
-  excluded_case_smoke_outcome: TIE_NEGATIVE
+  previous_excluded_case_smoke_status: ARTIFACT_LOST
+  restart_excluded_case_smoke_status: pending
   excluded_case_smoke_included_in_efficacy_evidence: false
 excluded_prior_exposure:
   - more-itertools-islice-release
